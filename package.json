@@ -1,0 +1,23 @@
+{
+  "name": "c8y-message-calculator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Estimates Cumulocity messages per calendar month from a fleet description. Volume only - never prices.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/test/",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --serve",
+    "package": "node scripts/build.mjs && node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "esbuild": "^0.24.0",
+    "preact-render-to-string": "^6.7.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "preact": "^10.25.0"
+  }
+}

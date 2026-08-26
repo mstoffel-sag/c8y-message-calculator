@@ -1,0 +1,37 @@
+Cumulocity SaaS Pricing Overview (Feb 2026)1. Core Concepts
+Pricing Model: Usage-based, focused on customer data.
+Contracting Model (Commit-to-Consume): Customers commit to a total spend amount (not quantities). Usage is metered daily and draws down the commitment. No Bill of Materials.
+Auto-Renewal: If commitment depletes, a "top-up" commitment is applied. Contracts auto-renew (12-month term) if terms end without a new agreement.
+Rollover: Unused commitment at contract expiration is forfeited (no carry-forward).
+2. Pricing Components (Redacted)
+Deployments (Base Monthly Fee):
+Shared Cloud: [PRICE]/month.
+Dedicated Cloud (Prod): [PRICE]/month.
+Dedicated Cloud (Non-Prod): [PRICE]/month.
+Core Metrics (Usage-Based):
+Messages: [PRICE] per 100k (all creation/update API requests).
+Operational Data Store (ODS): [PRICE] per GiB (daily max storage).
+Add-Ons:
+Enterprise Functions: [PRICE]/deployment (custom branding, domains, user hierarchy).
+Multi-Tenancy: [PRICE]/tenant.
+Data Broker: [PRICE]/tenant.
+Microservice Hosting: [PRICE]/CCU (1 CPU + 4 GiB RAM).
+Streaming Analytics: [PRICE]/tenant.
+DataHub (Standard): [PERCENTAGE] uplift on messages + [PRICE]/GiB queried.
+DataHub (Dedicated): [PRICE]/16 GiB Memory unit.
+VPN Services: [PRICE] (AWS) or [PRICE] (Azure).
+Platform Scale Up: [PRICE]/deployment.
+3. Discounting & Negotiation
+Messages: Fully customizable based on volume/margin/value.
+Product Catalog Discount: Flat % discount on all items (except messages).
+Expected ≤ [PERCENTAGE]; single digits are typical.
+Requires executive approval (CEO, CPO, CRO) for individual line item discounts.
+4. Operational Process
+Tooling: Use the "Sales Configurator" Google Sheet for estimates, currency conversion, and margin calculations.
+Process Steps:
+Engage customer for requirements.
+Create estimate in Sales Configurator.
+Upload data to HubSpot.
+Export "Product Catalog" to PDF.
+Draft "CTC Cloud Agreement" in SpotDraft and attach the PDF.
+Send for signature.

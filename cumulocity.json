@@ -1,0 +1,11 @@
+{
+  "name": "Message Calculator",
+  "description": "Estimates Cumulocity messages per calendar month from a fleet description. Volume only, never prices.",
+  "key": "c8y-message-calculator-key",
+  "contextPath": "message-calculator",
+  "type": "HOSTED",
+  "resourcesUrl": "/",
+  "availability": "PRIVATE",
+  "noAppSwitcher": false,
+  "version": "0.1.0"
+}

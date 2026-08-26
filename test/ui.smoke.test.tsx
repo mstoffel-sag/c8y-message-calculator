@@ -1,0 +1,522 @@
+/**
+ * Renders every wizard step once. A typecheck will not catch a component that
+ * throws on first paint, and this is meant to be run, not admired.
+ */
+
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { render } from 'preact-render-to-string';
+
+import { computeScenario } from '../lib/engine/index.js';
+import { blankScenario, conceptSection9Scenario, presetByKey } from '../lib/presets/index.js';
+import { STEPS } from '../src/ui/wizard/steps.js';
+import { StepFleet } from '../src/ui/wizard/StepFleet.js';
+import { StepTimeSeries } from '../src/ui/wizard/StepTimeSeries.js';
+import { StepDiscrete } from '../src/ui/wizard/StepDiscrete.js';
+import { StepCommands } from '../src/ui/wizard/StepCommands.js';
+import { StepCommercial } from '../src/ui/wizard/StepCommercial.js';
+import { StepRollout } from '../src/ui/wizard/StepRollout.js';
+import { StepResults } from '../src/ui/wizard/StepResults.js';
+import { CANVAS_HEIGHT, Explainer, LAYOUT, boxFor, rowCentre } from '../src/ui/Explainer.js';
+
+const noop = () => {};
+
+describe('the wizard renders', () => {
+  const scenario = conceptSection9Scenario();
+  const result = computeScenario(scenario);
+  const props = { scenario, onChange: noop };
+
+  test('the step list is the order a customer can answer in', () => {
+    assert.deepEqual(
+      STEPS.map((s) => s.key),
+      ['fleet', 'series', 'discrete', 'commands', 'commercial', 'rollout', 'results'],
+    );
+  });
+
+  test('1 machines', () => {
+    const html = render(<StepFleet {...props} />);
+    assert.match(html, /Rooftop HVAC unit/);
+    assert.match(html, /machine type/i);
+  });
+
+  test('2 measurements teaches bundling and shows the proposal', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    assert.match(html, /one timestamp/i);
+    assert.match(html, /acme_Climate/);
+    assert.match(html, /When it changes/, 'both rhythms live in the one table');
+    assert.match(html, /Readings per measurement/, 'the interactive explainer is on this step');
+  });
+
+  test('2 asks the rhythm, and asks it once per series', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    // One table, six rows: the four timed readings and the two flags, which are
+    // measurements with one series each and not a different kind of thing.
+    const rows = html.match(/<tr><td>/g) ?? [];
+    assert.equal(rows.length, 6, `${rows.length} rows`);
+    assert.equal((html.match(/On a timer/g) ?? []).length, 6, 'every row is asked');
+    assert.doesNotMatch(html, /States and flags/, 'and none of them has a section of its own');
+    // The flags still travel alone -- the row says so instead of offering a
+    // measurement type to join -- but the type they send in is still named, and
+    // the name is still theirs to change.
+    assert.match(html, /nothing can share an on-change timestamp/);
+    assert.match(html, /placeholder="acme_CompressorOnOff"/);
+  });
+
+  test('2 makes every series column a dropdown', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    // Four timed readings and two flags: name, unit and rhythm for each, plus
+    // the measurement type and the period unit on the four timed ones.
+    const selects = html.match(/<select/g) ?? [];
+    assert.ok(selects.length >= 4 * 4 + 2 * 3, `only ${selects.length} dropdowns`);
+    // Options come from the catalogue, and every list stays escapable.
+    assert.match(html, /<optgroup label="Climate"/);
+    assert.match(html, /Other/, 'every catalogue can be escaped');
+    assert.match(html, /A measurement type of its own/);
+  });
+
+  test('2 names things the way the platform does', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    assert.match(html, /<th[^>]*>Series<\/th>/, 'a datapoint is a series');
+    assert.match(html, /<th[^>]*>Measurement type<\/th>/, 'and what it goes into has a name');
+    assert.doesNotMatch(html, /atapoint/, 'the word does not belong on this step');
+  });
+
+  test('2 mints the measurement type when "of its own" is chosen', async () => {
+    const { assignOwnBundle } = await import('../src/ui/store.js');
+    const hvac = props.scenario.machineTypes[0]!;
+    const pressure = hvac.metrics.find((m) => m.name === 'Pressure')!;
+    const split = assignOwnBundle(props.scenario, hvac.id, pressure.id);
+    const html = render(<StepTimeSeries scenario={split} onChange={noop} />);
+    // Named after the series, and editable in its row the moment it exists --
+    // it used to take an interval change before any type was created at all.
+    assert.match(html, /acme_Pressure · 1 series/);
+    assert.match(html, /<input type="text" value="acme_Pressure"/);
+    // The offer is gone from the row that took it, and still open to the three
+    // still sharing acme_Climate.
+    assert.equal((html.match(/A measurement type of its own/g) ?? []).length, 3);
+  });
+
+  test('2 lets the measurement type be renamed in the table', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    // The suggested name is a placeholder, not a value: an untouched scenario
+    // carries no fragment name that nobody chose.
+    assert.match(html, /<input type="text" value="acme_Climate"/, 'editable in the row');
+    assert.match(html, /placeholder="acme_RooftopHvacUnit60s"/, 'and the tool still suggests one');
+    // One box per measurement type, not one per row: the four HVAC series share
+    // acme_Climate, and four identical fields for one value would invite an edit
+    // in row three that silently rewrites row one.
+    assert.equal((html.match(/value="acme_Climate"/g) ?? []).length, 1);
+    assert.match(html, /in that same message/, 'the other rows say where they went');
+    // One field per row that shares the measurement type, not a second list of
+    // them further down the page.
+    assert.doesNotMatch(html, /<h4[^>]*>Measurement types</, 'the separate section is gone');
+  });
+
+  test('2 asks for the sampling interval as a value and a unit', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    assert.match(html, /class="duration"/);
+    // Every unit the customer might reach for, in reading order.
+    for (const unit of ['ms', 's', 'min', 'h', 'day', 'week']) {
+      assert.match(html, new RegExp(`<option[^>]*value="${unit}"`), `no ${unit} option`);
+    }
+    // The HVAC preset samples at 60 s, which reads back as 1 min -- not 60 s,
+    // and not 0.0166 h.
+    assert.match(html, /value="1"\/><select><option/);
+    assert.match(html, /<option selected value="min">/);
+    assert.match(html, /samples \/ machine \/ month/, 'the consequence is shown alongside');
+  });
+
+  test('2 has no bundle-level destructive control', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    assert.doesNotMatch(html, /Split apart/);
+    assert.doesNotMatch(html, /Delete bundle/);
+  });
+
+  test('3 and 4 use the same dropdowns', () => {
+    const discrete = render(<StepDiscrete {...props} />);
+    assert.match(discrete, /<optgroup label="Maintenance"/, 'alarm and event catalogues');
+
+    const commands = render(<StepCommands {...props} />);
+    assert.match(commands, /PENDING, EXECUTING, SUCCESSFUL — 4 messages/,
+      'the transition option states the total so nobody has to add one');
+  });
+
+  test('"how often" is asked the same way as the sampling interval', () => {
+    // Same control, same markup, on every screen that asks it.
+    for (const html of [
+      render(<StepTimeSeries {...props} />),
+      render(<StepDiscrete {...props} />),
+      render(<StepCommands {...props} />),
+    ]) {
+      assert.match(html, /class="duration"/);
+      assert.match(html, /class="prefix">every</);
+    }
+
+    // States, events and alarms stop at weeks: they only have a day-scaled
+    // counter, and "once a month" is said as "every 30 days".
+    const discrete = render(<StepDiscrete {...props} />);
+    assert.match(discrete, /<option[^>]*value="week"/);
+
+    // Facts and commands reach months and years, because a monthly campaign
+    // genuinely does not scale with month length.
+    assert.match(discrete, /<option[^>]*value="month"/);
+    const commands = render(<StepCommands {...props} />);
+    assert.match(commands, /<option[^>]*value="year"/);
+
+    // And every field shows what it works out to.
+    assert.match(discrete, /per machine in a 31-day month/);
+  });
+
+  test('the fact "Quoted per month / per day" column is gone', () => {
+    // The unit in the period carries that choice now.
+    assert.doesNotMatch(render(<StepDiscrete {...props} />), /Quoted/);
+  });
+
+  test('2 datapoints offers to bundle when nothing is bundled yet', () => {
+    const hvac = presetByKey('hvac')!;
+    const loose = {
+      ...blankScenario(),
+      machineTypes: [
+        {
+          ...hvac,
+          metrics: hvac.metrics.map((m) => (m.kind === 'continuous' ? { ...m, bundleId: null } : m)),
+          bundles: [],
+        },
+      ],
+    };
+    const html = render(<StepTimeSeries scenario={loose} onChange={noop} />);
+    assert.match(html, /Suggestion/, 'four 60 s readings in four measurements should be flagged');
+    assert.match(html, /Apply/);
+  });
+
+  test('3 explains all three of events, alarms and inventory', () => {
+    const html = render(<StepDiscrete {...props} />);
+    assert.match(html, /Events/);
+    assert.match(html, /Alarms/);
+    assert.match(html, /Inventory/);
+    assert.match(html, /not a time series store/i);
+    assert.match(html, /lifecycle/i);
+  });
+
+  test('4 commands states the real cost', () => {
+    const html = render(<StepCommands {...props} />);
+    assert.match(html, /PENDING/);
+    assert.match(html, /three or four messages/i);
+  });
+
+  test('5 deployment and add-ons lists every asked line item with its cell', () => {
+    const html = render(<StepCommercial {...props} />);
+    for (const label of [
+      'Public/Shared Cloud', 'Dedicated - Production', 'Operational Data Store',
+      'Streaming Analytics', 'DataHub - Standard Deployment', 'Microservice Hosting',
+      'Enterprise Functions', 'Data Broker', 'VPN Services', 'Gold',
+    ]) {
+      assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `missing ${label}`);
+    }
+    assert.match(html, /D23/, 'period 1 shared cloud cell');
+    assert.match(html, /commit-to-consume/i);
+  });
+
+  test('5 shows no price, rate or currency', () => {
+    const html = render(<StepCommercial {...props} />);
+    assert.doesNotMatch(html, /€|EUR|USD|\$\d/);
+    assert.doesNotMatch(html, /\bprice\b/i);
+  });
+
+  test('6 rollout', () => {
+    const html = render(<StepRollout {...props} />);
+    assert.match(html, /11 %/);
+    assert.match(html, /Period 1/);
+  });
+
+  test('7 results carries every counter cell and the hand-off', () => {
+    const html = render(<StepResults scenario={scenario} result={result} expert />);
+    for (const cell of ['D28', 'D29', 'D30', 'D31', 'D32', 'D33', 'D34', 'D35', 'D36']) {
+      assert.match(html, new RegExp(cell), `missing ${cell}`);
+    }
+    assert.match(html, /Measurements Created/);
+    assert.match(html, /volume estimate/);
+    assert.match(html, /measurement\/measurements\/create/);
+  });
+
+  test('every step survives an empty scenario', () => {
+    const empty = blankScenario();
+    const emptyResult = computeScenario(empty);
+    const p = { scenario: empty, onChange: noop };
+    assert.doesNotThrow(() => render(<StepFleet {...p} />));
+    assert.doesNotThrow(() => render(<StepTimeSeries {...p} />));
+    assert.doesNotThrow(() => render(<StepDiscrete {...p} />));
+    assert.doesNotThrow(() => render(<StepCommands {...p} />));
+    assert.doesNotThrow(() => render(<StepCommercial {...p} />));
+    assert.doesNotThrow(() => render(<StepRollout {...p} />));
+    assert.doesNotThrow(() => render(<StepResults scenario={empty} result={emptyResult} expert />));
+  });
+});
+
+describe('a freshly added series', () => {
+  test('opens on the catalogue, not on the free-text field', () => {
+    const scenario = {
+      ...blankScenario(),
+      machineTypes: [
+        {
+          ...presetByKey('hvac')!,
+          metrics: [
+            {
+              id: 'fresh', name: '', unit: '', kind: 'continuous' as const,
+              cadence: { mode: 'interval' as const, seconds: 60 },
+              semanticGroup: '', bundleId: null,
+            },
+          ],
+          bundles: [],
+        },
+      ],
+    };
+    const html = render(<StepTimeSeries scenario={scenario} onChange={noop} />);
+    assert.match(html, /Choose a series…/);
+    // The placeholder is a known value, so no free-text field is open: an
+    // unnamed series invites a pick rather than demanding one be typed. Asserted
+    // on that field's own placeholder, because the measurement-type name beside
+    // it is a text field and always open.
+    assert.doesNotMatch(html, /placeholder="Name it yourself"/);
+  });
+});
+
+describe('the explainer is drawn, not written', () => {
+  test('it shows a diagram and no JSON at all', () => {
+    const html = render(<Explainer />);
+    assert.match(html, /<svg /, 'the point is a shape');
+    assert.match(html, /class="dg-msg"/, 'envelopes');
+    assert.match(html, /class="dg-dot"/, 'readings as dots');
+
+    // Nothing a customer has to be able to read JSON to follow.
+    assert.doesNotMatch(html, /<pre/);
+    assert.doesNotMatch(html, /&quot;/);
+    assert.doesNotMatch(html, /\bsource\b|\bdeviceId\b|acme_Climate/);
+  });
+
+  test('it names the two figures that matter and says one never moves', () => {
+    const html = render(<Explainer />);
+    assert.match(html, /Messages \/ month/);
+    assert.match(html, /Readings stored/);
+    assert.match(html, /the same at every setting/);
+    assert.match(html, /batch for the network, bundle for the count/);
+  });
+
+  test('it carries a text alternative for the diagram', () => {
+    const html = render(<Explainer />);
+    assert.match(html, /role="img"/);
+    assert.match(html, /aria-label="Four sensor readings[^"]*4 messages\."/);
+  });
+
+  test('it opens on the unbundled design, so dragging makes the number fall', () => {
+    const html = render(<Explainer />);
+    // Four separate envelopes, four messages per tick, 178.6 M a month.
+    assert.match(html, /178\.6 M/, 'the naive monthly total');
+    assert.doesNotMatch(html, />44\.6 M</, 'the bundled figure is what dragging reveals');
+    assert.match(html, /drag right to bundle/);
+  });
+});
+
+describe('expert mode gates the JSON', () => {
+  const scenario = conceptSection9Scenario();
+  const result = computeScenario(scenario);
+
+  test('off by default: no payloads, but the reader is told where they are', () => {
+    const html = render(<StepResults scenario={scenario} result={result} expert={false} />);
+    assert.doesNotMatch(html, /<pre/, 'no JSON on screen');
+    assert.doesNotMatch(html, /measurement\/measurements\/create/);
+    assert.match(html, /Expert mode/, 'and it says how to get them');
+    // The numbers a customer came for are still all there.
+    assert.match(html, /Measurements Created/);
+    assert.match(html, /D28/);
+  });
+
+  test('on: the payloads come back', () => {
+    const html = render(<StepResults scenario={scenario} result={result} expert />);
+    assert.match(html, /<pre/);
+    assert.match(html, /measurement\/measurements\/create/);
+    assert.match(html, /acme_Climate/);
+  });
+});
+
+describe('the diagram geometry holds at every setting', () => {
+  test('the three columns do not touch', () => {
+    const sensorRight = LAYOUT.sensorX + LAYOUT.sensorW;
+    const boxRight = LAYOUT.boxX + LAYOUT.boxW;
+
+    assert.ok(
+      LAYOUT.boxX - sensorRight >= 40,
+      `only ${LAYOUT.boxX - sensorRight}px for the connector wires`,
+    );
+    assert.ok(
+      LAYOUT.tallyX - boxRight >= 20,
+      `tally starts at ${LAYOUT.tallyX}, envelopes end at ${boxRight} -- it overlaps`,
+    );
+    assert.ok(
+      LAYOUT.tallyX + LAYOUT.tallyW <= LAYOUT.width,
+      `the tally runs ${LAYOUT.tallyX + LAYOUT.tallyW - LAYOUT.width}px past the canvas`,
+    );
+  });
+
+  test('the tally sits beside the first envelope, not on it', () => {
+    // Worst case: one envelope per reading, so the first is at its shortest.
+    const { top, height } = boxFor([0]);
+    const tallyTop = LAYOUT.top + 24 - 22; // cap height of the 30px figure
+    const tallyBottom = LAYOUT.top + 54;
+    // Vertical overlap is fine and expected -- they are side by side. What
+    // matters is that horizontally they never meet, asserted above.
+    assert.ok(tallyBottom > tallyTop);
+    assert.ok(top + height <= CANVAS_HEIGHT);
+  });
+
+  for (const perMessage of [1, 2, 3, 4]) {
+    test(`${perMessage} reading(s) per measurement stays inside the canvas`, () => {
+      const groups: number[][] = [];
+      for (let i = 0; i < 4; i += perMessage) {
+        groups.push([0, 1, 2, 3].slice(i, i + perMessage));
+      }
+
+      for (const members of groups) {
+        const { top, height } = boxFor(members);
+
+        assert.ok(top >= 0, `box top ${top} above the canvas`);
+        assert.ok(top + height <= CANVAS_HEIGHT, `box bottom ${top + height} past ${CANVAS_HEIGHT}`);
+        assert.ok(height >= 20, `box height ${height} too small to hold anything`);
+
+        // Whichever layout applies, nothing may sit on or past the border.
+        if (height < LAYOUT.stackMinHeight) {
+          const line = top + height / 2;
+          assert.ok(line > top + 8 && line < top + height - 8, 'single line not centred clear');
+        } else {
+          const sub = top + 41;
+          const dots = top + height - 18;
+          assert.ok(top + 24 > top + 10, 'title inside');
+          assert.ok(sub < dots - 10, `subtitle ${sub} collides with dots ${dots}`);
+          assert.ok(dots < top + height - 8, 'dots clear of the bottom border');
+        }
+
+        // The dot row must not run out of the envelope either.
+        const dotsRight = LAYOUT.boxX + 22 + members.length * 17 + 60;
+        assert.ok(
+          dotsRight <= LAYOUT.boxX + LAYOUT.boxW,
+          `${members.length} dots plus their label overflow the envelope by ${dotsRight - LAYOUT.boxX - LAYOUT.boxW}px`,
+        );
+      }
+    });
+  }
+
+  test('rows are evenly spaced and centred in their band', () => {
+    for (let i = 0; i < 4; i++) {
+      assert.equal(rowCentre(i), LAYOUT.top + i * LAYOUT.row + LAYOUT.row / 2);
+      assert.ok(rowCentre(i) - 15 >= 0, 'sensor pill clears the top edge');
+      assert.ok(rowCentre(i) + 15 <= CANVAS_HEIGHT, 'sensor pill clears the bottom edge');
+    }
+  });
+});
+
+describe('the configuration diagram appears where it helps', () => {
+  const scenario = conceptSection9Scenario();
+
+  test('live on the datapoints step', () => {
+    const html = render(<StepTimeSeries scenario={scenario} onChange={noop} />);
+    assert.match(html, /What one of these machines sends/);
+    // Two diagrams on this step: the worked example and the customer's own.
+    assert.ok((html.match(/class="diagram"/g) ?? []).length >= 2);
+    assert.match(html, /acme_Climate/);
+    assert.match(html, /class="dg-msg"/, 'the shared bundle');
+    assert.match(html, /class="dg-msg-solo"/, 'the two flags travelling alone');
+    assert.match(html, /shared &mdash; readings on the same tick|shared — readings/);
+  });
+
+  test('as a summary on the results step, expert mode or not', () => {
+    const result = computeScenario(scenario);
+    for (const expert of [false, true]) {
+      const html = render(<StepResults scenario={scenario} result={result} expert={expert} />);
+      assert.match(html, /What each machine sends/);
+      assert.match(html, /class="dg-msg"/);
+    }
+  });
+
+  test('it names the real datapoints, not placeholders', () => {
+    const html = render(<StepTimeSeries scenario={scenario} onChange={noop} />);
+    for (const name of ['Supply air temp', 'Humidity', 'Compressor on/off', 'Filter status']) {
+      assert.match(html, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `missing ${name}`);
+    }
+  });
+
+  test('a machine with no datapoints yet draws no diagram', () => {
+    const bare = {
+      ...blankScenario(),
+      machineTypes: [{ ...presetByKey('hvac')!, metrics: [], bundles: [] }],
+    };
+    const html = render(<StepTimeSeries scenario={bare} onChange={noop} />);
+    assert.doesNotMatch(html, /What one of these machines sends/);
+    // The worked example is still there, so count diagrams rather than looking
+    // for envelopes: the explainer draws those too.
+    assert.equal((html.match(/class="diagram"/g) ?? []).length, 1, 'only the explainer');
+    assert.doesNotMatch(html, /class="dg-msg-solo"/, 'nothing of the customer own to draw');
+  });
+})
+
+describe('machine types fold away', () => {
+  // Two types, so the default is one open and one folded. With a single type the
+  // step behaves exactly as it did before there was anything to fold.
+  const two = {
+    ...conceptSection9Scenario(),
+    machineTypes: [presetByKey('hvac')!, { ...presetByKey('meter')!, id: 'mt-meter' }],
+  };
+
+  const openCount = (html: string) => (html.match(/<details class="mt" open/g) ?? []).length;
+  const blockCount = (html: string) => (html.match(/<details class="mt"/g) ?? []).length;
+
+  test('every step that edits machines uses the same disclosure', () => {
+    for (const [name, html] of [
+      ['datapoints', render(<StepTimeSeries scenario={two} onChange={noop} />)],
+      ['commands', render(<StepCommands scenario={two} onChange={noop} />)],
+    ] as const) {
+      assert.equal(blockCount(html), 2, `${name}: one block per machine type`);
+      assert.equal(openCount(html), 1, `${name}: the first is open, the rest folded`);
+    }
+  });
+
+  test('step 3 folds each machine type inside every element panel', () => {
+    const html = render(<StepDiscrete scenario={two} onChange={noop} />);
+    // Events, alarms and facts, two machine types each.
+    assert.equal(blockCount(html), 6);
+    assert.equal(openCount(html), 3, 'the first type stays open in each panel');
+  });
+
+  test('one machine type stays open', () => {
+    const one = { ...conceptSection9Scenario() };
+    const html = render(<StepTimeSeries scenario={one} onChange={noop} />);
+    assert.equal(blockCount(html), 1);
+    assert.equal(openCount(html), 1);
+  });
+
+  test('the folded header carries the summary, not just the name', () => {
+    const html = render(<StepTimeSeries scenario={two} onChange={noop} />);
+    assert.match(html, /4 time series, 2 on-change series, 1 event, 1 alarm, 1 fact, 1 command/);
+    assert.match(html, /3 measurement types/, 'the two flags are measurements of their own');
+    assert.match(html, /every 1 min/, 'the sampling rhythm');
+    assert.match(html, /Measurements 45\.9 M/, 'the message mix by element');
+    // compact() trims a trailing zero, so 45,977,000 is "46 M".
+    assert.match(html, /<b>46 M<\/b>/, 'the number the summary exists for');
+    assert.match(html, /messages \/ month/);
+  });
+
+  test('a summary inside one element panel is about that element only', () => {
+    const html = render(<StepDiscrete scenario={two} onChange={noop} />);
+    assert.match(html, /1 alarm<\/span>/, 'the alarms panel counts alarms, not datapoints');
+    assert.doesNotMatch(html, /4 time series/, 'and does not repeat the whole machine type');
+  });
+
+  test('a machine type with nothing in it says so', () => {
+    const bare = {
+      ...blankScenario(),
+      machineTypes: [{ ...presetByKey('hvac')!, metrics: [], bundles: [] }],
+    };
+    const html = render(<StepTimeSeries scenario={bare} onChange={noop} />);
+    assert.match(html, /nothing modelled yet/);
+  });
+})
+

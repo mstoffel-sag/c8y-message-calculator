@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-test/
+dist-package/
+.DS_Store
+
+# The Sales Configurator workbook is the internal price list. It is the
+# reference this tool maps onto, never something the tool ships or publishes:
+# the app, the generated workbook and the docs carry volumes only. Keep it out
+# of the repository entirely -- history is forever.
+*.xlsx
