@@ -21,6 +21,7 @@ export type LineItemGroup = 'Deployment' | 'Core Metrics' | 'Add-Ons' | 'Support
 /** What the tool can say about a line item. */
 export type LineItemSource =
   | 'calculated' // the tool derives it from the fleet
+  | 'estimated' // the tool derives it, on assumptions worth overriding
   | 'asked' // the customer states it; the tool cannot derive it
   | 'choice'; // a yes/no the customer makes
 
@@ -65,8 +66,8 @@ export const LINE_ITEMS: LineItem[] = [
   },
   {
     key: 'ods', group: 'Core Metrics', label: 'Operational Data Store',
-    unit: 'per GiB', baseRow: 37, source: 'asked',
-    help: 'Daily maximum storage, in GiB. The calculator estimates a range on the Storage sheet -- 100 to 400 bytes per stored value, over the tenant\'s retention period -- from rules of thumb that are marked "to be verified" at source. It stays an asked figure because a 4x spread is a judgement, not an answer: pick from the range and say which end you picked.',
+    unit: 'per GiB', baseRow: 37, source: 'estimated',
+    help: 'Daily maximum storage, in GiB. Filled in from the storage estimate -- the values still on disk over the tenant\'s retention period, at the assumed bytes per value -- and overridable here. The underlying figure is a rule of thumb spanning 100 to 400 bytes and marked "to be verified" at source, so the Storage sheet carries the whole range beside whatever number lands in the cell.',
   },
 
   {

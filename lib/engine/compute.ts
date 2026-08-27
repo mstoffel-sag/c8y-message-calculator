@@ -334,7 +334,11 @@ export function computeScenario(scenario: Scenario): ScenarioResult {
   // Storage needs the whole month series, not one month: what is on disk at the
   // end of a month is what the months before it left inside the retention
   // window. So it is derived here, once, rather than per consumer.
-  const storage = storageByMonth(months, scenario.settings.retentionDays);
+  const storage = storageByMonth(
+    months,
+    scenario.settings.retentionDays,
+    scenario.settings.bytesPerValue,
+  );
   return {
     scenarioName: scenario.name,
     periods,

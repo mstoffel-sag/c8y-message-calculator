@@ -15,7 +15,7 @@ npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 ```
 
 ```
-npm test         # 229 tests: the engine, the cell map, the xlsx writer, and every wizard step
+npm test         # 230 tests: the engine, the cell map, the xlsx writer, and every wizard step
 npm run typecheck
 npm run build    # static bundle in dist/
 npm run package  # dist-package/message-calculator-<version>.zip, ready to upload
@@ -114,7 +114,12 @@ The Results step and a `Storage` sheet in the workbook estimate the Operational 
 values the fleet writes: **100–400 bytes per stored value** in MongoDB, held for the tenant's
 **retention period**, plus a **DataHub extract at 20–25 %** of that. Both figures come from
 `StorageCalculation.txt` and both are marked "to be verified" at source, so both ends of the range
-are always shown and no midpoint ever is — the Configurator's ODS cell stays a human's to fill.
+are always shown and no midpoint ever is.
+
+The Configurator's ODS cell (`D37`) is filled in from it, at the assumed bytes per value — **400 B by
+default, the top of the range**, because under-stating usage on a commit-to-consume contract depletes
+the commitment early rather than saving anything. The note beside the cell carries the whole range,
+and typing a figure on the Deployment step overrides it.
 
 The retention period is walked backwards through the months the ramp produced, so a fleet three
 months into a rollout is not credited with a full period of history, and storage keeps climbing after

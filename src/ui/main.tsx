@@ -114,7 +114,7 @@ function App() {
         {def.key === 'series' && <StepTimeSeries {...props} />}
         {def.key === 'discrete' && <StepDiscrete {...props} />}
         {def.key === 'commands' && <StepCommands {...props} />}
-        {def.key === 'commercial' && <StepCommercial {...props} />}
+        {def.key === 'commercial' && <StepCommercial {...props} result={result} />}
         {def.key === 'rollout' && <StepRollout {...props} />}
         {def.key === 'results' && (
           <StepResults scenario={scenario} result={result} expert={expert} />

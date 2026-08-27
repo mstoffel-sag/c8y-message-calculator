@@ -186,15 +186,16 @@ describe('Configurator cells', () => {
     assert.equal(ASKED_LINE_ITEMS.length, LINE_ITEMS.length - 1);
   });
 
-  test('storage is estimated as a range, and still asked for', () => {
+  test('storage is filled in, and stays overridable', () => {
     const ods = LINE_ITEMS.find((i) => i.key === 'ods');
     assert.ok(ods);
-    // The tool now has a figure to offer -- 100 to 400 bytes per stored value --
-    // but a 4x spread is a judgement, so the cell stays a human's to fill and
-    // the help says where the range comes from.
-    assert.equal(ods.source, 'asked');
-    assert.match(ods.help ?? '', /100 to 400 bytes/);
+    // 'estimated' rather than 'calculated': the tool has a figure, but it rests
+    // on an unverified rule of thumb, so it is offered and not imposed.
+    assert.equal(ods.source, 'estimated');
+    assert.match(ods.help ?? '', /overridable/);
     assert.match(ods.help ?? '', /to be verified/);
+    // Still asked-for in the wizard, so a customer with real numbers can say so.
+    assert.ok(ASKED_LINE_ITEMS.some((i) => i.key === 'ods'));
   });
 
   test('no line item carries a price, rate or currency', () => {

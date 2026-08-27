@@ -151,6 +151,16 @@ export interface ScenarioSettings {
    * Absent means DEFAULT_RETENTION_DAYS.
    */
   retentionDays?: number;
+  /**
+   * Bytes per stored value, for the single figure the Configurator's ODS cell
+   * needs. The evidence is a range (100-400 B, unverified) and the Storage sheet
+   * always reports both ends; this is the one number picked out of it to quote.
+   *
+   * Absent means BYTES_PER_VALUE_HIGH, the top of the range -- because under-
+   * stating usage on a commit-to-consume contract does not save the customer
+   * anything, it just depletes the commitment early and triggers a top-up.
+   */
+  bytesPerValue?: number;
 }
 
 export interface Scenario {
@@ -282,6 +292,8 @@ export interface StorageMonth {
   year: number;
   /** 1-12. */
   month: number;
+  /** Which contract period this month belongs to; the Configurator is per period. */
+  periodIndex: number;
   /** Measurement values written during this month. */
   written: number;
   /**
@@ -294,6 +306,13 @@ export interface StorageMonth {
   daysCovered: number;
   lowGiB: number;
   highGiB: number;
+  /**
+   * The figure that goes in the quote, at the scenario's assumed bytes per
+   * value. Somewhere in [lowGiB, highGiB]; the range stays reported beside it.
+   */
+  quotedGiB: number;
+  /** The assumption behind quotedGiB, so it can be stated wherever it appears. */
+  bytesPerValue: number;
   dataHubLowGiB: number;
   dataHubHighGiB: number;
   /**

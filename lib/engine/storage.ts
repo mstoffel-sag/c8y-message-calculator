@@ -76,8 +76,12 @@ function gib(values: number, bytesPerValue: number): number {
 export function storageByMonth(
   months: MonthResult[],
   retentionDays = DEFAULT_RETENTION_DAYS,
+  bytesPerValue = BYTES_PER_VALUE_HIGH,
 ): StorageMonth[] {
   const span = Math.max(retentionDays, 0);
+  // Outside the measured range is allowed -- somebody may have verified it -- but
+  // a nonsensical figure is not.
+  const perValue = bytesPerValue > 0 ? bytesPerValue : BYTES_PER_VALUE_HIGH;
 
   return months.map((month, i) => {
     let remaining = span;
@@ -96,12 +100,15 @@ export function storageByMonth(
     return {
       year: month.year,
       month: month.month,
+      periodIndex: month.periodIndex,
       written: month.storedValues,
       retained,
       retentionDays: span,
       daysCovered: span - remaining,
       lowGiB: gib(retained, BYTES_PER_VALUE_LOW),
       highGiB: gib(retained, BYTES_PER_VALUE_HIGH),
+      quotedGiB: gib(retained, perValue),
+      bytesPerValue: perValue,
       dataHubLowGiB: gib(retained, BYTES_PER_VALUE_LOW) * DATAHUB_SHARE_LOW,
       dataHubHighGiB: gib(retained, BYTES_PER_VALUE_HIGH) * DATAHUB_SHARE_HIGH,
       valuesPerMeasurement: measurements > 0 ? month.storedValues / measurements : 0,
@@ -121,3 +128,18 @@ export function peakStorageMonth(storage: StorageMonth[]): StorageMonth | undefi
     undefined,
   );
 }
+
+/**
+ * The fullest month inside one contract period.
+ *
+ * The Configurator asks for a quantity per period, and storage does not
+ * necessarily peak in the same month as the message count: it is still filling
+ * up after the traffic has levelled off.
+ */
+export function peakStorageForPeriod(
+  storage: StorageMonth[],
+  periodIndex: number,
+): StorageMonth | undefined {
+  return peakStorageMonth(storage.filter((m) => m.periodIndex === periodIndex));
+}
+

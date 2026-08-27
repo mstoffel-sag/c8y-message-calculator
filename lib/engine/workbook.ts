@@ -23,7 +23,7 @@ import { formatRatePeriod } from './cadence.js';
 import { formatMonth } from './calendar.js';
 import { measurementView } from './diagram.js';
 import { machineCountIn } from './compute.js';
-import { DEFAULT_RETENTION_DAYS, STORAGE_SOURCE_NOTE } from './storage.js';
+import { DEFAULT_RETENTION_DAYS, STORAGE_SOURCE_NOTE, peakStorageForPeriod } from './storage.js';
 import type { MetricKind, Period, Scenario, ScenarioResult } from './types.js';
 import type { Cell, Row, Sheet } from '../xlsx/writer.js';
 
@@ -132,9 +132,31 @@ function configuratorSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         );
       } else {
         const value = scenarioPeriod?.commercial[item.key];
-        if (typeof value === 'number' && value > 0) cells.push(num(COL.value, value));
+        const stated = typeof value === 'number' && value > 0;
+        if (stated) cells.push(num(COL.value, value as number));
         else if (value === true) cells.push(text(COL.value, 'Yes'));
-        cells.push(text(COL.note, 'stated in the wizard', 'note'));
+
+        // The one estimated line: storage. Filled in from the values still on
+        // disk at this period's fullest month, unless somebody has stated a
+        // figure of their own -- theirs wins, because they may have measured it.
+        const storage = item.key === 'ods' ? peakStorageForPeriod(result.storage, period.index) : undefined;
+        if (storage !== undefined && !stated) {
+          cells.push(num(COL.value, Number(storage.quotedGiB.toFixed(2))));
+        }
+        cells.push(
+          text(
+            COL.note,
+            storage === undefined
+              ? 'stated in the wizard'
+              : stated
+                ? `stated in the wizard; the estimate was ${storage.quotedGiB.toFixed(1)} GiB`
+                : `estimated: ${Math.round(storage.retained).toLocaleString('en-GB')} values on disk ` +
+                  `at ${storage.bytesPerValue} B each, ${storage.retentionDays} days retained. ` +
+                  `Unverified assumption -- the evidence spans ${storage.lowGiB.toFixed(1)} to ` +
+                  `${storage.highGiB.toFixed(1)} GiB. See the Storage sheet.`,
+            'note',
+          ),
+        );
       }
 
       rows.push(row(r, cells));

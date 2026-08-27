@@ -1,6 +1,7 @@
 /** Step 6: periods, the ramp, and the calendar. */
 
 import {
+  BYTES_PER_VALUE_HIGH,
   DEFAULT_RETENTION_DAYS,
   monthName,
   periodMonthsCell,
@@ -79,6 +80,20 @@ export function StepRollout({ scenario, onChange }: Props) {
           value={scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS}
           onChange={(retentionDays) =>
             onChange({ ...scenario, settings: { ...scenario.settings, retentionDays } })
+          }
+        />
+        {/* The one number picked out of the 100-400 B range to quote. It starts
+            at the top of it, because under-stating usage on a commit-to-consume
+            contract depletes the commitment early rather than saving anything. */}
+        <Num
+          label="Bytes / value"
+          width="160px"
+          min={1}
+          suffix="B"
+          title="Bytes per stored value, for the storage figure that goes in the Configurator's ODS cell. The evidence is 100-400 B and unverified, so the Results step and the workbook always show the whole range beside whatever this is set to."
+          value={scenario.settings.bytesPerValue ?? BYTES_PER_VALUE_HIGH}
+          onChange={(bytesPerValue) =>
+            onChange({ ...scenario, settings: { ...scenario.settings, bytesPerValue } })
           }
         />
       </div>

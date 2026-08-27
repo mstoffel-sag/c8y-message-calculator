@@ -17,7 +17,7 @@ import {
   type PeriodResult,
   type ScenarioResult,
 } from '../../lib/engine/index.js';
-import { compact, gibRange, n, nf1, pct, signed } from './format.js';
+import { compact, gib, gibRange, n, nf1, pct, signed } from './format.js';
 
 export function Results({ result }: { result: ScenarioResult }) {
   const peak = result.peakMonth;
@@ -294,26 +294,32 @@ function Storage({ result }: { result: ScenarioResult }) {
         <div class="grid four" style="margin-bottom:18px">
           <div class="stat">
             <span>Operational data store</span>
-            <b>{gibRange(peak.lowGiB, peak.highGiB)}</b>
+            <b>{gib(peak.quotedGiB)}</b>
             <small>
-              {formatMonth(peak.year, peak.month)} &middot; {n(peak.retentionDays)} days kept
+              at {n(peak.bytesPerValue)} B / value &middot; {gibRange(peak.lowGiB, peak.highGiB)}{' '}
+              across the range
+            </small>
+          </div>
+          <div class="stat">
+            <span>Fullest month</span>
+            <b>{formatMonth(peak.year, peak.month)}</b>
+            <small>
+              {n(peak.retentionDays)} days kept
+              {partial && ` · only ${n(peak.daysCovered)} days of history yet`}
             </small>
           </div>
           <div class="stat">
             <span>Values on disk</span>
             <b>{compact(peak.retained)}</b>
-            <small>
-              {compact(peak.written)} written that month
-              {partial && ` · only ${n(peak.daysCovered)} days of history yet`}
-            </small>
+            <small>{compact(peak.written)} written that month</small>
           </div>
           <div class="stat">
             <span>Values per measurement</span>
             <b>{nf1.format(peak.valuesPerMeasurement)}</b>
             <small>
               {peak.valuesPerMeasurement > 1.5
-                ? 'bundled, so nearer the bottom of the range'
-                : 'one value per message, so nearer the top'}
+                ? `one envelope, not ${nf1.format(peak.valuesPerMeasurement)}`
+                : 'one envelope per value: nothing shared'}
             </small>
           </div>
           <div class="stat">
@@ -326,14 +332,19 @@ function Storage({ result }: { result: ScenarioResult }) {
         <div class="grid two">
           <div>
             <p class="note" style="margin:0">
-              <b>The range is the answer.</b> {STORAGE_SOURCE_NOTE}
+              <b>{gib(peak.quotedGiB)} goes in the ODS cell</b>, at{' '}
+              {n(peak.bytesPerValue)} bytes per value. That is one figure picked out of a range, and
+              the range is the evidence: {STORAGE_SOURCE_NOTE} Override it on the Deployment step if
+              the tenant has been measured.
             </p>
             <p style="font-size:13px;color:var(--ink-mute);margin-top:10px">
               Bundling moves the real figure down inside that range as well as cutting messages: a
               measurement carrying {nf1.format(peak.valuesPerMeasurement)} values pays for its
-              envelope once instead of {nf1.format(peak.valuesPerMeasurement)} times. The tool does
-              not try to split the envelope from the value, because the source does not measure them
-              separately.
+              envelope once instead of {nf1.format(peak.valuesPerMeasurement)} times, and the
+              100&ndash;400 B figure was measured on values stored one per measurement. The tool
+              does not split the envelope cost from the value cost, because the source measures the
+              two together &mdash; so a well-bundled fleet has room below the quoted figure, not
+               above it.
             </p>
           </div>
           <div>
@@ -342,7 +353,7 @@ function Storage({ result }: { result: ScenarioResult }) {
               times what it does at 30. This uses{' '}
               <b>{n(peak.retentionDays)} days</b>
               {peak.retentionDays === DEFAULT_RETENTION_DAYS && ' (the starting assumption)'} &mdash;
-              set it to the tenant's real retention rule on the Rollout step.
+              set that and the bytes per value to the tenant's own figures on the Rollout step.
             </p>
             <p style="font-size:13px;color:var(--ink-mute)">
               Measurements only. Events, alarms, inventory writes and operations are stored too, but

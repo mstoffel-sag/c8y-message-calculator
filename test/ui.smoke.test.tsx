@@ -220,7 +220,7 @@ describe('the wizard renders', () => {
   });
 
   test('5 deployment and add-ons lists every asked line item with its cell', () => {
-    const html = render(<StepCommercial {...props} />);
+    const html = render(<StepCommercial {...props} result={result} />);
     for (const label of [
       'Public/Shared Cloud', 'Dedicated - Production', 'Operational Data Store',
       'Streaming Analytics', 'DataHub - Standard Deployment', 'Microservice Hosting',
@@ -233,7 +233,7 @@ describe('the wizard renders', () => {
   });
 
   test('5 shows no price, rate or currency', () => {
-    const html = render(<StepCommercial {...props} />);
+    const html = render(<StepCommercial {...props} result={result} />);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/);
     assert.doesNotMatch(html, /\bprice\b/i);
   });
@@ -262,7 +262,7 @@ describe('the wizard renders', () => {
     assert.doesNotThrow(() => render(<StepTimeSeries {...p} />));
     assert.doesNotThrow(() => render(<StepDiscrete {...p} />));
     assert.doesNotThrow(() => render(<StepCommands {...p} />));
-    assert.doesNotThrow(() => render(<StepCommercial {...p} />));
+    assert.doesNotThrow(() => render(<StepCommercial {...p} result={emptyResult} />));
     assert.doesNotThrow(() => render(<StepRollout {...p} />));
     assert.doesNotThrow(() => render(<StepResults scenario={empty} result={emptyResult} expert />));
   });
@@ -297,7 +297,8 @@ describe('a freshly added series', () => {
 });
 
 describe('the storage estimate shows its working', () => {
-  const result = computeScenario(conceptSection9Scenario());
+  const scenario = conceptSection9Scenario();
+  const result = computeScenario(scenario);
 
   test('7 reports a range, both ends of it, and where it came from', () => {
     const html = render(<Results result={result} />);
@@ -310,12 +311,26 @@ describe('the storage estimate shows its working', () => {
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
   });
 
-  test('it never offers a single number to quote', () => {
+  test('the figure it quotes is one end of the range, and says so', () => {
     const html = render(<Results result={result} />);
-    // No midpoint, no "about", no average of two unverified figures. Every GiB
-    // figure on the page is one end of a stated range.
-    assert.doesNotMatch(html, /40\.5 GiB/, 'the midpoint of 16.2 and 64.8');
-    assert.match(html, /The range is the answer/);
+    // 400 B per value is the default: the top of the range, because
+    // under-stating usage on a commit-to-consume contract depletes the
+    // commitment early rather than saving anybody anything.
+    assert.match(html, /64\.8 GiB<\/b>/, 'the quoted figure');
+    assert.match(html, /at 400 B \/ value/);
+    assert.match(html, /16\.2 – 64\.8 GiB/, 'with the whole range beside it');
+    // Never a midpoint: no averaging of two unverified figures.
+    assert.doesNotMatch(html, /40\.5/, 'the midpoint of 16.2 and 64.8');
+    assert.match(html, /goes in the ODS cell/);
+  });
+
+  test('the ODS cell is filled in for every period, and stays overridable', () => {
+    const html = render(<StepCommercial scenario={scenario} result={result} onChange={noop} />);
+    // Empty box, estimate as the placeholder: nobody has stated this, and this
+    // is what the workbook will use if nobody does.
+    assert.match(html, /placeholder="64\.82"/);
+    assert.match(html, /estimated at 400 B \/ value/);
+    assert.match(html, /16\.2–64\.8 GiB across the range/);
   });
 
   test('it says what it leaves out', () => {

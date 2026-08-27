@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 15 — operational storage estimated as a range, from StorageCalculation.txt · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
+**Status:** draft for review, rev 16 — the storage estimate fills the Configurator's ODS cell, overridably · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
 
 ---
 
@@ -326,10 +326,24 @@ Configurator (row 37) that somebody has to fill in. The tool now offers a figure
 | DataHub extract, relative to MongoDB | **20–25 %** | Rule of thumb, tested on Edge. Also *"to be verified"*. |
 | Retention | **asked** (30 days to start) | Not in the source at all. It is a tenant setting, and the tool cannot read it. |
 
-**Both ends are reported, and no midpoint is ever shown.** Averaging two unverified figures produces
-something that looks like a measurement, and a number that looks measured ends up in a commitment.
-A fourfold spread *is* the finding; the tool's job is to hand it over intact, so the ODS cell stays
-`asked` (§7) and the range sits beside it with its provenance.
+**Both ends are always reported, and no midpoint is ever computed.** Averaging two unverified figures
+produces something that looks like a measurement. A fourfold spread *is* the finding, and the tool
+hands it over intact.
+
+**But a cell needs one number, so the tool writes one.** `D37` is filled in from the values on disk at
+the assumed **bytes per value**, which defaults to **400 B — the top of the range**. Not a midpoint,
+and not the bottom: on a commit-to-consume contract, under-stating usage saves the customer nothing,
+it depletes the commitment early and triggers an automatic top-up. The assumption is a scenario
+setting beside retention, the whole range travels in the note column next to the cell, and a customer
+who has measured their own tenant overrides it on the Deployment step — their figure wins.
+
+That makes storage the tool's only `estimated` line item, a third kind alongside `calculated` and
+`asked`: derived, but on assumptions worth overriding. `calculated` would claim the fleet implies it;
+`asked` would waste a figure the tool can produce.
+
+A well-bundled fleet has room *below* the quoted figure and none above it: the 100–400 B was measured
+on values stored one per measurement, and a measurement carrying four values pays for its envelope
+once rather than four times. That is another reason the top of the range is the safe end to write.
 
 Two things the source does not say, and the model therefore has to get right:
 
@@ -585,10 +599,9 @@ these cells".
 | Add-Ons | Streaming Analytics · DataHub Standard + data queried · DataHub Dedicated · Microservice Hosting · Enterprise Functions · Tenants · Data Broker · VPN Services | 38–46 |
 | Support | Gold (Public Cloud Upgrade) | 47 |
 
-Exactly one of these is calculated. **Everything else is asked**, including storage — but storage is
-now asked *with a range beside it*: §4.6 estimates 100–400 bytes per stored value over the tenant's
-retention period, and the ODS cell stays a human's to fill because a fourfold spread is a judgement,
-not an answer.
+One of these is **calculated** (messages). One is **estimated** — the Operational Data Store, filled
+in from §4.6 with its assumptions in the note column and overridable in the wizard. **Everything else
+is asked.**
 
 **DataHub Standard is a yes/no that the tool records and does not act on.** It applies an uplift to
 the message *rate* in the Configurator. It does not change the message *count*, so it changes nothing
@@ -855,7 +868,7 @@ the invoice does, because it buys query latency, headroom and a database that st
 | **Does a batch help?** | **No.** Ten measurements in one batch request counts as **ten messages**. | Removed the `bulkCounting` switch. Added the *batch for the network, bundle for the count* rule (§2) |
 | **What is a month?** | **Calendar month.** | Removed the month-basis setting; the engine works in real month lengths and sizes on the longest month (§2, §9) |
 | **Do no-op `PUT`s count?** | **Yes. Every `PUT` counts.** | New guard-rail (§3) and lint rule L10 |
-| **Bytes per stored value?** | **100–400 B in MongoDB, unverified** (StorageCalculation.txt). | §4.6 reports the full range and its provenance; §4.4 still rests on message count and transition timing, not on a storage saving, because a 4x spread cannot carry an argument |
+| **Bytes per stored value?** | **100–400 B in MongoDB, unverified** (StorageCalculation.txt). | §4.6 reports the full range and its provenance, and writes the top of it into the ODS cell where a single number is required; §4.4 still rests on message count and transition timing, not on a storage saving, because a 4x spread cannot carry an argument |
 | **Maximum series per measurement?** | **Do not exceed 100.** | L6 now fires above 100, as a platform recommendation rather than our guess |
 | **Do failed requests count?** | **No.** Only successful writes. | A retry loop costs network, not messages (§2). The no-op `PUT` rule stands — a *successful* write that changes nothing still counts |
 | **Reads?** | **Confirmed not counted.** | — |
