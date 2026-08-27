@@ -17,6 +17,7 @@ import {
   computeScenario,
   fragmentNameFor,
   intervalSlug,
+  commitmentFor,
   intervalsOf,
   lintScenario,
   measurementView,
@@ -29,7 +30,7 @@ import {
   machineTypeSummary,
   REFERENCE_DAYS,
 } from '../lib/engine/index.js';
-import { presetByKey } from '../lib/presets/index.js';
+import { blankScenario, conceptSection9Scenario, presetByKey } from '../lib/presets/index.js';
 
 function unbundled(): MachineType {
   const hvac = presetByKey('hvac')!;
@@ -631,3 +632,90 @@ describe('naming the measurement type a lone series sends in', () => {
   });
 });
 
+
+describe('the commit-to-consume commitment', () => {
+  const twoPeriods = () => {
+    const base = conceptSection9Scenario();
+    const hvac = base.machineTypes[0]!;
+    return {
+      ...base,
+      periods: [
+        { index: 1, months: 12, machineCountOverrides: {}, commercial: {} },
+        { index: 2, months: 24, machineCountOverrides: { [hvac.id]: 4000 }, commercial: {} },
+      ],
+    };
+  };
+
+  test('the term is every period added up', () => {
+    const scenario = twoPeriods();
+    const c = commitmentFor(scenario, computeScenario(scenario));
+    assert.deepEqual(c.months, [12, 24]);
+    assert.equal(c.termMonths, 36);
+  });
+
+  test('messages are rounded up per month, then multiplied by the months', () => {
+    const scenario = twoPeriods();
+    const result = computeScenario(scenario);
+    const c = commitmentFor(scenario, result);
+
+    // Not ROUNDUP(total_over_term / 100000): the platform bills a month at a
+    // time, so each month's part-block is paid for. Rounding once at the end
+    // would under-count by up to one block per month.
+    const expected = result.periods.reduce(
+      (sum, p, i) => sum + Math.ceil(p.peak.total / 100_000) * (c.months[i] ?? 0),
+      0,
+    );
+    assert.equal(c.termUnitsQuoted, expected);
+    assert.equal(c.unitsPerMonth.length, 2);
+  });
+
+  test('a commitment quoted on peak months is bigger than the fleet will use', () => {
+    const scenario = twoPeriods();
+    const c = commitmentFor(scenario, computeScenario(scenario));
+    // Every period is quoted at its fullest month, but February is short and the
+    // fleet steps up mid-contract, so real consumption is lower.
+    assert.ok(c.termUnitsActual < c.termUnitsQuoted, `${c.termUnitsActual} vs ${c.termUnitsQuoted}`);
+    assert.ok(c.headroom > 0 && c.headroom < 0.5);
+    assert.equal(
+      c.headroom,
+      1 - c.termUnitsActual / c.termUnitsQuoted,
+      'the headroom is that gap, as a share',
+    );
+  });
+
+  test('a flat fleet on 31-day months has almost no headroom', () => {
+    const base = conceptSection9Scenario();
+    const scenario = {
+      ...base,
+      settings: { ...base.settings, startYear: 2027, startMonth: 1 },
+      periods: [{ index: 1, months: 1, machineCountOverrides: {}, commercial: {} }],
+    };
+    const c = commitmentFor(scenario, computeScenario(scenario));
+    // One month, quoted at itself: nothing to over-state.
+    assert.equal(c.termUnitsActual, c.termUnitsQuoted);
+    assert.equal(c.headroom, 0);
+  });
+
+  test('it holds no price and cannot produce one', () => {
+    const scenario = twoPeriods();
+    const c = commitmentFor(scenario, computeScenario(scenario));
+    // Every field is a count, a month or a ratio. The multiplication by a rate
+    // happens in the workbook, over a column the tool leaves empty.
+    for (const [key, value] of Object.entries(c)) {
+      const numbers = Array.isArray(value) ? value : [value];
+      for (const n of numbers) {
+        assert.equal(typeof n, 'number', key);
+        assert.ok(Number.isFinite(n), key);
+      }
+    }
+    assert.equal(Object.keys(c).includes('price'), false);
+  });
+
+  test('an empty scenario commits to nothing', () => {
+    const empty = blankScenario();
+    const c = commitmentFor(empty, computeScenario(empty));
+    assert.equal(c.termMessages, 0);
+    assert.equal(c.termUnitsQuoted, 0);
+    assert.equal(c.headroom, 0, 'not NaN');
+  });
+});

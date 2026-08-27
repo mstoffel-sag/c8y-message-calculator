@@ -15,11 +15,13 @@ import {
   type Finding,
   type MonthResult,
   type PeriodResult,
+  commitmentFor,
+  type Scenario,
   type ScenarioResult,
 } from '../../lib/engine/index.js';
 import { compact, gib, gibRange, n, nf1, pct, signed } from './format.js';
 
-export function Results({ result }: { result: ScenarioResult }) {
+export function Results({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
   const peak = result.peakMonth;
   const steady = result.months.filter((m) => m.onboardingCreates === 0);
   const steadyPeak = steady.reduce<MonthResult | undefined>(
@@ -124,6 +126,8 @@ export function Results({ result }: { result: ScenarioResult }) {
       </section>
 
       <Storage result={result} />
+
+      <Commitment scenario={scenario} result={result} />
 
       <div class="grid two">
         <ByMachineType peak={peak} />
@@ -362,6 +366,83 @@ function Storage({ result }: { result: ScenarioResult }) {
                 {peak.nonMeasurementShare < 0.01 ? 'under 1 %' : pct(peak.nonMeasurementShare)}
               </b>{' '}
               of the documents this fleet writes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The commit-to-consume commitment, in the only terms this tool has: quantities.
+ *
+ * A CTC contract is signed on one number -- total spend over the term -- and the
+ * tool supplies every factor in it except the rate. So this reports the
+ * quantities that get multiplied, and says plainly that the multiplication
+ * happens in the workbook over a price column the tool leaves empty.
+ *
+ * The headroom line is the point of the section. The Configurator quotes a
+ * period at its peak month times its length, which is the right way to quote it,
+ * and it is also more than the fleet will send. Unused commitment is forfeited at
+ * expiry, so the gap is worth seeing before signature rather than after.
+ */
+function Commitment({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
+  const c = commitmentFor(scenario, result);
+  if (c.termMonths === 0 || c.termUnitsQuoted === 0) return null;
+  const gap = c.termUnitsQuoted - c.termUnitsActual;
+
+  return (
+    <section class="panel">
+      <header>
+        <h2>The commitment</h2>
+        <span class="sub">
+          {c.termMonths} months &middot; every quantity a commit-to-consume total is built from
+        </span>
+      </header>
+      <div class="body">
+        <div class="grid four" style="margin-bottom:18px">
+          <div class="stat">
+            <span>Messages over the term</span>
+            <b>{compact(c.termMessages)}</b>
+            <small>every month at its own volume</small>
+          </div>
+          <div class="stat">
+            <span>Billable units, as quoted</span>
+            <b>{compact(c.termUnitsQuoted)}</b>
+            <small>
+              each period's peak month &times; its length &middot;{' '}
+              {c.unitsPerMonth.map((u, i) => `${n(u)}/mo x ${n(c.months[i] ?? 0)}`).join(' + ')}
+            </small>
+          </div>
+          <div class="stat">
+            <span>Billable units, month by month</span>
+            <b>{compact(c.termUnitsActual)}</b>
+            <small>what the fleet is expected to consume</small>
+          </div>
+          <div class="stat">
+            <span>Quoted but not expected</span>
+            <b>{compact(gap)}</b>
+            <small>{pct(c.headroom)} of the commitment</small>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div>
+            <p class="note" style="margin:0">
+              <b>The tool stops one multiplication short.</b> A commitment is billable units times a
+              rate, and the rate is not in here &mdash; the Quote sheet of the workbook carries the
+              multiplication as a live formula over an empty price column, so the commitment appears
+              the moment somebody types their rates and never before.
+            </p>
+          </div>
+          <div>
+            <p style="font-size:13px;color:var(--ink-mute);margin-top:0">
+              <b>Quoting the peak is right, and it over-states.</b> A period is quoted at one month's
+              quantity, and the peak is the honest month to pick &mdash; but the months add up to{' '}
+              {compact(gap)} fewer billable units than {compact(c.termUnitsQuoted)}, because the
+              fleet ramps and not every month has 31 days. Unused commitment is forfeited at expiry,
+              not carried forward, so that gap is worth settling before signature.
             </p>
           </div>
         </div>

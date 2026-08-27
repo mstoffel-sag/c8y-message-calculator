@@ -1,7 +1,8 @@
 # Cumulocity Message Calculator
 
 Estimates **messages per calendar month** from a description of a fleet. Volume only: no prices, no
-billable units, no commitment sizing. See [CONCEPT.md](CONCEPT.md) for the design and the reasoning.
+billable units. The commit-to-consume commitment is computed in *quantities* and multiplied by prices
+the file does not contain. See [CONCEPT.md](CONCEPT.md) for the design and the reasoning.
 
 First draft. Runs locally, and packages into a zip a Cumulocity tenant will host.
 
@@ -15,7 +16,7 @@ npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 ```
 
 ```
-npm test         # 230 tests: the engine, the cell map, the xlsx writer, and every wizard step
+npm test         # 238 tests: the engine, the cell map, the xlsx writer, and every wizard step
 npm run typecheck
 npm run build    # static bundle in dist/
 npm run package  # dist-package/message-calculator-<version>.zip, ready to upload
@@ -106,7 +107,7 @@ tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurato
 | 4 Commands | operations, with the status-transition count |
 | 5 Deployment & add-ons | every Configurator line item the fleet cannot imply |
 | 6 Rollout | periods, the ramp, and where it starts on the calendar |
-| 7 Results | messages per calendar month, the cell each number goes in, the operational-storage range, and an Excel download |
+| 7 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
 
 ### Operational storage is a range, not a number
 
@@ -195,7 +196,12 @@ Invariants worth not breaking:
 - **`Metric.bundleId` is authoritative** for bundle membership. `Bundle.metricIds` supplies display
   order only, so a scenario imported with the two out of step still computes predictably.
 - **Configurator period blocks are 30 rows apart.** `cellFor(baseRow, period)` is the only place that
-  knows it, so period 2's Measurements Created is `D58` without anyone counting rows.
+  knows it, so period 2's Measurements Created is `D58` without anyone counting rows. The workbook
+  itself lays periods out **side by side**, one column each, with the rows kept at the Configurator's
+  period-1 addresses so column D still pastes cell for cell.
+- **The commitment stops one multiplication short.** `commitment.ts` produces billable units over the
+  term; the Quote sheet multiplies them by a price column that ships empty. A commit-to-consume total
+  therefore exists in the file and never in the tool.
 - **Price columns, never price values.** The Quote sheet in the download has a shaded unit-price
   column and computes its own totals, but every one of those cells ships empty: the salesperson types
   the numbers after the customer sends the file back. That is what keeps the constraint intact --

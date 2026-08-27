@@ -301,7 +301,7 @@ describe('the storage estimate shows its working', () => {
   const result = computeScenario(scenario);
 
   test('7 reports a range, both ends of it, and where it came from', () => {
-    const html = render(<Results result={result} />);
+    const html = render(<Results scenario={scenario} result={result} />);
     assert.match(html, /Operational storage/);
     // The §9 fleet stores 174 M values inside a 30-day retention period: 16.2
     // GiB at 100 bytes each, 64.8 at 400.
@@ -312,7 +312,7 @@ describe('the storage estimate shows its working', () => {
   });
 
   test('the figure it quotes is one end of the range, and says so', () => {
-    const html = render(<Results result={result} />);
+    const html = render(<Results scenario={scenario} result={result} />);
     // 400 B per value is the default: the top of the range, because
     // under-stating usage on a commit-to-consume contract depletes the
     // commitment early rather than saving anybody anything.
@@ -334,7 +334,7 @@ describe('the storage estimate shows its working', () => {
   });
 
   test('it says what it leaves out', () => {
-    const html = render(<Results result={result} />);
+    const html = render(<Results scenario={scenario} result={result} />);
     assert.match(html, /Measurements only/);
     assert.match(html, /under 1 %/, 'and how far off that can be for this fleet');
   });

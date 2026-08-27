@@ -143,3 +143,8 @@ export function peakStorageForPeriod(
   return peakStorageMonth(storage.filter((m) => m.periodIndex === periodIndex));
 }
 
+/** The GiB a period is quoted at: its fullest month, at the assumed bytes. */
+export function storageGiBForPeriod(result: { storage: StorageMonth[] }, periodIndex: number): number {
+  return peakStorageForPeriod(result.storage, periodIndex)?.quotedGiB ?? 0;
+}
+

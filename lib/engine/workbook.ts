@@ -25,7 +25,10 @@ import { measurementView } from './diagram.js';
 import { machineCountIn } from './compute.js';
 import { DEFAULT_RETENTION_DAYS, STORAGE_SOURCE_NOTE, peakStorageForPeriod } from './storage.js';
 import type { MetricKind, Period, Scenario, ScenarioResult } from './types.js';
+import { colName } from '../xlsx/writer.js';
 import type { Cell, Row, Sheet } from '../xlsx/writer.js';
+import { MESSAGE_BILLING_UNIT, commitmentFor } from './commitment.js';
+import { storageGiBForPeriod } from './storage.js';
 
 const COL = { category: 2, label: 3, value: 4, unit: 6, note: 7 } as const;
 
@@ -52,11 +55,27 @@ function num(col: number, value: number, style: Cell['style'] = 'number'): Cell 
 /**
  * Sheet 1: the hand-off, row-aligned with the Configurator.
  *
+ * One row per line item, **one column per period**. The Configurator itself
+ * stacks its periods vertically 30 rows apart, and this sheet used to mirror
+ * that -- which made a five-period estimate 150 rows of near-identical blocks
+ * that nobody could compare. Side by side, the ramp is the thing you see.
+ *
+ * The rows still sit at the Configurator's own period-1 addresses, so column D
+ * pastes into period 1 cell for cell. Later periods are the same column of
+ * values 30 rows further down: copy the period's column, paste at its D cell.
+ * The note on the sheet says which.
+ *
  * Only the peak month of each period appears. A period is quoted at one number
  * per counter and the peak is the honest one to quote -- the full month-by-month
  * spread is on its own sheet so the range stays visible.
  */
 function configuratorSheet(scenario: Scenario, result: ScenarioResult): Sheet {
+  const periods = result.periods;
+  /** Period p occupies this column: D for period 1, E for 2, and so on. */
+  const periodCol = (index: number) => COL.value + index - 1;
+  const unitCol = COL.value + periods.length;
+  const noteCol = unitCol + 1;
+
   const rows: Row[] = [
     row(1, [text(COL.category, 'Cumulocity message estimate', 'title')]),
     row(2, [text(COL.category, scenario.name || 'Untitled scenario', 'label')]),
@@ -70,126 +89,155 @@ function configuratorSheet(scenario: Scenario, result: ScenarioResult): Sheet {
     row(4, [
       text(
         COL.category,
-        'Rows align with the Sales Configurator: copy column D for a period and paste it at the same cell there. Prices, discounts and currency stay in the Configurator -- this file has none.',
+        `Periods run left to right. Column D is period 1 at the Configurator's own rows, so it pastes ` +
+          `cell for cell; each later column pastes at its own period's D cell, ${PERIOD_ROW_STRIDE} rows further down per period. ` +
+          'Prices, discounts and currency stay in the Configurator -- this file has none.',
         'note',
       ),
     ]),
   ];
 
-  for (const period of result.periods) {
-    const base = 21 + (period.index - 1) * PERIOD_ROW_STRIDE;
-    const scenarioPeriod = scenario.periods.find((p) => p.index === period.index);
-    const peak = period.peak;
+  rows.push(
+    row(6, [
+      text(
+        COL.category,
+        'Rows 6 to 20 are deliberately empty. The Configurator keeps its own period summary and ' +
+          'commitment formulas there, so nothing is written into them -- paste from row 21 down.',
+        'note',
+      ),
+    ]),
+  );
 
-    rows.push(
-      row(base, [
-        text(COL.label, `Period ${period.index}:`, 'label'),
-        num(COL.value, scenarioPeriod?.months ?? 0, 'numberBold'),
-        text(5, 'months', 'note'),
+  // Row 21 is where the Configurator keeps period 1's length in months.
+  rows.push(
+    row(21, [
+      text(COL.label, 'Period length', 'label'),
+      ...periods.map((period) =>
+        num(
+          periodCol(period.index),
+          scenario.periods.find((p) => p.index === period.index)?.months ?? 0,
+          'numberBold',
+        ),
+      ),
+      text(unitCol, 'months', 'note'),
+      text(noteCol, 'paste each column at the cell named in its heading', 'note'),
+    ]),
+  );
+
+  rows.push(
+    row(22, [
+      text(COL.category, 'Category', 'heading'),
+      text(COL.label, 'Product Name', 'heading'),
+      ...periods.map((period) =>
         text(
-          COL.note,
-          `peak month ${formatMonth(peak.year, peak.month)}, ${peak.days} days`,
+          periodCol(period.index),
+          `Period ${period.index} -> ${periodMonthsCell(period.index)}`,
+          'heading',
+        ),
+      ),
+      text(unitCol, 'Unit', 'heading'),
+      text(noteCol, 'Where this came from', 'heading'),
+    ]),
+  );
+
+  let lastCategory = '';
+  for (const item of LINE_ITEMS) {
+    const cells: Cell[] = [];
+    if (item.group !== lastCategory) {
+      cells.push(text(COL.category, item.group, 'label'));
+      lastCategory = item.group;
+    }
+    cells.push(text(COL.label, item.label, item.key === 'messages' ? 'label' : 'default'));
+    cells.push(text(unitCol, item.unit, 'note'));
+
+    if (item.key === 'messages') {
+      // Left blank on purpose, in every period column. In the Configurator this
+      // cell holds =SUM(D28:D36) -- the only formula in the quantity column --
+      // so writing a value here would mean pasting a column that silently
+      // replaced a formula with a constant. The totals go in the notes column as
+      // a cross-check.
+      for (const period of periods) cells.push(text(periodCol(period.index), ''));
+      cells.push(
+        text(
+          noteCol,
+          'leave these cells alone: the Configurator sums the nine counters. Should come to ' +
+            periods
+              .map((p) => `${Math.round(p.peak.total).toLocaleString('en-GB')} (P${p.index})`)
+              .join(', '),
           'note',
         ),
-      ]),
-    );
-
-    rows.push(
-      row(base + 1, [
-        text(COL.category, 'Category', 'heading'),
-        text(COL.label, 'Product Name', 'heading'),
-        text(COL.value, 'Quantity per Month', 'heading'),
-        text(5, '', 'heading'),
-        text(COL.unit, 'Unit', 'heading'),
-        text(COL.note, 'Where this came from', 'heading'),
-      ]),
-    );
-
-    let lastCategory = '';
-    for (const item of LINE_ITEMS) {
-      const r = item.baseRow + (period.index - 1) * PERIOD_ROW_STRIDE;
-      const cells: Cell[] = [];
-
-      if (item.group !== lastCategory) {
-        cells.push(text(COL.category, item.group, 'label'));
-        lastCategory = item.group;
-      }
-      cells.push(text(COL.label, item.label, item.key === 'messages' ? 'label' : 'default'));
-      cells.push(text(COL.unit, item.unit, 'note'));
-
-      if (item.key === 'messages') {
-        // Left blank on purpose. In the Configurator this cell holds
-        // =SUM(D28:D36) -- the only formula in column D -- so writing a value
-        // here would mean pasting a column that silently replaces it with a
-        // constant. The total goes in the notes column as a cross-check.
-        cells.push(text(COL.value, ''));
-        cells.push(
-          text(
-            COL.note,
-            `leave this cell alone: the Configurator sums it. Should come to ${Math.round(peak.total).toLocaleString('en-GB')}`,
-            'note',
-          ),
-        );
-      } else {
+      );
+    } else {
+      let anyEstimated = false;
+      let anyStated = false;
+      for (const period of periods) {
+        const scenarioPeriod = scenario.periods.find((p) => p.index === period.index);
         const value = scenarioPeriod?.commercial[item.key];
         const stated = typeof value === 'number' && value > 0;
-        if (stated) cells.push(num(COL.value, value as number));
-        else if (value === true) cells.push(text(COL.value, 'Yes'));
+        const storage =
+          item.key === 'ods' ? peakStorageForPeriod(result.storage, period.index) : undefined;
 
-        // The one estimated line: storage. Filled in from the values still on
-        // disk at this period's fullest month, unless somebody has stated a
-        // figure of their own -- theirs wins, because they may have measured it.
-        const storage = item.key === 'ods' ? peakStorageForPeriod(result.storage, period.index) : undefined;
-        if (storage !== undefined && !stated) {
-          cells.push(num(COL.value, Number(storage.quotedGiB.toFixed(2))));
+        if (stated) {
+          anyStated = true;
+          cells.push(num(periodCol(period.index), value as number));
+        } else if (value === true) {
+          anyStated = true;
+          cells.push(text(periodCol(period.index), 'Yes'));
+        } else if (storage !== undefined) {
+          anyEstimated = true;
+          cells.push(num(periodCol(period.index), Number(storage.quotedGiB.toFixed(2))));
         }
-        cells.push(
-          text(
-            COL.note,
-            storage === undefined
-              ? 'stated in the wizard'
-              : stated
-                ? `stated in the wizard; the estimate was ${storage.quotedGiB.toFixed(1)} GiB`
-                : `estimated: ${Math.round(storage.retained).toLocaleString('en-GB')} values on disk ` +
-                  `at ${storage.bytesPerValue} B each, ${storage.retentionDays} days retained. ` +
-                  `Unverified assumption -- the evidence spans ${storage.lowGiB.toFixed(1)} to ` +
-                  `${storage.highGiB.toFixed(1)} GiB. See the Storage sheet.`,
-            'note',
-          ),
-        );
       }
 
-      rows.push(row(r, cells));
-    }
-
-    // The nine counters, at the rows the Configurator keeps for them.
-    COUNTER_KEYS.forEach((key, i) => {
-      const r = COUNTER_BASE_ROWS[i]! + (period.index - 1) * PERIOD_ROW_STRIDE;
-      rows.push(
-        row(r, [
-          text(COL.label, `- ${COUNTER_LABELS[key]}`),
-          num(COL.value, peak.counters[key]),
-          text(COL.note, cellFor(COUNTER_BASE_ROWS[i]!, period.index), 'cellRef'),
-        ]),
-      );
-    });
-
-    rows.push(
-      row(base + 27, [
+      const storage = item.key === 'ods' ? peakStorageForPeriod(result.storage, 1) : undefined;
+      cells.push(
         text(
-          COL.label,
-          `Column D here is safe to paste wholesale at ${periodMonthsCell(period.index)} -- ` +
-            `every cell in it is an input in the Configurator except ${cellFor(27, period.index)}, ` +
-            `which is left blank here so its formula survives.`,
+          noteCol,
+          storage === undefined
+            ? 'stated in the wizard'
+            : anyEstimated
+              ? `estimated: values on disk at ${storage.bytesPerValue} B each, ` +
+                `${storage.retentionDays} days retained. Unverified assumption -- the evidence spans ` +
+                `${storage.lowGiB.toFixed(1)} to ${storage.highGiB.toFixed(1)} GiB in period 1. ` +
+                'See the Storage sheet.'
+              : anyStated
+                ? 'stated in the wizard, overriding the storage estimate'
+                : 'stated in the wizard',
           'note',
         ),
+      );
+    }
+
+    rows.push(row(item.baseRow, cells));
+  }
+
+  // The nine counters, at the rows the Configurator keeps for them.
+  COUNTER_KEYS.forEach((key, i) => {
+    const r = COUNTER_BASE_ROWS[i]!;
+    rows.push(
+      row(r, [
+        text(COL.label, `- ${COUNTER_LABELS[key]}`),
+        ...periods.map((period) => num(periodCol(period.index), period.peak.counters[key])),
+        text(noteCol, periods.map((p) => cellFor(r, p.index)).join(' · '), 'cellRef'),
       ]),
     );
-  }
+  });
+
+  rows.push(
+    row(48, [
+      text(
+        COL.label,
+        `Every cell in a period column is an input in the Configurator except the Messages row, ` +
+          `which is left blank here so its SUM survives.`,
+        'note',
+      ),
+    ]),
+  );
 
   return {
     name: 'Configurator',
-    columnWidths: [3, 16, 34, 20, 9, 30, 42],
+    columnWidths: [3, 16, 34, ...periods.map(() => 16), 9, 46],
+    freezeRows: 22,
     rows,
   };
 }
@@ -488,212 +536,245 @@ function commercialQuantity(period: Period | undefined, key: string): number {
 }
 
 /**
- * Sheet 2: the quote.
+ * Sheet 2: the quote, and the commit-to-consume commitment.
  *
  * Ships with **price columns and no prices**. The customer fills in the wizard
  * and sends the file on; the salesperson opens this sheet, types their own unit
- * prices into the shaded column, and the totals compute themselves.
+ * prices into the shaded column, and every total computes itself -- including
+ * the commitment, which is the number a CTC contract is actually signed on.
  *
- * That is what lets the constraint hold (CONCEPT.md section 1). The tool
- * contains no price list, the file the customer sends contains no price list,
- * and the numbers arrive from the person doing the quoting. Nothing
- * confidential is ever in the bundle.
+ * That is what lets the constraint hold (CONCEPT.md §1). The tool supplies every
+ * factor except the rate, so the commitment exists in the file without a price
+ * ever existing in the tool.
  *
- * Quantities are referenced from the Configurator sheet rather than copied, so
- * there is one source of truth for every figure.
+ * Periods run left to right, one column each, and the arithmetic reads across a
+ * row: quantity per month per period, billable units over the whole term, unit
+ * price, total. The Configurator computes a period as monthly total x months and
+ * sums the periods at E18; this is the same expression rearranged so a reader
+ * can see every period at once.
  */
 function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
+  const periods = result.periods;
+  const commitment = commitmentFor(scenario, result);
+
+  const CAT = 2;
+  const LABEL = 3;
+  const periodCol = (index: number) => 3 + index;
+  const UNIT = 4 + periods.length;
+  const TERM = UNIT + 1;
+  const PRICE = TERM + 1;
+  const TOTAL = PRICE + 1;
+
+  const MONTHS_ROW = 11;
+  const HEAD_ROW = 12;
+  const FIRST_ITEM = 13;
+
+  /** "D13*D$11+E13*E$11": a quantity per month, over the term. */
+  const overTerm = (r: number, wrap: (cell: string) => string) =>
+    periods
+      .map((p) => `${wrap(`${colName(periodCol(p.index))}${r}`)}*${colName(periodCol(p.index))}$${MONTHS_ROW}`)
+      .join('+');
+
+  const itemRows = LINE_ITEMS.map((item, i) => ({ item, r: FIRST_ITEM + i }));
+  const lastItemRow = FIRST_ITEM + LINE_ITEMS.length - 1;
+  const totalRow = lastItemRow + 2;
+
   const rows: Row[] = [
-    row(1, [text(QUOTE_COL.category, 'Quote', 'title')]),
-    row(2, [text(QUOTE_COL.category, scenario.name || 'Untitled scenario', 'label')]),
+    row(1, [text(CAT, 'Quote', 'title')]),
+    row(2, [text(CAT, scenario.name || 'Untitled scenario', 'label')]),
     row(3, [
       text(
-        QUOTE_COL.category,
-        'Quantities come from the estimate. Type your own unit prices into the shaded column and the totals follow. This file ships with no prices in it.',
+        CAT,
+        'Quantities come from the estimate. Type your own unit prices into the shaded column and every total follows, including the commitment. This file ships with no prices in it.',
         'note',
       ),
     ]),
     row(4, [
       text(
-        QUOTE_COL.category,
-        'Messages are sold per 100,000 per month, so the Billable Quantity column rounds the message count up for you.',
+        CAT,
+        `Messages are sold per ${MESSAGE_BILLING_UNIT.toLocaleString('en-GB')} per month, so the term column rounds each period's monthly count up before multiplying by its length.`,
         'note',
       ),
     ]),
     row(6, [
-      text(QUOTE_COL.label, 'Catalog discount', 'label'),
-      { col: QUOTE_COL.quantity, value: null, style: 'percentInput' },
-      text(
-        QUOTE_COL.unit,
-        'applies to every line except Messages, as the Configurator does',
-        'note',
-      ),
+      text(LABEL, 'Catalog discount', 'label'),
+      { col: 4, value: null, style: 'percentInput' },
+      text(UNIT, 'applies to every line except Messages, as the Configurator does', 'note'),
     ]),
     row(8, [
-      text(QUOTE_COL.label, 'Quote total, all periods', 'label'),
+      text(LABEL, 'CTC commitment, whole term', 'label'),
       {
-        col: QUOTE_COL.total,
+        col: TOTAL,
         value: null,
         style: 'moneyBold',
-        formula: result.periods
-          .map((p) => `H${49 + (p.index - 1) * PERIOD_ROW_STRIDE}`)
-          .join('+'),
+        // The table's own total, referenced rather than summed twice.
+        formula: `${colName(TOTAL)}${totalRow}`,
         cached: 0,
       },
+      text(
+        UNIT,
+        `${commitment.termMonths} months across ${periods.length} period${periods.length === 1 ? '' : 's'}`,
+        'note',
+      ),
     ]),
     row(9, [
       text(
-        QUOTE_COL.label,
-        'Discounts, approval thresholds and currency conversion stay in the Sales Configurator. This sheet is a working total, not an approved quote.',
+        LABEL,
+        'A commit-to-consume contract is signed on that one number. Discounts, approval thresholds, minimum commitments and currency conversion stay in the Sales Configurator -- this sheet is a working total, not an approved quote.',
         'note',
       ),
     ]),
+    row(MONTHS_ROW, [
+      text(LABEL, 'Months in period', 'label'),
+      ...periods.map((p, i) =>
+        num(periodCol(p.index), commitment.months[i] ?? 0, 'numberBold'),
+      ),
+      text(UNIT, 'months', 'note'),
+      num(TERM, commitment.termMonths, 'numberBold'),
+      text(TOTAL, 'term', 'note'),
+    ]),
+    row(HEAD_ROW, [
+      text(CAT, 'Category', 'heading'),
+      text(LABEL, 'Product Name', 'heading'),
+      ...periods.map((p) => text(periodCol(p.index), `Period ${p.index} / month`, 'heading')),
+      text(UNIT, 'Unit', 'heading'),
+      text(TERM, 'Billable units, whole term', 'heading'),
+      text(PRICE, 'Unit Price', 'heading'),
+      text(TOTAL, 'Total, whole term', 'heading'),
+    ]),
   ];
 
-  for (const period of result.periods) {
-    const offset = (period.index - 1) * PERIOD_ROW_STRIDE;
-    const base = 21 + offset;
-    const scenarioPeriod = scenario.periods.find((p) => p.index === period.index);
-    const monthsCell = `D${base}`;
-    const peak = period.peak;
+  let lastCategory = '';
+  for (const { item, r } of itemRows) {
+    const cells: Cell[] = [];
+    if (item.group !== lastCategory) {
+      cells.push(text(CAT, item.group, 'label'));
+      lastCategory = item.group;
+    }
+    cells.push(text(LABEL, item.label, item.key === 'messages' ? 'label' : 'default'));
+    cells.push(text(UNIT, item.unit, 'note'));
 
-    rows.push(
-      row(base, [
-        text(QUOTE_COL.label, `Period ${period.index}:`, 'label'),
-        num(QUOTE_COL.quantity, scenarioPeriod?.months ?? 0, 'numberBold'),
-        text(5, 'months', 'note'),
-      ]),
-    );
-
-    rows.push(
-      row(base + 1, [
-        text(QUOTE_COL.category, 'Category', 'heading'),
-        text(QUOTE_COL.label, 'Product Name', 'heading'),
-        text(QUOTE_COL.quantity, 'Quantity per Month', 'heading'),
-        text(QUOTE_COL.billable, 'Billable Quantity', 'heading'),
-        text(QUOTE_COL.unit, 'Unit', 'heading'),
-        text(QUOTE_COL.price, 'Unit Price', 'heading'),
-        text(QUOTE_COL.total, 'Total Price', 'heading'),
-      ]),
-    );
-
-    let lastCategory = '';
-    for (const item of LINE_ITEMS) {
-      const r = item.baseRow + offset;
-      const cells: Cell[] = [];
-
-      if (item.group !== lastCategory) {
-        cells.push(text(QUOTE_COL.category, item.group, 'label'));
-        lastCategory = item.group;
-      }
-      cells.push(text(QUOTE_COL.label, item.label, item.key === 'messages' ? 'label' : 'default'));
-      cells.push(text(QUOTE_COL.unit, item.unit, 'note'));
-
-      if (item.key === 'messages') {
-        // The Configurator sums the nine counters; so does this.
-        const first = COUNTER_BASE_ROWS[0]! + offset;
-        const last = COUNTER_BASE_ROWS[COUNTER_BASE_ROWS.length - 1]! + offset;
+    if (item.key === 'messages') {
+      // The nine counters live on the Configurator sheet; this reads them there
+      // rather than restating them, so one edit moves both sheets.
+      for (const period of periods) {
+        const c = colName(periodCol(period.index));
         cells.push({
-          col: QUOTE_COL.quantity,
+          col: periodCol(period.index),
           value: null,
           style: 'numberBold',
-          formula: `SUM(Configurator!D${first}:D${last})`,
-          cached: peak.total,
+          formula: `SUM(Configurator!${c}${COUNTER_BASE_ROWS[0]}:${c}${COUNTER_BASE_ROWS[COUNTER_BASE_ROWS.length - 1]})`,
+          cached: period.peak.total,
         });
+      }
+      cells.push({
+        col: TERM,
+        value: null,
+        style: 'numberBold',
+        // Rounded up per month, then multiplied by the months -- the order the
+        // Configurator bills in, and not the same as rounding up at the end.
+        formula: overTerm(r, (cell) => `ROUNDUP(${cell}/${MESSAGE_BILLING_UNIT},0)`),
+        cached: commitment.termUnitsQuoted,
+      });
+      cells.push({ col: PRICE, value: null, style: 'priceInput' });
+      // Messages carry their own negotiated rate, so no catalog discount.
+      cells.push({
+        col: TOTAL,
+        value: null,
+        style: 'money',
+        formula: `${colName(TERM)}${r}*${colName(PRICE)}${r}`,
+        cached: 0,
+      });
+    } else {
+      const quantities = periods.map((period) =>
+        item.key === 'ods'
+          ? storageGiBForPeriod(result, period.index)
+          : commercialQuantity(scenario.periods.find((p) => p.index === period.index), item.key),
+      );
+
+      for (const [i, period] of periods.entries()) {
+        const c = colName(periodCol(period.index));
         cells.push({
-          col: QUOTE_COL.billable,
+          col: periodCol(period.index),
           value: null,
-          style: 'number',
-          formula: `ROUNDUP(D${r}/100000,0)`,
-          cached: Math.ceil(peak.total / 100_000),
-        });
-        cells.push({ col: QUOTE_COL.price, value: null, style: 'priceInput' });
-        // Messages carry their own negotiated rate, so no catalog discount.
-        cells.push({
-          col: QUOTE_COL.total,
-          value: null,
-          style: 'money',
-          formula: `E${r}*G${r}`,
-          cached: 0,
-        });
-      } else if (item.source === 'choice') {
-        cells.push({ col: QUOTE_COL.quantity, value: null, formula: `Configurator!D${r}` });
-      } else {
-        const quantity = commercialQuantity(scenarioPeriod, item.key);
-        cells.push({
-          col: QUOTE_COL.quantity,
-          value: null,
-          style: 'number',
-          formula: `Configurator!D${r}`,
-          cached: quantity,
-        });
-        cells.push({
-          col: QUOTE_COL.billable,
-          value: null,
-          style: 'number',
-          formula: `D${r}`,
-          cached: quantity,
-        });
-        cells.push({ col: QUOTE_COL.price, value: null, style: 'priceInput' });
-        cells.push({
-          col: QUOTE_COL.total,
-          value: null,
-          style: 'money',
-          formula: `E${r}*G${r}*(1-${DISCOUNT_CELL})`,
-          cached: 0,
+          style: item.source === 'choice' ? 'default' : 'number',
+          formula: `Configurator!${c}${item.baseRow}`,
+          cached: item.source === 'choice' ? undefined : quantities[i],
         });
       }
 
-      rows.push(row(r, cells));
+      if (item.source === 'choice') {
+        // A yes/no is not a quantity. The Configurator applies it to the message
+        // rate rather than charging for it, so there is nothing to multiply --
+        // and multiplying "Yes" by a month count would put #VALUE! in the total.
+        cells.push(text(TOTAL, 'applied to the message rate, not charged as a quantity', 'note'));
+      } else {
+        cells.push({
+          col: TERM,
+          value: null,
+          style: 'number',
+          formula: overTerm(r, (cell) => cell),
+          cached: Number(
+            quantities
+              .reduce((sum, q, i) => sum + q * (commitment.months[i] ?? 0), 0)
+              .toFixed(2),
+          ),
+        });
+        cells.push({ col: PRICE, value: null, style: 'priceInput' });
+        cells.push({
+          col: TOTAL,
+          value: null,
+          style: 'money',
+          formula: `${colName(TERM)}${r}*${colName(PRICE)}${r}*(1-${DISCOUNT_CELL})`,
+          cached: 0,
+        });
+      }
     }
 
-    // The nine counters as sub-lines: they make up the message figure, so they
-    // are shown, but they are not priced separately.
-    COUNTER_KEYS.forEach((key, i) => {
-      const r = COUNTER_BASE_ROWS[i]! + offset;
-      rows.push(
-        row(r, [
-          text(QUOTE_COL.label, `- ${COUNTER_LABELS[key]}`),
-          {
-            col: QUOTE_COL.quantity,
-            value: null,
-            style: 'number',
-            formula: `Configurator!D${r}`,
-            cached: peak.counters[key],
-          },
-        ]),
-      );
-    });
-
-    const itemFirst = 23 + offset;
-    const itemLast = 47 + offset;
-    rows.push(
-      row(base + 27, [
-        text(QUOTE_COL.price, 'Total (Monthly)', 'label'),
-        {
-          col: QUOTE_COL.total,
-          value: null,
-          style: 'moneyBold',
-          formula: `SUM(H${itemFirst}:H${itemLast})`,
-          cached: 0,
-        },
-      ]),
-      row(base + 28, [
-        text(QUOTE_COL.price, 'Total (Period)', 'label'),
-        {
-          col: QUOTE_COL.total,
-          value: null,
-          style: 'moneyBold',
-          formula: `H${base + 27}*${monthsCell}`,
-          cached: 0,
-        },
-      ]),
-    );
+    rows.push(row(r, cells));
   }
+
+  rows.push(
+    row(totalRow, [
+      text(PRICE, 'CTC commitment, whole term', 'label'),
+      {
+        col: TOTAL,
+        value: null,
+        style: 'moneyBold',
+        formula: `SUM(${colName(TOTAL)}${FIRST_ITEM}:${colName(TOTAL)}${lastItemRow})`,
+        cached: 0,
+      },
+    ]),
+    row(totalRow + 2, [
+      text(LABEL, 'Messages over the term', 'label'),
+      num(TERM, Math.round(commitment.termMessages), 'numberBold'),
+      text(TOTAL, 'every month at its own volume', 'note'),
+    ]),
+    row(totalRow + 3, [
+      text(LABEL, 'Billable units if billed month by month', 'label'),
+      num(TERM, commitment.termUnitsActual, 'number'),
+      text(TOTAL, 'lower than the quoted commitment whenever the fleet ramps', 'note'),
+    ]),
+    row(totalRow + 4, [
+      text(LABEL, 'Units quoted but not expected to be consumed', 'label'),
+      num(TERM, Math.max(0, commitment.termUnitsQuoted - commitment.termUnitsActual), 'number'),
+    ]),
+    row(totalRow + 6, [
+      text(
+        LABEL,
+        'The commitment above quotes each period at its peak month, as the Configurator does. Real ' +
+          'consumption is the months added up, which is lower whenever the fleet ramps or February ' +
+          'is in the term. Unused commitment is forfeited at expiry, so the gap is worth settling ' +
+          'before signature.',
+        'note',
+      ),
+    ]),
+  );
 
   return {
     name: 'Quote',
-    columnWidths: [3, 16, 34, 20, 18, 30, 14, 16],
+    columnWidths: [3, 16, 40, ...periods.map(() => 17), 22, 24, 14, 18],
+    freezeRows: HEAD_ROW,
     rows,
   };
 }

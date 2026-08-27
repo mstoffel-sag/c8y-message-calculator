@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 16 — the storage estimate fills the Configurator's ODS cell, overridably · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
+**Status:** draft for review, rev 17 — periods side by side, and the CTC commitment computed in quantities · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
 
 ---
 
@@ -592,6 +592,14 @@ The Configurator repeats an identical block per period, offset by **30 rows**: p
 number it produces, which is the difference between "here are some figures" and "type these into
 these cells".
 
+**The workbook does not copy that shape.** Five vertical blocks of the same twenty-five line items is
+150 rows in which nothing can be compared, and comparing periods is the whole reason a ramp is
+modelled. So the workbook puts **one row per line item and one column per period**. The rows stay at
+the Configurator's own period-1 addresses, so column D still pastes cell for cell; each later column
+is the same list of values pasted at its own period's `D` cell, and the column heading names it
+(`Period 2 -> D51`). Rows 6–20 are left empty because the Configurator keeps its own period summary
+and commitment formulas there.
+
 | Group | Line items | Base row |
 |---|---|---|
 | Deployment | Public/Shared Cloud · Dedicated Production · Development · Testing | 23–26 |
@@ -613,11 +621,40 @@ in a bundle a customer may be shown (§1).
 Discounts, currency, margin, minimum commitments and approval thresholds. Those are the
 Configurator's, and a tool that may be put in front of a customer must not carry them.
 
-Nor does it ask what the customer is committing to. Cumulocity is **commit-to-consume**: a customer
-commits to a spend amount rather than to quantities, there is no bill of materials, usage is metered
-daily and drawn down against the commitment, and unused commitment is forfeited at expiry rather than
-carried forward. All of that is downstream of a volume estimate, and none of it is this tool's
-business (§2).
+### 6.6 The commit-to-consume commitment
+
+Cumulocity is **commit-to-consume**: a customer commits to a spend amount rather than to quantities,
+there is no bill of materials, usage is metered daily and drawn down against the commitment, and
+unused commitment is forfeited at expiry rather than carried forward. One number decides the deal, and
+the Configurator computes it at `E18` as
+
+```
+commitment = Σ periods ( Σ line items ( billable quantity × unit price ) ) × months
+```
+
+**The tool computes every factor in that except the price**, and stops there. The Quote sheet carries
+the multiplication as a live formula over an empty price column, so the commitment exists in the file
+without a price ever existing in the tool — the same trick that lets the workbook be a quote without
+carrying a price list (§1). No money is ever cached in a cell: every money cell is a formula whose
+cached value is zero, which is enforced by test.
+
+Two quantities, deliberately both reported:
+
+- **As quoted.** Each period at its peak month's billable units × its length, summed. This is what the
+  Configurator does and it is the right way to quote a period: a period is sold at one monthly number.
+- **Month by month.** Every month at its own volume, rounded up to whole billing units individually,
+  summed across the term. This is what the fleet will actually consume.
+
+The second is always the smaller, because a ramping fleet spends most of the term below its peak and
+because February is short. **The gap is reported as its own figure**, and it matters commercially in
+one direction only: unused commitment is forfeited, so a commitment sized on peak × months is money
+the customer pays for and does not use. That is an argument to have before signature, which is why the
+tool puts a number on it rather than leaving it implicit.
+
+Rounding order is not cosmetic here. Messages are sold per 100,000 **per month**, so each month's
+part-block is paid for; rounding the term total up once at the end would under-count by up to one
+block per month. The workbook's formula rounds per period column before multiplying by the months, and
+a test pins the order.
 
 ---
 
@@ -674,7 +711,7 @@ asserted.
 | L9 | Command transitions unmodelled, or more than 4 per command | Warning — each update bills (§3) |
 | L10 | A machine fact is re-sent on a timer or at every boot rather than on change | Warning — every successful `PUT` counts, even a no-op |
 
-**Export** — JSON that round-trips back into the tool, and an **Excel workbook** of five sheets.
+**Export** — JSON that round-trips back into the tool, and an **Excel workbook** of six sheets.
 
 The workbook is what makes the hand-off work in the direction it actually flows: **the customer fills
 in the wizard and sends the file to their account team, who price it up.** So it carries the quantities
@@ -682,8 +719,9 @@ in the wizard and sends the file to their account team, who price it up.** So it
 
 | Sheet | For | Contents |
 |---|---|---|
-| **Configurator** | transfer | every quantity on the row the Configurator keeps for it, so column D pastes at the same cell. `D27` is left blank on purpose — it is the one formula in that column (`=SUM(D28:D36)`) and a pasted constant would destroy it |
-| **Quote** | the account team | quantities referenced from the Configurator sheet, a shaded unit-price column, and formulas for line totals, monthly total and period total. Messages arrive pre-rounded into blocks of 100,000 |
+| **Configurator** | transfer | every quantity on the row the Configurator keeps for it, **one column per period**, so column D pastes at the same cell and each later column pastes at the cell its heading names. The Messages row is left blank in every period column on purpose — it is the one formula in that column (`=SUM(D28:D36)`) and a pasted constant would destroy it |
+| **Quote** | the account team | quantities referenced from the Configurator sheet, periods side by side, billable units over the whole term, a shaded unit-price column, and **the CTC commitment** as a formula (§6.6). Messages are rounded into blocks of 100,000 per month before being multiplied by the months |
+| **Storage** | review | the operational-storage range month by month, with its assumptions and their provenance (§4.6) |
 | **Design** | the device team | every reading, its cadence, and the measurement it travels in |
 | **Months** | evidence | all nine counters for every calendar month, so the range is demonstrable rather than asserted |
 | **Guidance** | review | every finding with its volume delta |

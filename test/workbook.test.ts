@@ -171,6 +171,8 @@ describe('the workbook content', () => {
     const result = computeScenario(conceptSection9Scenario());
     const peak = result.periods[0]!.peak;
 
+    // Period 1 is column D, at the Configurator's own rows, so it pastes cell
+    // for cell. That is the property that makes the sheet worth aligning.
     const valueAt = (r: number) =>
       configurator.rows.find((row) => row.row === r)?.cells.find((c) => c.col === 4)?.value;
 
@@ -186,42 +188,83 @@ describe('the workbook content', () => {
     assert.equal(valueAt(27), '', 'D27 must stay empty so the formula survives');
   });
 
-  test('column D contains no value that would clobber a formula', () => {
-    const configurator = sheet('Configurator');
-    const formulaRows = [27, 57, 87, 117, 147];
-    for (const r of formulaRows) {
-      const cell = configurator.rows.find((row) => row.row === r)?.cells.find((c) => c.col === 4);
-      assert.ok(
-        cell === undefined || cell.value === '' || cell.value === null,
-        `D${r} would overwrite the Messages formula`,
-      );
-    }
-    // But the total is still stated, so the paste can be checked.
-    const note = configurator.rows
-      .find((row) => row.row === 27)
-      ?.cells.find((c) => c.col === 7)?.value;
-    assert.match(String(note), /45,978,000/);
-  });
-
-  test('a second period lands 30 rows lower', () => {
+  test('periods run left to right, one column each', () => {
     const base = conceptSection9Scenario();
     const hvac = base.machineTypes[0]!;
     const scenario = {
       ...base,
       periods: [
         { index: 1, months: 12, machineCountOverrides: {}, commercial: {} },
-        { index: 2, months: 12, machineCountOverrides: { [hvac.id]: 4000 }, commercial: {} },
+        { index: 2, months: 24, machineCountOverrides: { [hvac.id]: 4000 }, commercial: {} },
+        { index: 3, months: 12, machineCountOverrides: { [hvac.id]: 8000 }, commercial: {} },
       ],
     };
     const configurator = workbookSheets(scenario, computeScenario(scenario))[0]!;
-    const valueAt = (r: number) =>
-      configurator.rows.find((row) => row.row === r)?.cells.find((c) => c.col === 4)?.value;
+    const at = (r: number, c: number) =>
+      configurator.rows.find((row) => row.row === r)?.cells.find((x) => x.col === c)?.value;
 
-    const p1 = valueAt(28);
-    const p2 = valueAt(58);
-    assert.ok(typeof p1 === 'number' && typeof p2 === 'number');
-    assert.ok(p2 > p1, 'period 2 has four times the fleet');
-    assert.equal(p2 / p1, 4);
+    // Months: D, E, F -- not three blocks 30 rows apart.
+    assert.equal(at(21, 4), 12);
+    assert.equal(at(21, 5), 24);
+    assert.equal(at(21, 6), 12);
+    // And the same row of measurements grows across the columns.
+    const [p1, p2, p3] = [at(28, 4), at(28, 5), at(28, 6)];
+    assert.ok(typeof p1 === 'number' && typeof p2 === 'number' && typeof p3 === 'number');
+    assert.equal(p2 / p1, 4, 'period 2 has four times the fleet');
+    assert.equal(p3 / p1, 8);
+    // Nothing is written at the old vertical offsets any more.
+    assert.equal(configurator.rows.find((row) => row.row === 58), undefined);
+    // Each column's heading names the cell it pastes into.
+    assert.equal(at(22, 4), 'Period 1 -> D21');
+    assert.equal(at(22, 5), 'Period 2 -> D51');
+    assert.equal(at(22, 6), 'Period 3 -> D81');
+  });
+
+  test('no period column carries a value that would clobber a formula', () => {
+    const base = conceptSection9Scenario();
+    const scenario = {
+      ...base,
+      periods: [1, 2, 3, 4, 5].map((i) => ({
+        index: i,
+        months: 12,
+        machineCountOverrides: {},
+        commercial: {},
+      })),
+    };
+    const configurator = workbookSheets(scenario, computeScenario(scenario))[0]!;
+    const messages = configurator.rows.find((row) => row.row === 27)!;
+    // Row 27 is the Messages row: five period columns, every one blank.
+    for (const col of [4, 5, 6, 7, 8]) {
+      const cell = messages.cells.find((c) => c.col === col);
+      assert.ok(
+        cell === undefined || cell.value === '' || cell.value === null,
+        `period column ${col} would overwrite the Messages SUM`,
+      );
+    }
+    // But the totals are still stated, so each paste can be checked.
+    const note = messages.cells.find((c) => c.value && String(c.value).includes('45,978,000'));
+    assert.ok(note, 'the cross-check total is missing');
+    assert.match(String(note!.value), /\(P1\)/);
+  });
+
+  test('the counter notes name the cell each period pastes into', () => {
+    const base = conceptSection9Scenario();
+    const scenario = {
+      ...base,
+      periods: [1, 2].map((i) => ({
+        index: i,
+        months: 12,
+        machineCountOverrides: {},
+        commercial: {},
+      })),
+    };
+    const configurator = workbookSheets(scenario, computeScenario(scenario))[0]!;
+    const note = configurator.rows
+      .find((row) => row.row === 28)!
+      .cells.find((c) => c.style === 'cellRef');
+    // Measurements Created is D28 in period 1 and D58 in period 2 -- the
+    // vertical stride the Configurator itself uses.
+    assert.equal(note?.value, 'D28 · D58');
   });
 
   test('the Months sheet is the evidence for the range', () => {
@@ -323,10 +366,24 @@ describe('no prices, anywhere', () => {
     // Nor the Configurator's minimum-commitment thresholds.
     assert.doesNotMatch(text, /160,?000|60,?000/);
 
-    // "commitment" appears once, and only to say the workbook does not size one.
-    const mentions = text.match(/[^|]*commitment[^|]*/gi) ?? [];
-    assert.equal(mentions.length, 1, mentions.join(' // '));
-    assert.match(mentions[0]!, /no commitment sizing/);
+    // The workbook now does size a commitment -- the whole point of a
+    // commit-to-consume contract -- but only as a formula over an empty price
+    // column. So no commitment *value* may ship, on any sheet.
+    for (const cell of sheetsFor(scenario)
+      .flatMap((sheet) => sheet.rows)
+      .flatMap((row) => row.cells)) {
+      if (cell.style === 'money' || cell.style === 'moneyBold') {
+        assert.ok(cell.formula, 'a money cell must be computed, never written');
+        assert.equal(cell.value, null, 'a money value shipped with the file');
+        assert.equal(cell.cached, 0, 'a money cell cached a non-zero total');
+      }
+    }
+    // Not asserted: that prose near the word "commitment" carries no digits. It
+    // was, and it failed on "paste from row 21 down" -- a heuristic that forbids
+    // honest sentences gets weakened until it means nothing. The invariant that
+    // matters is the one above: every money cell is a formula over an empty
+    // price, so no commitment figure can ship whatever the prose says.
+    assert.ok((text.match(/commitment/gi) ?? []).length > 0, 'and it is named, not hidden');
   });
 
   test('it says what it is, so nobody mistakes it for a quote', () => {
@@ -415,58 +472,96 @@ describe('the Quote sheet', () => {
   });
 
   test('quantities are referenced, not copied, so there is one source of truth', () => {
-    // Public/Shared Cloud, row 23.
-    assert.equal(cell(23, 4)?.formula, 'Configurator!D23');
-    // Measurements Created, row 28.
-    assert.equal(cell(28, 4)?.formula, 'Configurator!D28');
+    // The Quote sheet has its own compact row order; every quantity is a
+    // reference into the Configurator sheet, so one edit moves both.
+    assert.equal(cell(13, 4)?.formula, 'Configurator!D23', 'Public/Shared Cloud');
+    const referenced = quote()
+      .rows.flatMap((r) => r.cells)
+      .filter((c) => typeof c.formula === 'string' && c.formula.startsWith('Configurator!'));
+    assert.ok(referenced.length >= 15, `only ${referenced.length} referenced quantities`);
   });
 
-  test('messages are billed per 100,000, rounded up', () => {
-    const quantity = cell(27, 4);
-    const billable = cell(27, 5);
+  test('messages are billed per 100,000, rounded up per month then over the term', () => {
+    // One period of 12 months, so the messages row sits at 17.
+    const quantity = cell(17, 4);
+    const term = cell(17, 6);
     assert.equal(quantity?.formula, 'SUM(Configurator!D28:D36)');
     assert.equal(quantity?.cached, 45_978_000);
-    assert.equal(billable?.formula, 'ROUNDUP(D27/100000,0)');
-    assert.equal(billable?.cached, 460, '45,978,000 messages is 460 blocks of 100,000');
+    // Rounded up per month and then multiplied by the months -- the order the
+    // Configurator bills in. Rounding at the end would under-count.
+    assert.equal(term?.formula, 'ROUNDUP(D17/100000,0)*D$11');
+    assert.equal(term?.cached, 460 * 12, '460 blocks a month for 12 months');
   });
 
   test('the catalog discount applies to everything except messages', () => {
     // Messages carry their own negotiated rate.
-    assert.equal(cell(27, 8)?.formula, 'E27*G27');
+    assert.equal(cell(17, 8)?.formula, 'F17*G17');
     // Everything else takes the discount in D6.
-    assert.equal(cell(23, 8)?.formula, 'E23*G23*(1-$D$6)');
-    assert.equal(cell(37, 8)?.formula, 'E37*G37*(1-$D$6)');
+    assert.equal(cell(13, 8)?.formula, 'F13*G13*(1-$D$6)');
+    assert.equal(cell(18, 8)?.formula, 'F18*G18*(1-$D$6)', 'Operational Data Store');
     // And the discount cell itself is an empty input.
     assert.equal(cell(6, 4)?.style, 'percentInput');
     assert.equal(cell(6, 4)?.value, null);
   });
 
-  test('the totals mirror the Configurator: monthly, then times the months', () => {
-    assert.equal(cell(48, 8)?.formula, 'SUM(H23:H47)');
-    assert.equal(cell(49, 8)?.formula, 'H48*D21');
-    assert.equal(cell(8, 8)?.formula, 'H49', 'one period, so the grand total is its period total');
+  test('the commitment is the term column times the price column, summed', () => {
+    // Every line: billable units over the term (F) x unit price (G) -> total (H).
+    // The commitment is the sum of that column, and the headline at row 8 points
+    // at it rather than summing a second time.
+    assert.equal(cell(30, 8)?.formula, 'SUM(H13:H28)');
+    assert.equal(cell(8, 8)?.formula, 'H30');
+    assert.equal(cell(30, 7)?.value, 'CTC commitment, whole term');
+    // Nothing is cached: the file ships with no price, so every total is zero
+    // until Excel recalculates on open.
+    assert.equal(cell(30, 8)?.cached, 0);
   });
 
-  test('five periods chain into the grand total', () => {
+  test('the quantity side of the commitment is computed, not left to Excel', () => {
+    // Prices are Excel's job. Quantities are the tool's, so they arrive filled
+    // in: 460 blocks a month for 12 months.
+    assert.equal(cell(17, 6)?.cached, 5520);
+    // Messages over the whole term, at every month's own volume.
+    const term = quote().rows.find((r) => r.row === 32)!;
+    assert.ok((term.cells.find((c) => c.col === 6)?.value as number) > 500_000_000);
+    // And the gap against a commitment quoted on peak months.
+    const gap = quote().rows.find((r) => r.row === 34)!;
+    assert.ok((gap.cells.find((c) => c.col === 6)?.value as number) >= 0);
+  });
+
+  test('five periods widen the sheet instead of lengthening it', () => {
     const base = conceptSection9Scenario();
     const scenario = {
       ...base,
       periods: [1, 2, 3, 4, 5].map((i) => ({
         index: i,
-        months: 12,
+        months: i * 6,
         machineCountOverrides: {},
         commercial: {},
       })),
     };
     const sheet = workbookSheets(scenario, computeScenario(scenario))[1]!;
-    const grand = sheet.rows.find((r) => r.row === 8)?.cells.find((c) => c.col === 8);
-    assert.equal(grand?.formula, 'H49+H79+H109+H139+H169');
-    // And each period's own total is 30 rows below the last.
-    for (const i of [1, 2, 3, 4, 5]) {
-      const r = 49 + (i - 1) * 30;
-      const total = sheet.rows.find((row) => row.row === r)?.cells.find((c) => c.col === 8);
-      assert.equal(total?.formula, `H${r - 1}*D${21 + (i - 1) * 30}`, `period ${i} total`);
+    const at = (r: number, c: number) =>
+      sheet.rows.find((row) => row.row === r)?.cells.find((x) => x.col === c);
+
+    // Months in D..H, and the term is their sum: 6+12+18+24+30.
+    for (const [i, col] of [4, 5, 6, 7, 8].entries()) {
+      assert.equal(at(11, col)?.value, (i + 1) * 6, `period ${i + 1} months`);
     }
+    assert.equal(at(11, 10)?.value, 90, 'term months');
+
+    // Five periods push the term, price and total columns right; the line items
+    // stay on the same rows, which is the point of laying them out this way.
+    assert.equal(at(12, 10)?.value, 'Billable units, whole term');
+    assert.equal(at(12, 12)?.value, 'Total, whole term');
+
+    // The term column multiplies each period by its own length and adds them up.
+    assert.equal(
+      at(17, 10)?.formula,
+      'ROUNDUP(D17/100000,0)*D$11+ROUNDUP(E17/100000,0)*E$11+ROUNDUP(F17/100000,0)*F$11' +
+        '+ROUNDUP(G17/100000,0)*G$11+ROUNDUP(H17/100000,0)*H$11',
+    );
+    // And the commitment still sums one column.
+    assert.equal(at(30, 12)?.formula, 'SUM(L13:L28)');
   });
 
   test('every cached value is zero wherever a price is missing', () => {

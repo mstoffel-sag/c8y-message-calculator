@@ -32,7 +32,7 @@ export function StepResults({
       <DownloadWorkbook scenario={scenario} result={result} />
       <Handoff scenario={scenario} result={result} />
       <Design scenario={scenario} />
-      <Results result={result} />
+      <Results scenario={scenario} result={result} />
       {/* The payloads are for whoever writes the device code, not for the
           person filling in the wizard. */}
       {expert ? <Payloads scenario={scenario} /> : <PayloadsHidden />}
