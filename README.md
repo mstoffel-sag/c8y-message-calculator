@@ -16,7 +16,7 @@ npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 ```
 
 ```
-npm test         # 238 tests: the engine, the cell map, the xlsx writer, and every wizard step
+npm test         # 242 tests: the engine, the cell map, the xlsx writer, and every wizard step
 npm run typecheck
 npm run build    # static bundle in dist/
 npm run package  # dist-package/message-calculator-<version>.zip, ready to upload

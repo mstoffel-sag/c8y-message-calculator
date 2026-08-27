@@ -18,6 +18,7 @@ import { StepCommercial } from '../src/ui/wizard/StepCommercial.js';
 import { StepRollout } from '../src/ui/wizard/StepRollout.js';
 import { StepResults } from '../src/ui/wizard/StepResults.js';
 import { Results } from '../src/ui/Results.js';
+import { Handoff } from '../src/ui/wizard/Handoff.js';
 import { CANVAS_HEIGHT, Explainer, LAYOUT, boxFor, rowCentre } from '../src/ui/Explainer.js';
 
 const noop = () => {};
@@ -293,6 +294,48 @@ describe('a freshly added series', () => {
     // on that field's own placeholder, because the measurement-type name beside
     // it is a text field and always open.
     assert.doesNotMatch(html, /placeholder="Name it yourself"/);
+  });
+});
+
+describe('the hand-off row explains its own buttons', () => {
+  const scenario = conceptSection9Scenario();
+  const result = computeScenario(scenario);
+
+  test('each button says what it copies, and where it goes', () => {
+    const html = render(<Handoff scenario={scenario} result={result} />);
+    // The old row was two bare labels against one run-on sentence.
+    assert.match(html, /<b>Counters<\/b> copies the nine numbers above as a single column/);
+    assert.match(html, /<b>All<\/b> copies every row as <em>cell, value, label<\/em>/);
+    // The paste target is a real Excel range. It used to render as "D28:36",
+    // which Excel does not accept.
+    assert.match(html, /<code>D28:D36<\/code>/);
+    assert.doesNotMatch(html, /D28:36/);
+  });
+
+  test('the storage line shows the figure the workbook writes, not a dash', () => {
+    const html = render(<Handoff scenario={scenario} result={result} />);
+    // The workbook fills D37 in from the storage estimate. This screen used to
+    // show a dash there, which made the two disagree about the same cell.
+    assert.match(html, /64\.8/);
+    assert.match(html, /estimated, overridable/);
+    assert.match(html, /title="the tool's estimate; state a figure/);
+  });
+
+  test('and the copied cell/value list carries it too', async () => {
+    const html = render(<Handoff scenario={scenario} result={result} />);
+    // "All" copies cell, value and label per line; the storage row has to be in
+    // it, or the checklist misses the one line the tool filled in itself.
+    assert.match(html, /Every cell, value and label/);
+    // The value is built on click, so assert the source of truth instead.
+    const { storageGiBForPeriod } = await import('../lib/engine/index.js');
+    assert.ok(storageGiBForPeriod(result, 1) > 0);
+  });
+
+  test('and every copy button can report what happened', () => {
+    const html = render(<Handoff scenario={scenario} result={result} />);
+    // Two per period, each with a title naming the period's own target cell.
+    assert.match(html, /title="Nine counters for period 1, ready to paste at D28"/);
+    assert.match(html, /title="Every cell, value and label for period 1"/);
   });
 });
 

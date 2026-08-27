@@ -8,41 +8,63 @@
 
 import {
   COUNTER_BASE_ROWS,
+  PERIOD_ROW_STRIDE,
   COUNTER_KEYS,
   COUNTER_LABELS,
   LINE_ITEMS,
   cellFor,
   formatMonth,
   periodMonthsCell,
+  storageGiBForPeriod,
   type PeriodResult,
   type Scenario,
   type ScenarioResult,
 } from '../../../lib/engine/index.js';
 import { commercialBool, commercialNumber } from '../store.js';
-import { copy, n } from '../format.js';
+import { CopyButton } from '../parts.js';
+import { n, nf1 } from '../format.js';
 
 interface Props {
   scenario: Scenario;
   result: ScenarioResult;
 }
 
-/** Value and display string for one line item in one period. */
+/** Where a number on this screen came from, which decides how it is drawn. */
+type Origin = 'calculated' | 'estimated' | 'stated' | 'none';
+
+/**
+ * Value and display string for one line item in one period.
+ *
+ * The estimated lines matter here: storage is filled in by the tool unless
+ * somebody states a figure, and this screen showed a dash for it while the
+ * workbook wrote 64.82 into the same cell. A hand-off sheet that disagrees with
+ * the file it hands off is worse than one that says nothing.
+ */
 function valueFor(
   scenario: Scenario,
+  result: ScenarioResult,
   periodResult: PeriodResult,
   key: string,
-): { text: string; calculated: boolean } {
+): { text: string; origin: Origin } {
   const period = scenario.periods.find((p) => p.index === periodResult.index);
   if (key === 'messages') {
-    return { text: n(periodResult.peak.total), calculated: true };
+    return { text: n(periodResult.peak.total), origin: 'calculated' };
   }
-  if (!period) return { text: '—', calculated: false };
+  if (!period) return { text: '—', origin: 'none' };
+
   const item = LINE_ITEMS.find((i) => i.key === key);
   if (item?.source === 'choice') {
-    return { text: commercialBool(period, key) ? 'Yes' : 'No', calculated: false };
+    return { text: commercialBool(period, key) ? 'Yes' : 'No', origin: 'stated' };
   }
+
   const value = commercialNumber(period, key);
-  return { text: value === 0 ? '—' : n(value), calculated: false };
+  if (value > 0) return { text: n(value), origin: 'stated' };
+
+  if (item?.source === 'estimated' && key === 'ods') {
+    const giB = storageGiBForPeriod(result, periodResult.index);
+    if (giB > 0) return { text: nf1.format(giB), origin: 'estimated' };
+  }
+  return { text: '—', origin: 'none' };
 }
 
 export function Handoff({ scenario, result }: Props) {
@@ -53,7 +75,7 @@ export function Handoff({ scenario, result }: Props) {
     ];
     for (const item of LINE_ITEMS) {
       if (item.key === 'messages') continue; // D27 is a formula in the workbook.
-      const { text } = valueFor(scenario, periodResult, item.key);
+      const { text } = valueFor(scenario, result, periodResult, item.key);
       if (text !== '—') lines.push(`${cellFor(item.baseRow, periodResult.index)}\t${text.replace(/,/g, '')}\t${item.label}`);
     }
     COUNTER_KEYS.forEach((key, i) => {
@@ -110,13 +132,25 @@ export function Handoff({ scenario, result }: Props) {
                     <div class="hint" style="margin:0">
                       {item.unit}
                       {item.source === 'calculated' && ' · calculated'}
+                      {item.source === 'estimated' && ' · estimated, overridable'}
                     </div>
                   </td>
                   {result.periods.map((p) => {
-                    const { text, calculated } = valueFor(scenario, p, item.key);
+                    const { text, origin } = valueFor(scenario, result, p, item.key);
                     return (
                       <td class="num" key={p.index}>
-                        <span style={text === '—' ? 'color:var(--ink-faint)' : calculated ? 'font-weight:600' : ''}>
+                        <span
+                          style={
+                            origin === 'none'
+                              ? 'color:var(--ink-faint)'
+                              : origin === 'calculated'
+                                ? 'font-weight:600'
+                                : origin === 'estimated'
+                                  ? 'font-style:italic'
+                                  : ''
+                          }
+                          title={origin === 'estimated' ? 'the tool\'s estimate; state a figure on the Deployment step to override it' : undefined}
+                        >
                           {text}
                         </span>
                         <div class="cell">{cellFor(item.baseRow, p.index)}</div>
@@ -144,18 +178,35 @@ export function Handoff({ scenario, result }: Props) {
             ))}
 
             <tr>
+              {/* What the two buttons do, said in the row that holds them. They
+                  used to be labelled "Counters" and "All" against one run-on
+                  sentence, which is not an explanation of either. */}
               <td class="hint">
-                Nine counters as one column, ready to paste into{' '}
-                {cellFor(28, 1)}:{cellFor(36, 1).slice(1)} &mdash; or everything as cell/value pairs.
+                <b>Counters</b> copies the nine numbers above as a single column, in Configurator
+                order. Select that period&rsquo;s counter block &mdash;{' '}
+                <code>
+                  {cellFor(COUNTER_BASE_ROWS[0]!, 1)}:{cellFor(COUNTER_BASE_ROWS[8]!, 1)}
+                </code>{' '}
+                in period 1, and {PERIOD_ROW_STRIDE} rows lower for each period after &mdash; and
+                paste once.
+                <div style="margin-top:5px">
+                  <b>All</b> copies every row as <em>cell, value, label</em>, tab separated. Not a
+                  paste target &mdash; the cells are not contiguous &mdash; but a checklist to work
+                  down and tick off.
+                </div>
               </td>
               {result.periods.map((p) => (
                 <td class="num" key={p.index}>
-                  <button
-                    onClick={() => copy(COUNTER_KEYS.map((k) => Math.round(p.peak.counters[k])).join('\n'))}
-                  >
-                    Counters
-                  </button>{' '}
-                  <button onClick={() => copy(tsvFor(p))}>All</button>
+                  <CopyButton
+                    label="Counters"
+                    title={`Nine counters for period ${p.index}, ready to paste at ${cellFor(COUNTER_BASE_ROWS[0]!, p.index)}`}
+                    text={() => COUNTER_KEYS.map((k) => Math.round(p.peak.counters[k])).join('\n')}
+                  />{' '}
+                  <CopyButton
+                    label="All"
+                    title={`Every cell, value and label for period ${p.index}`}
+                    text={() => tsvFor(p)}
+                  />
                 </td>
               ))}
             </tr>

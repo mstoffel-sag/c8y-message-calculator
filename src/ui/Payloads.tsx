@@ -14,7 +14,7 @@ import {
   type PayloadNamespace,
   type Scenario,
 } from '../../lib/engine/index.js';
-import { copy } from './format.js';
+import { CopyButton } from './parts.js';
 
 const ORDER: PayloadNamespace[] = [
   'measurement fragment',
@@ -85,9 +85,7 @@ function Example({ example }: { example: PayloadExample }) {
       <header>
         <code class="frag">{example.name}</code>
         <span class="hint" style="margin:0">{example.title}</span>
-        <button class="spacer" onClick={() => copy(example.restBody)}>
-          Copy
-        </button>
+        <CopyButton class="spacer" label="Copy" text={() => example.restBody} />
       </header>
       <code class="path">{example.restPath}</code>
       <pre>{example.restBody}</pre>

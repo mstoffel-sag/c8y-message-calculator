@@ -2,6 +2,7 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { copy } from './format.js';
 import type { Choice as ChoiceOption } from '../../lib/presets/catalog.js';
 import {
   DURATION_UNITS,
@@ -71,6 +72,42 @@ export function Txt({
         onInput={(e) => onChange((e.target as HTMLInputElement).value)}
       />
     </label>
+  );
+}
+
+/**
+ * A button that copies something, and then says so.
+ *
+ * Every copy in this app goes through here, because the interesting part is not
+ * the copying -- it is the two seconds afterwards. A button that changes nothing
+ * when clicked reads as broken whether it worked or not, and the clipboard is
+ * exactly the kind of thing that fails for reasons the reader cannot see.
+ */
+export function CopyButton({
+  text, label, title, class: className,
+}: {
+  /** Computed on click, so a large payload is not built on every render. */
+  text: () => string;
+  label: string;
+  title?: string;
+  class?: string;
+}) {
+  const [state, setState] = useState<'idle' | 'done' | 'failed'>('idle');
+
+  useEffect(() => {
+    if (state === 'idle') return undefined;
+    const back = setTimeout(() => setState('idle'), 2200);
+    return () => clearTimeout(back);
+  }, [state]);
+
+  return (
+    <button
+      class={className}
+      title={state === 'failed' ? 'The browser refused the clipboard' : title}
+      onClick={async () => setState((await copy(text())) ? 'done' : 'failed')}
+    >
+      {state === 'done' ? '\u2713 Copied' : state === 'failed' ? 'Blocked' : label}
+    </button>
   );
 }
 

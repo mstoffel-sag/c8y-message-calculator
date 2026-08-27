@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 17 — periods side by side, and the CTC commitment computed in quantities · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
+**Status:** draft for review, rev 18 — the hand-off's copy buttons work off a file:// origin, and say so · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
 
 ---
 
@@ -710,6 +710,14 @@ asserted.
 | L8 | Alarm rate implies repeatedly re-raising the same alarm type | Suggestion — use alarm lifecycle |
 | L9 | Command transitions unmodelled, or more than 4 per command | Warning — each update bills (§3) |
 | L10 | A machine fact is re-sent on a timer or at every boot rather than on change | Warning — every successful `PUT` counts, even a no-op |
+
+**Copy to clipboard.** The hand-off table offers two copies per period: the nine counters as one
+column, ready to paste into that period's `D28:D36` in one action, and every line as *cell, value,
+label* — a checklist rather than a paste target, since those cells are not contiguous. Both report
+what happened. `navigator.clipboard` exists only in a secure context, so a build opened by
+double-clicking `dist/index.html` has no clipboard API at all; the copy falls back to
+`document.execCommand` and the button says **Copied** or **Blocked** rather than leaving a reader to
+guess whether it is wired up.
 
 **Export** — JSON that round-trips back into the tool, and an **Excel workbook** of six sheets.
 
