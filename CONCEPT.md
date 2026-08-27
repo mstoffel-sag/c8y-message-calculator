@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 19 — an inventory entry is called inventory, and commands close step 3 · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
+**Status:** draft for review, rev 19 — an inventory entry is called inventory, and commands join the elements that surround them · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
 
 ---
 
@@ -497,16 +497,20 @@ measure, everything else that travels between machine and platform, and only the
 items that have nothing to do with the fleet. A running total stays pinned to the screen throughout, so
 every input visibly moves the number.
 
-| Step | Screen | What it asks, and what it teaches |
-|---|---|---|
-| 1 | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
-| 2 | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. |
-| 3 | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. |
-| 4 | **Deployment & add-ons** | Every Configurator line item the fleet cannot imply, with its cell reference. Quantities only. |
-| 5 | **Rollout** | Periods, month counts, the ramp, and where it starts on the calendar. |
-| 6 | **Results** | §7. |
+| # | Key | Screen | What it asks, and what it teaches |
+|---|---|---|---|
+| 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
+| 2 | `series` | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. |
+| 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. |
+| 4 | `commercial` | **Deployment & add-ons** | Every Configurator line item the fleet cannot imply, with its cell reference. Quantities only. |
+| 5 | `rollout` | **Rollout** | Periods, month counts, the ramp, and where it starts on the calendar. |
+| 6 | `results` | **Results** | §7. |
 
-**The protocol is asked, and deliberately does not count.** Step 1 asks what each machine type talks
+The **key** is the handle: it is what `steps.ts` stores, what the tests are named after, and what
+everything outside this table refers to. The number is a property of this table only, so reordering
+the wizard is a change to one row here and nothing else.
+
+**The protocol is asked, and deliberately does not count.** The **Machines** step asks what each type talks
 — OPC UA, Modbus TCP, BACnet/IP, native MQTT, a custom agent, or something the customer types in
 themselves. It is the first question anyone asks of a finished estimate, it travels to the Design
 sheet of the workbook, and it appears on the machine type's folded header. It appears in **no
@@ -518,7 +522,7 @@ into one message needs a custom template. Advice, not arithmetic.
 
 **The vocabulary is the platform's.** What the industry calls a "datapoint" is a **series** — one
 named value over time — and the fragment that carries a set of series under one timestamp is a
-**measurement type**. Step 2 says series and measurement type in its column headings, its dropdowns
+**measurement type**. **Measurements** says series and measurement type in its column headings, its dropdowns
 and its prose, because a customer who leaves with the wrong words models the wrong thing.
 
 **One table, because a flag is not a different kind of thing.** A state sent on change is a
@@ -542,7 +546,7 @@ on the spot, named after the series and editable immediately — a series never 
 type that does not exist, and a type left with no series in it is dropped, because a measurement type
 is its members.
 
-**Bundling is the default, not a feature.** Step 2's grouping happens as the customer types: a new
+**Bundling is the default, not a feature.** The grouping happens as the customer types: a new
 series drops straight into the measurement type for its interval, and one is created if there is
 none.
 Splitting is the deliberate act. This inverts the usual failure mode, where the good design is
@@ -552,14 +556,14 @@ The proposal is driven by **interval**, because that is what the Measurement API
 timestamp per measurement means readings on the same tick can share a message and readings on
 different ticks never can. Semantics *refine* the proposal afterwards (L6), they do not drive it.
 
-Design principle for steps 1–4: **the customer describes physical reality; the tool designs the
-payload.** Asking a customer to invent fragment names up front is how bad models get built. Asking
+Design principle for every step that describes the fleet: **the customer describes physical reality;
+the tool designs the payload.** Asking a customer to invent fragment names up front is how bad models get built. Asking
 "how often is this sampled?" is a question they can answer without knowing anything about Cumulocity.
 
 ### Machine types fold to a summary
 
-Steps 2, 3 and 4 each edit every machine type, so a fleet with six types meant six full-height
-blocks per step and a page nobody reads. Each block is a disclosure, and its header answers the two
+**Measurements** and the elements step each edit every machine type, so a fleet with six types meant
+six full-height blocks per step and a page nobody reads. Each block is a disclosure, and its header answers the two
 questions you would otherwise have to open it for: **what did I model here, and how much of the
 volume is it.**
 
@@ -583,9 +587,9 @@ did. Three things this pins down:
 
 Figures are per 31-day month at the type's own count and online percentage — deliberately not the
 peak-month total in the header, because a summary has to compare machine types like with like. The
-same call produces step 1's one-line description of each type, so the two cannot drift.
+same call produces the one-line description on **Machines**, so the two cannot drift.
 
-### Step 5 in more detail — the commercial line items
+### The commercial line items in more detail
 
 The Configurator repeats an identical block per period, offset by **30 rows**: period 1 occupies rows
 21–49, period 2 rows 51–79, and so on. Knowing that, the tool returns an exact cell address for every
@@ -662,7 +666,7 @@ a test pins the order.
 
 **The hand-off table** — the primary artefact. Every number the tool produces, next to the exact
 Configurator cell it belongs in, per period: the nine counters, the period length, and every
-deployment and add-on quantity collected in step 5. Two copy actions per period — the nine counters
+deployment and add-on quantity collected on **Deployment & add-ons**. Two copy actions per period — the nine counters
 as one pasteable column for `D28:D36`, and everything as cell/value pairs. Everything else on the
 page supports this table.
 
@@ -893,7 +897,7 @@ the invoice does, because it buys query latency, headroom and a database that st
   invisible in the output. Mitigation: the §5 plain-language questions, an inline example per kind,
   and L2/L5 catching the two common mistakes after the fact.
 - **Over-optimisation.** Bundling purely for volume can produce fragments that make no sense to a
-  dashboard builder. Mitigation: the semantic-group split in step 2, and L6.
+  dashboard builder. Mitigation: the semantic-group split on **Measurements**, and L6.
 - **Overselling savings.** A volume reduction is not automatically a cost reduction. Mitigation: the
   §9 caveat, and the discipline of never computing a bill (§2).
 - **Definition drift.** The Configurator changes yearly. Mitigation: counting rules in one module,

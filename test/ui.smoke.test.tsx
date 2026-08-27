@@ -5,6 +5,9 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render } from 'preact-render-to-string';
 
 import { computeScenario } from '../lib/engine/index.js';
@@ -22,6 +25,12 @@ import { CANVAS_HEIGHT, Explainer, LAYOUT, boxFor, rowCentre } from '../src/ui/E
 
 const noop = () => {};
 
+/**
+ * Test names carry the step's key from steps.ts -- fleet, series, discrete,
+ * commercial, rollout, results -- and never its position. Reordering the wizard
+ * used to rename every test in this file, which made a diff that moved one step
+ * look like a rewrite of the suite.
+ */
 describe('the wizard renders', () => {
   const scenario = conceptSection9Scenario();
   const result = computeScenario(scenario);
@@ -34,13 +43,13 @@ describe('the wizard renders', () => {
     );
   });
 
-  test('1 machines', () => {
+  test('fleet: machine types and counts', () => {
     const html = render(<StepFleet {...props} />);
     assert.match(html, /Rooftop HVAC unit/);
     assert.match(html, /machine type/i);
   });
 
-  test('1 asks how the machine talks, from a list that can be escaped', () => {
+  test('fleet: asks how the machine talks, from a list that can be escaped', () => {
     const html = render(<StepFleet {...props} />);
     assert.match(html, /<th[^>]*>Talks<\/th>/);
     assert.match(html, /<optgroup label="Shop floor"/, 'grouped by who does the talking');
@@ -54,7 +63,7 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(html, /placeholder="Name the protocol"/);
   });
 
-  test('2 measurements teaches bundling and shows the proposal', () => {
+  test('series: teaches bundling and shows the proposal', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /one timestamp/i);
     assert.match(html, /acme_Climate/);
@@ -62,7 +71,7 @@ describe('the wizard renders', () => {
     assert.match(html, /Readings per measurement/, 'the interactive explainer is on this step');
   });
 
-  test('2 asks the rhythm, and asks it once per series', () => {
+  test('series: asks the rhythm, and asks it once per series', () => {
     const html = render(<StepTimeSeries {...props} />);
     // One table, six rows: the four timed readings and the two flags, which are
     // measurements with one series each and not a different kind of thing.
@@ -77,7 +86,7 @@ describe('the wizard renders', () => {
     assert.match(html, /placeholder="acme_CompressorOnOff"/);
   });
 
-  test('2 makes every series column a dropdown', () => {
+  test('series: makes every column a dropdown', () => {
     const html = render(<StepTimeSeries {...props} />);
     // Four timed readings and two flags: name, unit and rhythm for each, plus
     // the measurement type and the period unit on the four timed ones.
@@ -89,14 +98,14 @@ describe('the wizard renders', () => {
     assert.match(html, /A measurement type of its own/);
   });
 
-  test('2 names things the way the platform does', () => {
+  test('series: names things the way the platform does', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /<th[^>]*>Series<\/th>/, 'a datapoint is a series');
     assert.match(html, /<th[^>]*>Measurement type<\/th>/, 'and what it goes into has a name');
     assert.doesNotMatch(html, /atapoint/, 'the word does not belong on this step');
   });
 
-  test('2 mints the measurement type when "of its own" is chosen', async () => {
+  test('series: mints the measurement type when "of its own" is chosen', async () => {
     const { assignOwnBundle } = await import('../src/ui/store.js');
     const hvac = props.scenario.machineTypes[0]!;
     const pressure = hvac.metrics.find((m) => m.name === 'Pressure')!;
@@ -111,7 +120,7 @@ describe('the wizard renders', () => {
     assert.equal((html.match(/A measurement type of its own/g) ?? []).length, 3);
   });
 
-  test('2 lets the measurement type be renamed in the table', () => {
+  test('series: lets the measurement type be renamed in the table', () => {
     const html = render(<StepTimeSeries {...props} />);
     // The suggested name is a placeholder, not a value: an untouched scenario
     // carries no fragment name that nobody chose.
@@ -127,7 +136,7 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(html, /<h4[^>]*>Measurement types</, 'the separate section is gone');
   });
 
-  test('2 asks for the sampling interval as a value and a unit', () => {
+  test('series: asks for the sampling interval as a value and a unit', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /class="duration"/);
     // Every unit the customer might reach for, in reading order.
@@ -141,23 +150,23 @@ describe('the wizard renders', () => {
     assert.match(html, /samples \/ machine \/ month/, 'the consequence is shown alongside');
   });
 
-  test('2 has no bundle-level destructive control', () => {
+  test('series: has no bundle-level destructive control', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.doesNotMatch(html, /Split apart/);
     assert.doesNotMatch(html, /Delete bundle/);
   });
 
-  test('3 names all four elements, and commands are one of them', () => {
+  test('discrete: names all four elements, and commands are one of them', () => {
     const html = render(<StepDiscrete {...props} />);
     for (const heading of ['Events', 'Alarms', 'Inventory', 'Commands']) {
       assert.match(html, new RegExp(`<h3[^>]*>${heading}`), `missing the ${heading} section`);
     }
-    // The step that used to be step 4, now the last section of step 3.
+    // Commands used to be a step of their own; now the last panel of this one.
     assert.match(html, /Operations Created \+ Operations Updated/);
     assert.doesNotMatch(html, /\bfacts?\b/i, 'inventory is called inventory');
   });
 
-  test('3 uses one catalogue dropdown per element', () => {
+  test('discrete: uses one catalogue dropdown per element', () => {
     const html = render(<StepDiscrete {...props} />);
     assert.match(html, /<optgroup label="Maintenance"/, 'alarm and event catalogues');
     assert.match(html, /PENDING, EXECUTING, SUCCESSFUL — 4 messages/,
@@ -193,7 +202,7 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(render(<StepDiscrete {...props} />), /Quoted/);
   });
 
-  test('2 datapoints offers to bundle when nothing is bundled yet', () => {
+  test('series: offers to bundle when nothing is bundled yet', () => {
     const hvac = presetByKey('hvac')!;
     const loose = {
       ...blankScenario(),
@@ -210,7 +219,7 @@ describe('the wizard renders', () => {
     assert.match(html, /Apply/);
   });
 
-  test('3 explains all three of events, alarms and inventory', () => {
+  test('discrete: explains events, alarms and inventory', () => {
     const html = render(<StepDiscrete {...props} />);
     assert.match(html, /Events/);
     assert.match(html, /Alarms/);
@@ -219,13 +228,13 @@ describe('the wizard renders', () => {
     assert.match(html, /lifecycle/i);
   });
 
-  test('3 states the real cost of a command', () => {
+  test('discrete: states the real cost of a command', () => {
     const html = render(<StepDiscrete {...props} />);
     assert.match(html, /PENDING/);
     assert.match(html, /three or four messages/i);
   });
 
-  test('4 deployment and add-ons lists every asked line item with its cell', () => {
+  test('commercial: lists every asked line item with its cell', () => {
     const html = render(<StepCommercial {...props} result={result} />);
     for (const label of [
       'Public/Shared Cloud', 'Dedicated - Production', 'Operational Data Store',
@@ -238,19 +247,19 @@ describe('the wizard renders', () => {
     assert.match(html, /commit-to-consume/i);
   });
 
-  test('4 shows no price, rate or currency', () => {
+  test('commercial: shows no price, rate or currency', () => {
     const html = render(<StepCommercial {...props} result={result} />);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/);
     assert.doesNotMatch(html, /\bprice\b/i);
   });
 
-  test('5 rollout', () => {
+  test('rollout: the ramp, on the real calendar', () => {
     const html = render(<StepRollout {...props} />);
     assert.match(html, /11 %/);
     assert.match(html, /Period 1/);
   });
 
-  test('6 results carries every counter cell and the hand-off', () => {
+  test('results: carries every counter cell and the hand-off', () => {
     const html = render(<StepResults scenario={scenario} result={result} expert />);
     for (const cell of ['D28', 'D29', 'D30', 'D31', 'D32', 'D33', 'D34', 'D35', 'D36']) {
       assert.match(html, new RegExp(cell), `missing ${cell}`);
@@ -347,7 +356,7 @@ describe('the storage estimate shows its working', () => {
   const scenario = conceptSection9Scenario();
   const result = computeScenario(scenario);
 
-  test('7 reports a range, both ends of it, and where it came from', () => {
+  test('results: reports a range, both ends of it, and where it came from', () => {
     const html = render(<Results scenario={scenario} result={result} />);
     assert.match(html, /Operational storage/);
     // The §9 fleet stores 174 M values inside a 30-day retention period: 16.2
@@ -575,13 +584,13 @@ describe('machine types fold away', () => {
   const openCount = (html: string) => (html.match(/<details class="mt" open/g) ?? []).length;
   const blockCount = (html: string) => (html.match(/<details class="mt"/g) ?? []).length;
 
-  test('step 2 folds every machine type but the first', () => {
+  test('series: folds every machine type but the first', () => {
     const html = render(<StepTimeSeries scenario={two} onChange={noop} />);
     assert.equal(blockCount(html), 2, 'one block per machine type');
     assert.equal(openCount(html), 1, 'the first is open, the rest folded');
   });
 
-  test('step 3 folds each machine type inside every element panel', () => {
+  test('discrete: folds each machine type inside every element panel', () => {
     const html = render(<StepDiscrete scenario={two} onChange={noop} />);
     // Events, alarms, inventory and commands, two machine types each.
     assert.equal(blockCount(html), 8);
@@ -622,3 +631,33 @@ describe('machine types fold away', () => {
   });
 })
 
+
+describe('a step is never named by its number', () => {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+  function sources(dir: string, out: string[] = []): string[] {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) sources(full, out);
+      else if (/\.(ts|tsx|css)$/.test(entry.name)) out.push(full);
+    }
+    return out;
+  }
+
+  test('no file outside steps.ts names a step by its position', () => {
+    // Moving one step used to renumber file headers, cross-references and half
+    // the test names in this file, which made a two-line change look like a
+    // rewrite. The order lives in steps.ts and in one CONCEPT.md table; every
+    // other reference uses the component name or the step key.
+    const owner = resolve(root, 'src/ui/wizard/steps.ts');
+    for (const file of [...sources(resolve(root, 'src')), ...sources(resolve(root, 'test'))]) {
+      if (file === owner) continue;
+      const body = readFileSync(file, 'utf8');
+      assert.doesNotMatch(
+        body,
+        /\bsteps? [0-9]/i,
+        `${relative(root, file)} names a step by number -- use the component name or its key`,
+      );
+    }
+  });
+});

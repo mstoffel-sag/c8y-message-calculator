@@ -1,5 +1,6 @@
 /**
- * Step 3: everything that is not a measurement. CONCEPT.md section 3.
+ * Everything that is not a measurement: events, alarms, inventory, commands.
+ * CONCEPT.md section 3.
  *
  * Events, alarms and inventory get confused with each other constantly, and each
  * confusion has a cost: alarms used as events produce noise, events used for

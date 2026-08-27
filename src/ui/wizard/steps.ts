@@ -9,10 +9,17 @@
  * Commands used to be a step of their own. They are one element among four --
  * and the shortest of the four to answer -- so a whole screen for them put the
  * emphasis in the wrong place and made the fleet's non-measurement traffic look
- * like two unrelated subjects. They now close step 3, after the three inbound
+ * like two unrelated subjects. They now close `discrete`, after the inbound
  * elements, where the contrast with them is the point being taught.
  */
 
+/**
+ * The `key` is the handle for a step, and its position in this array is the only
+ * statement of order anywhere. Nothing outside this file names a step by number:
+ * components refer to each other by component name, tests are named after the
+ * key, and CONCEPT.md numbers the rows of one table. Reordering the wizard is
+ * then a change to this array, not a rename across twenty files.
+ */
 export interface StepDef {
   key: string;
   title: string;

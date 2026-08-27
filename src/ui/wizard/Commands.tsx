@@ -1,5 +1,5 @@
 /**
- * Commands: the closing section of step 3. CONCEPT.md section 3.
+ * Commands: the closing section of StepDiscrete. CONCEPT.md section 3.
  *
  * The one element that runs the other way, and the one people leave out of
  * estimates entirely. It sits with events, alarms and inventory rather than in a

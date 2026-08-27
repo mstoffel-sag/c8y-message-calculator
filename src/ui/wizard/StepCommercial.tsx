@@ -1,5 +1,5 @@
 /**
- * Step 4: deployment and add-ons.
+ * Deployment and add-ons.
  *
  * These are the Configurator line items the fleet cannot imply. The tool
  * collects quantities and hands them back with their cell references so nobody

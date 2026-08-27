@@ -16,7 +16,7 @@ npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 ```
 
 ```
-npm test         # 244 tests: the engine, the cell map, the xlsx writer, and every wizard step
+npm test         # the engine, the cell map, the xlsx writer, and a render pass over every step
 npm run typecheck
 npm run build    # static bundle in dist/
 npm run package  # dist-package/message-calculator-<version>.zip, ready to upload
@@ -148,8 +148,8 @@ green-60 -- and `--on-brand` flips with it, because white on a light-green butto
 
 ### Machine types fold
 
-Steps 2 and 3 both edit the same machine types from different angles, so past
-two types either of them was a page nobody reads. Each block is a `<details>`
+Measurements and the elements step both edit the same machine types from
+different angles, so past two types either of them was a page nobody reads. Each block is a `<details>`
 whose `<summary>` carries what is inside it and what it costs:
 
 ```
@@ -159,9 +159,10 @@ whose `<summary>` carries what is inside it and what it costs:
                                        Measurements 45.9 M · Events 31 k · Alarms 31 k
 ```
 
-`machineTypeSummary` in the engine produces every figure there, and step 1's
-one-line description comes from the same call -- so the two cannot drift. Two
-things it gets right that the old hand-rolled line did not:
+`machineTypeSummary` in the engine produces every figure there, and the
+one-line machine description on the Machines step comes from the same call -- so
+the two cannot drift. Two things it gets right that the old hand-rolled line did
+not:
 
 - **A state is its own measurement.** It cannot join an interval bundle without
   making that bundle's series set vary, so the section 9 HVAC unit sends three
@@ -176,7 +177,7 @@ one has to compare like with like between machine types. `summary.total` for the
 section 9 HVAC unit is 45,977,000, the acceptance number for a 31-day month,
 and a test pins it there rather than to a second implementation.
 
-Inside step 3 the same block appears once per element, so there `only` narrows
+Inside the elements step the same block appears once per element, so `only` narrows
 the summary to that element -- the alarms panel summarises alarms. Which is
 folded lives in `collapse.ts`: localStorage, shared across the three steps by
 machine type id, and pruned to ids the scenario still has, because those ids come

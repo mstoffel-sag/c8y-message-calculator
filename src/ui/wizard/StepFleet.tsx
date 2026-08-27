@@ -1,4 +1,4 @@
-/** Step 1: machine types and counts. */
+/** Machines: types, counts, online share, and the protocol each one talks. */
 
 import { machineTypeSummary, type Scenario } from '../../../lib/engine/index.js';
 import { PRESETS, blankMachineType } from '../../../lib/presets/index.js';
@@ -53,7 +53,7 @@ export function StepFleet({ scenario, onChange }: Props) {
                       placeholder="Rooftop HVAC unit"
                       onChange={(name) => onChange(patchMachineType(scenario, mt.id, { name }))}
                     />
-                    {/* The same sentence the collapsed header on step 2 shows,
+                    {/* The same sentence StepTimeSeries' collapsed header shows,
                         from the same helper, so the two never disagree about
                         how many measurements a machine actually sends. */}
                     <div class="hint" style="margin-top:4px">

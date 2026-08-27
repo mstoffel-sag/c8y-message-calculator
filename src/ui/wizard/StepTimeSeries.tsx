@@ -1,5 +1,5 @@
 /**
- * Step 2: measurements. The core lesson lives here (CONCEPT.md section 4).
+ * Measurements. The core lesson of the wizard lives here (CONCEPT.md section 4).
  *
  * The vocabulary is the platform's, because a customer who leaves with the wrong
  * words models the wrong thing: a *series* is one named value over time -- what

@@ -1,4 +1,4 @@
-/** Step 5: periods, the ramp, and the calendar. */
+/** Rollout: periods, the ramp, and the calendar. */
 
 import {
   BYTES_PER_VALUE_HIGH,

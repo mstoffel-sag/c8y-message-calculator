@@ -386,7 +386,7 @@ td.cell { font-family: var(--mono); color: var(--ink-faint); font-size: var(--c8
 
 .mt-head { grid-column: 2; display: flex; gap: calc(var(--u) * 1.5); align-items: baseline; flex-wrap: wrap; }
 .mt-name { font-weight: 600; font-size: var(--c8y-font-size-large); line-height: var(--c8y-line-height-headings); }
-/* Inside the per-element panels of step 3 the machine name is a row label, not
+/* Inside StepDiscrete's per-element panels the machine name is a row label, not
    the page's subject, so it does not compete with the panel heading. */
 .panel.sub .mt-name { font-size: var(--c8y-font-size-base); }
 

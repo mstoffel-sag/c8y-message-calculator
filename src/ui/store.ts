@@ -586,10 +586,10 @@ export function commercialBool(period: Period, key: string): boolean {
  * is worse than one that fills in a unit.
  *
  * The *rhythm* is the exception, and only across the two measurement catalogues.
- * Step 2 offers timed readings and on-change flags in one list, because they are
- * one kind of thing; a door open/closed left on a one-minute timer is then the
- * single mistake the whole step exists to prevent, so a name that comes from the
- * other catalogue brings its rhythm with it.
+ * StepTimeSeries offers timed readings and on-change flags in one list, because
+ * they are one kind of thing; a door open/closed left on a one-minute timer is
+ * then the single mistake the whole step exists to prevent, so a name that comes
+ * from the other catalogue brings its rhythm with it.
  */
 export function setDatapointName(
   scenario: Scenario,

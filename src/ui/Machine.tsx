@@ -1,10 +1,10 @@
 /**
  * A machine type's editing block, folded down to one readable header.
  *
- * Steps 2 and 3 both edit the same machine types from different angles, and
- * both used to open with a full-height block per type. Past two types that
- * is a page nobody reads. So the block collapses, and the header carries the
- * summary: what was modelled, and what it costs in messages.
+ * StepTimeSeries and StepDiscrete both edit the same machine types from
+ * different angles, and both used to open with a full-height block per type.
+ * Past two types that is a page nobody reads. So the block collapses, and the
+ * header carries the summary: what was modelled, and what it costs in messages.
  *
  * <details> rather than a div and a class, because the browser then gives the
  * disclosure keyboard handling, the open/closed state to assistive technology,
@@ -99,10 +99,10 @@ function Figure({ messages, perMachine }: { messages: number; perMachine?: numbe
 }
 
 /**
- * @param only narrows the summary to one kind. Step 3 shows the same machine
- *   type once per element, so a full summary there would repeat the same three
- *   numbers three times; inside the Alarms panel the useful summary is the
- *   alarms.
+ * @param only narrows the summary to one kind. StepDiscrete shows the same
+ *   machine type once per element, so a full summary there would repeat the
+ *   same three numbers three times; inside the Alarms panel the useful summary
+ *   is the alarms.
  */
 export function MachineSummary({
   summary: s,
