@@ -8,5 +8,6 @@ export * from './lint.js';
 export * from './payload.js';
 export * from './diagram.js';
 export * from './summary.js';
+export * from './storage.js';
 export * from './workbook.js';
 export * from './configurator.js';

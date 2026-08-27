@@ -15,7 +15,7 @@ npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 ```
 
 ```
-npm test         # 219 tests: the engine, the cell map, the xlsx writer, and every wizard step
+npm test         # 229 tests: the engine, the cell map, the xlsx writer, and every wizard step
 npm run typecheck
 npm run build    # static bundle in dist/
 npm run package  # dist-package/message-calculator-<version>.zip, ready to upload
@@ -106,7 +106,19 @@ tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurato
 | 4 Commands | operations, with the status-transition count |
 | 5 Deployment & add-ons | every Configurator line item the fleet cannot imply |
 | 6 Rollout | periods, the ramp, and where it starts on the calendar |
-| 7 Results | messages per calendar month, the cell each number goes in, and an Excel download |
+| 7 Results | messages per calendar month, the cell each number goes in, the operational-storage range, and an Excel download |
+
+### Operational storage is a range, not a number
+
+The Results step and a `Storage` sheet in the workbook estimate the Operational Data Store from the
+values the fleet writes: **100–400 bytes per stored value** in MongoDB, held for the tenant's
+**retention period**, plus a **DataHub extract at 20–25 %** of that. Both figures come from
+`StorageCalculation.txt` and both are marked "to be verified" at source, so both ends of the range
+are always shown and no midpoint ever is — the Configurator's ODS cell stays a human's to fill.
+
+The retention period is walked backwards through the months the ramp produced, so a fleet three
+months into a rollout is not credited with a full period of history, and storage keeps climbing after
+the message count has levelled off.
 
 ### Styling follows the Cumulocity design system
 

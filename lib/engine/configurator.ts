@@ -66,7 +66,7 @@ export const LINE_ITEMS: LineItem[] = [
   {
     key: 'ods', group: 'Core Metrics', label: 'Operational Data Store',
     unit: 'per GiB', baseRow: 37, source: 'asked',
-    help: 'Daily maximum storage, in GiB. The calculator does not estimate this: there is no fixed relation between how many messages you send and how many bytes they occupy. It reports the number of values you store instead, which is the input to that judgement.',
+    help: 'Daily maximum storage, in GiB. The calculator estimates a range on the Storage sheet -- 100 to 400 bytes per stored value, over the tenant\'s retention period -- from rules of thumb that are marked "to be verified" at source. It stays an asked figure because a 4x spread is a judgement, not an answer: pick from the range and say which end you picked.',
   },
 
   {

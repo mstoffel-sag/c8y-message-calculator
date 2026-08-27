@@ -22,6 +22,7 @@ import {
 } from './types.js';
 import { type CalendarMonth, SECONDS_PER_DAY, expandMonths, secondsInMonth } from './calendar.js';
 import { lintScenario } from './lint.js';
+import { peakStorageMonth, storageByMonth } from './storage.js';
 import { commandsInMonth } from './cadence.js';
 
 /** Interval assumed for a state metric in the naive baseline when the machine
@@ -330,6 +331,10 @@ export function computeScenario(scenario: Scenario): ScenarioResult {
   });
 
   const first = months[0]!;
+  // Storage needs the whole month series, not one month: what is on disk at the
+  // end of a month is what the months before it left inside the retention
+  // window. So it is derived here, once, rather than per consumer.
+  const storage = storageByMonth(months, scenario.settings.retentionDays);
   return {
     scenarioName: scenario.name,
     periods,
@@ -337,6 +342,8 @@ export function computeScenario(scenario: Scenario): ScenarioResult {
     peakMonth: months.reduce((best, m) => (m.total > best.total ? m : best), first),
     leanMonth: months.reduce((best, m) => (m.total < best.total ? m : best), first),
     findings: lintScenario(scenario),
+    storage,
+    peakStorage: peakStorageMonth(storage),
   };
 }
 

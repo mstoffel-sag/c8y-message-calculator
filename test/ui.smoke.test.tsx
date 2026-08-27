@@ -17,6 +17,7 @@ import { StepCommands } from '../src/ui/wizard/StepCommands.js';
 import { StepCommercial } from '../src/ui/wizard/StepCommercial.js';
 import { StepRollout } from '../src/ui/wizard/StepRollout.js';
 import { StepResults } from '../src/ui/wizard/StepResults.js';
+import { Results } from '../src/ui/Results.js';
 import { CANVAS_HEIGHT, Explainer, LAYOUT, boxFor, rowCentre } from '../src/ui/Explainer.js';
 
 const noop = () => {};
@@ -292,6 +293,35 @@ describe('a freshly added series', () => {
     // on that field's own placeholder, because the measurement-type name beside
     // it is a text field and always open.
     assert.doesNotMatch(html, /placeholder="Name it yourself"/);
+  });
+});
+
+describe('the storage estimate shows its working', () => {
+  const result = computeScenario(conceptSection9Scenario());
+
+  test('7 reports a range, both ends of it, and where it came from', () => {
+    const html = render(<Results result={result} />);
+    assert.match(html, /Operational storage/);
+    // The §9 fleet stores 174 M values inside a 30-day retention period: 16.2
+    // GiB at 100 bytes each, 64.8 at 400.
+    assert.match(html, /16\.2 – 64\.8 GiB/);
+    assert.match(html, /to be verified/, 'the provenance travels with the number');
+    assert.match(html, /30 days kept/);
+    assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
+  });
+
+  test('it never offers a single number to quote', () => {
+    const html = render(<Results result={result} />);
+    // No midpoint, no "about", no average of two unverified figures. Every GiB
+    // figure on the page is one end of a stated range.
+    assert.doesNotMatch(html, /40\.5 GiB/, 'the midpoint of 16.2 and 64.8');
+    assert.match(html, /The range is the answer/);
+  });
+
+  test('it says what it leaves out', () => {
+    const html = render(<Results result={result} />);
+    assert.match(html, /Measurements only/);
+    assert.match(html, /under 1 %/, 'and how far off that can be for this fleet');
   });
 });
 

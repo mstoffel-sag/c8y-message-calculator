@@ -186,11 +186,15 @@ describe('Configurator cells', () => {
     assert.equal(ASKED_LINE_ITEMS.length, LINE_ITEMS.length - 1);
   });
 
-  test('storage is asked for, never estimated', () => {
+  test('storage is estimated as a range, and still asked for', () => {
     const ods = LINE_ITEMS.find((i) => i.key === 'ods');
     assert.ok(ods);
-    assert.equal(ods.source, 'asked', 'there is no fixed relation between messages and bytes');
-    assert.match(ods.help ?? '', /does not estimate/);
+    // The tool now has a figure to offer -- 100 to 400 bytes per stored value --
+    // but a 4x spread is a judgement, so the cell stays a human's to fill and
+    // the help says where the range comes from.
+    assert.equal(ods.source, 'asked');
+    assert.match(ods.help ?? '', /100 to 400 bytes/);
+    assert.match(ods.help ?? '', /to be verified/);
   });
 
   test('no line item carries a price, rate or currency', () => {

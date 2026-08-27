@@ -1,6 +1,11 @@
 /** Step 6: periods, the ramp, and the calendar. */
 
-import { monthName, periodMonthsCell, type Scenario } from '../../../lib/engine/index.js';
+import {
+  DEFAULT_RETENTION_DAYS,
+  monthName,
+  periodMonthsCell,
+  type Scenario,
+} from '../../../lib/engine/index.js';
 import { addPeriod, patchPeriod, removePeriod, setPeriodCount } from '../store.js';
 import { Num, Teach, Empty } from '../parts.js';
 
@@ -60,6 +65,21 @@ export function StepRollout({ scenario, onChange }: Props) {
           title="Multiplier on the average rate, for the throughput sanity check only. It does not change the message count."
           value={scenario.settings.peakFactor}
           onChange={(peakFactor) => onChange({ ...scenario, settings: { ...scenario.settings, peakFactor } })}
+        />
+        {/* Retention changes nothing about how many messages are sent -- only
+            how many of them are still on disk. It is here rather than on the
+            results screen because it is a fact about the tenant, like the
+            calendar start, not an output. */}
+        <Num
+          label="Data kept"
+          width="150px"
+          min={1}
+          suffix="days"
+          title="Days of data the tenant's retention rules keep. Decides the operational storage estimate on the Results step; it does not change the message count."
+          value={scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS}
+          onChange={(retentionDays) =>
+            onChange({ ...scenario, settings: { ...scenario.settings, retentionDays } })
+          }
         />
       </div>
 

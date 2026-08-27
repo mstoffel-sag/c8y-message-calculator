@@ -144,6 +144,13 @@ export interface ScenarioSettings {
    * Customer-visible in every payload example, so it is worth getting right.
    */
   fragmentPrefix: string;
+  /**
+   * Days of data the tenant keeps, from its retention rules. Decides the
+   * operational storage estimate and nothing else -- retention does not change
+   * how many messages are sent, only how many of them are still on disk.
+   * Absent means DEFAULT_RETENTION_DAYS.
+   */
+  retentionDays?: number;
 }
 
 export interface Scenario {
@@ -267,6 +274,43 @@ export interface PeriodResult {
   periodTotal: number;
 }
 
+/**
+ * Operational storage for one calendar month. Derived in storage.ts, which
+ * carries the assumptions and their provenance.
+ */
+export interface StorageMonth {
+  year: number;
+  /** 1-12. */
+  month: number;
+  /** Measurement values written during this month. */
+  written: number;
+  /**
+   * Values still inside the retention window at the end of it -- the fullest
+   * day, and so the daily maximum the platform bills for.
+   */
+  retained: number;
+  retentionDays: number;
+  /** Days of history actually behind this figure; short while the fleet ramps. */
+  daysCovered: number;
+  lowGiB: number;
+  highGiB: number;
+  dataHubLowGiB: number;
+  dataHubHighGiB: number;
+  /**
+   * Values per measurement document written this month. The source notes that
+   * putting several datapoints in one measurement "can reduce required
+   * diskspace significantly", because the envelope is paid once instead of
+   * once per value -- so a fleet with fat measurements sits nearer the bottom
+   * of the range than the top.
+   */
+  valuesPerMeasurement: number;
+  /**
+   * Non-measurement documents as a share of all documents written. The byte
+   * figures cover measurements only, so this is how far off that can be.
+   */
+  nonMeasurementShare: number;
+}
+
 export interface ScenarioResult {
   scenarioName: string;
   periods: PeriodResult[];
@@ -274,6 +318,13 @@ export interface ScenarioResult {
   peakMonth: MonthResult;
   leanMonth: MonthResult;
   findings: Finding[];
+  /** One entry per month, aligned with `months`. */
+  storage: StorageMonth[];
+  /**
+   * The fullest month. Storage accumulates, so this is not always the peak
+   * message month -- it keeps climbing while the fleet grows.
+   */
+  peakStorage?: StorageMonth;
 }
 
 /* ------------------------------------------------------------------- linting */

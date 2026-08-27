@@ -159,10 +159,10 @@ describe('the sheet writer', () => {
 });
 
 describe('the workbook content', () => {
-  test('five sheets, named for what they hold', () => {
+  test('six sheets, named for what they hold', () => {
     assert.deepEqual(
       sheetsFor().map((s) => s.name),
-      ['Configurator', 'Quote', 'Design', 'Months', 'Guidance'],
+      ['Configurator', 'Quote', 'Design', 'Months', 'Storage', 'Guidance'],
     );
   });
 
@@ -278,7 +278,7 @@ describe('the workbook content', () => {
   test('an empty scenario still produces a valid workbook', () => {
     const scenario = blankScenario();
     const sheets = workbookSheets(scenario, computeScenario(scenario));
-    assert.equal(sheets.length, 5);
+    assert.equal(sheets.length, 6);
     assert.doesNotThrow(() => buildXlsx(sheets));
   });
 
@@ -397,7 +397,7 @@ describe('the Quote sheet', () => {
   test('it is the second sheet, after the paste-ready quantities', () => {
     assert.deepEqual(
       sheetsFor().map((s) => s.name),
-      ['Configurator', 'Quote', 'Design', 'Months', 'Guidance'],
+      ['Configurator', 'Quote', 'Design', 'Months', 'Storage', 'Guidance'],
     );
   });
 

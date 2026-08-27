@@ -16,6 +16,32 @@ export function compact(value: number): string {
   return nf.format(value);
 }
 
+/**
+ * GiB, at a precision the underlying number can support. A storage figure that
+ * rests on "100-400 bytes, to be verified" has no business showing decimals
+ * once it is past a few GiB.
+ */
+export function gib(value: number): string {
+  if (value === 0) return '0 GiB';
+  if (value < 1) return `${value.toFixed(2)} GiB`;
+  if (value < 100) return `${nf1.format(value)} GiB`;
+  if (value < 10_240) return `${Math.round(value)} GiB`;
+  return `${nf1.format(value / 1024)} TiB`;
+}
+
+/**
+ * "16.2 – 64.8 GiB": the unit once, so a range fits on one line.
+ *
+ * Unless the two ends land in different units, where dropping the first one
+ * would read as "6,000 TiB to 23.4 TiB" -- so both are spelled out.
+ */
+export function gibRange(low: number, high: number): string {
+  const [a, b] = [gib(low), gib(high)];
+  const unitOf = (s: string) => s.replace(/^[\d.,\s]+/, '');
+  if (unitOf(a) !== unitOf(b)) return `${a} – ${b}`;
+  return `${a.replace(/\s*[A-Za-z]+$/, '')} – ${b}`;
+}
+
 export function signed(value: number): string {
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${compact(Math.abs(value))}`;
 }

@@ -8,14 +8,16 @@
  */
 
 import {
+  DEFAULT_RETENTION_DAYS,
   NAIVE_BASELINE_RULE,
+  STORAGE_SOURCE_NOTE,
   formatMonth,
   type Finding,
   type MonthResult,
   type PeriodResult,
   type ScenarioResult,
 } from '../../lib/engine/index.js';
-import { compact, n, nf1, signed } from './format.js';
+import { compact, gibRange, n, nf1, pct, signed } from './format.js';
 
 export function Results({ result }: { result: ScenarioResult }) {
   const peak = result.peakMonth;
@@ -113,14 +115,15 @@ export function Results({ result }: { result: ScenarioResult }) {
                 that still behaves at scale.
               </p>
               <p style="font-size:13px;color:var(--ink-mute)">
-                <b>{compact(peak.storedValues)} values stored</b> in the peak month, as a count. No
-                byte or GiB figure: there is no fixed relation between payload and stored size, so the
-                tool does not invent one.
+                <b>{compact(peak.storedValues)} values stored</b> in the peak month, as a count
+                &mdash; and the input to the storage estimate below.
               </p>
             </div>
           </div>
         </div>
       </section>
+
+      <Storage result={result} />
 
       <div class="grid two">
         <ByMachineType peak={peak} />
@@ -267,3 +270,92 @@ export function Findings({ findings }: { findings: Finding[] }) {
     </section>
   );
 }
+
+/**
+ * Operational storage: a range, and why it is a range.
+ *
+ * The two figures behind it are rules of thumb marked "to be verified" at
+ * source, and one of them spans 4x on its own. Reporting a midpoint would make
+ * that look like a measurement, so both ends are shown, the retention that
+ * scales them is stated, and the ODS line stays somebody's decision.
+ */
+function Storage({ result }: { result: ScenarioResult }) {
+  const peak = result.peakStorage;
+  if (!peak || peak.retained <= 0) return null;
+  const partial = peak.daysCovered < peak.retentionDays;
+
+  return (
+    <section class="panel">
+      <header>
+        <h2>Operational storage</h2>
+        <span class="sub">What is on disk on the fullest day &mdash; the figure ODS bills</span>
+      </header>
+      <div class="body">
+        <div class="grid four" style="margin-bottom:18px">
+          <div class="stat">
+            <span>Operational data store</span>
+            <b>{gibRange(peak.lowGiB, peak.highGiB)}</b>
+            <small>
+              {formatMonth(peak.year, peak.month)} &middot; {n(peak.retentionDays)} days kept
+            </small>
+          </div>
+          <div class="stat">
+            <span>Values on disk</span>
+            <b>{compact(peak.retained)}</b>
+            <small>
+              {compact(peak.written)} written that month
+              {partial && ` · only ${n(peak.daysCovered)} days of history yet`}
+            </small>
+          </div>
+          <div class="stat">
+            <span>Values per measurement</span>
+            <b>{nf1.format(peak.valuesPerMeasurement)}</b>
+            <small>
+              {peak.valuesPerMeasurement > 1.5
+                ? 'bundled, so nearer the bottom of the range'
+                : 'one value per message, so nearer the top'}
+            </small>
+          </div>
+          <div class="stat">
+            <span>DataHub extract</span>
+            <b>{gibRange(peak.dataHubLowGiB, peak.dataHubHighGiB)}</b>
+            <small>20&ndash;25 % of the same data</small>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div>
+            <p class="note" style="margin:0">
+              <b>The range is the answer.</b> {STORAGE_SOURCE_NOTE}
+            </p>
+            <p style="font-size:13px;color:var(--ink-mute);margin-top:10px">
+              Bundling moves the real figure down inside that range as well as cutting messages: a
+              measurement carrying {nf1.format(peak.valuesPerMeasurement)} values pays for its
+              envelope once instead of {nf1.format(peak.valuesPerMeasurement)} times. The tool does
+              not try to split the envelope from the value, because the source does not measure them
+              separately.
+            </p>
+          </div>
+          <div>
+            <p style="font-size:13px;color:var(--ink-mute);margin-top:0">
+              <b>Retention decides the size.</b> Identical traffic held for 90 days occupies three
+              times what it does at 30. This uses{' '}
+              <b>{n(peak.retentionDays)} days</b>
+              {peak.retentionDays === DEFAULT_RETENTION_DAYS && ' (the starting assumption)'} &mdash;
+              set it to the tenant's real retention rule on the Rollout step.
+            </p>
+            <p style="font-size:13px;color:var(--ink-mute)">
+              Measurements only. Events, alarms, inventory writes and operations are stored too, but
+              the source measured datapoints; they are{' '}
+              <b>
+                {peak.nonMeasurementShare < 0.01 ? 'under 1 %' : pct(peak.nonMeasurementShare)}
+              </b>{' '}
+              of the documents this fleet writes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+

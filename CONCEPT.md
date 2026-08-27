@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 14 — step 1 asks what each machine talks; descriptive, and no counter reads it · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
+**Status:** draft for review, rev 15 — operational storage estimated as a range, from StorageCalculation.txt · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
 
 ---
 
@@ -60,9 +60,10 @@ Where the concept needs to reason about money to justify a recommendation, it re
 - **No commit sizing, no utilisation, no overage.** A billing system is attached and takes care of
   withdrawal. This tool estimates messages; nothing downstream of that number is its business.
 - No deployment, add-on or support modelling. That is the Configurator's job.
-- **Storage is reported as a count, not in bytes or money.** Stored values, because they are the
-  counterweight to message optimisation (§4.4). There is no fixed relation between payload and stored
-  size, so no GiB figure is invented.
+- **Storage is estimated as a range, never as a number.** Stored values remain the primary figure,
+  because they are the counterweight to message optimisation (§4.4); the GiB range on top of them
+  rests on two unverified rules of thumb and is reported with both ends and its provenance (§4.6).
+  Still no money: what a GiB costs is not this tool's business.
 - No live traffic measurement. Pre-fill from tenant statistics is a later phase (§8).
 
 ---
@@ -288,9 +289,8 @@ For 1,000 machines, two flags, ~20 transitions per flag per day, on a 60 s bundl
 Option B costs **+2.8 %** on top of the 44.6 M messages the climate bundle already generates, and
 removes **a third** of the fleet's stored values — 88.0 M of 267.8 M.
 
-There is **no fixed relation between payload and stored size**, so the tool reports stored values as
-a count and makes no claim about bytes or GiB. The recommendation therefore does not rest on a storage
-saving at all. It rests on two things that are certain:
+The bytes those values occupy are only known to a factor of four (§4.6), so the recommendation does
+not rest on a storage saving at all. It rests on two things that are certain:
 
 - **1.24 M extra messages against 44.6 M is +2.8 %.** The cost of doing it properly is negligible.
 - **Losing the transition timestamp is a functional loss.** Option A cannot tell you when the
@@ -313,6 +313,46 @@ The same signal aggregated on the gateway to min / max / avg / RMS per axis per 
 one 60 s bundle: **44,640,000 messages.** A 60× reduction, and for most condition-monitoring
 use cases a *better* dataset. The tool flags any interval below 1 s and offers to model the aggregated
 alternative side by side.
+
+### 4.6 Operational storage — a range, and why it stays one
+
+The Operational Data Store is billed per GiB of **daily maximum** storage, so it is a real line in the
+Configurator (row 37) that somebody has to fill in. The tool now offers a figure for it, from
+`StorageCalculation.txt`:
+
+| Assumption | Value | Provenance |
+|---|---|---|
+| Bytes per stored value in MongoDB | **100–400 B** | 100 B from independent tests on Edge and a rule of thumb; 400 B from one proof of concept. Marked *"needs to be verified"* at source. |
+| DataHub extract, relative to MongoDB | **20–25 %** | Rule of thumb, tested on Edge. Also *"to be verified"*. |
+| Retention | **asked** (30 days to start) | Not in the source at all. It is a tenant setting, and the tool cannot read it. |
+
+**Both ends are reported, and no midpoint is ever shown.** Averaging two unverified figures produces
+something that looks like a measurement, and a number that looks measured ends up in a commitment.
+A fourfold spread *is* the finding; the tool's job is to hand it over intact, so the ODS cell stays
+`asked` (§7) and the range sits beside it with its provenance.
+
+Two things the source does not say, and the model therefore has to get right:
+
+**Retention decides the size, not the traffic.** What is billed is what is on disk on the fullest day,
+so identical traffic held for 90 days occupies three times what it does at 30. Retention lives in the
+scenario settings, next to the peak factor, and changes no counter.
+
+**The ramp means the period is not full yet.** A fleet three months into a rollout has three months of
+history, not thirty days of steady state at its final size. The retention period is walked backwards
+day by day through the months the ramp actually produced, so period 1 reads truthfully — and storage
+keeps climbing for months after the message count has levelled off, which is a property no
+single-month calculation can show. That behaviour is enforced by test.
+
+**What it covers: measurements.** Events, alarms, inventory writes and operations are stored too, but
+the source measured datapoints. Rather than assert that the difference is small, the tool reports the
+non-measurement share of documents alongside the estimate — under 1 % for the §9 fleet — so the
+simplification can be checked instead of trusted.
+
+**Bundling shows up here too.** The source notes that putting several datapoints in one measurement
+"can reduce required diskspace significantly", because the envelope is paid once per measurement
+rather than once per value. The tool reports values-per-measurement next to the range and says which
+end of it a fleet is nearer. It does **not** split the envelope cost from the value cost: the source
+measures the two together, and inventing the split would be inventing precision.
 
 ---
 
@@ -545,9 +585,10 @@ these cells".
 | Add-Ons | Streaming Analytics · DataHub Standard + data queried · DataHub Dedicated · Microservice Hosting · Enterprise Functions · Tenants · Data Broker · VPN Services | 38–46 |
 | Support | Gold (Public Cloud Upgrade) | 47 |
 
-Exactly one of these is calculated. **Everything else is asked**, including storage: there is no fixed
-relation between messages sent and bytes stored, so the tool asks for the ODS figure and reports the
-*number of values stored* as the input to that judgement rather than inventing a GiB estimate (§4.4).
+Exactly one of these is calculated. **Everything else is asked**, including storage — but storage is
+now asked *with a range beside it*: §4.6 estimates 100–400 bytes per stored value over the tenant's
+retention period, and the ODS cell stays a human's to fill because a fourfold spread is a judgement,
+not an answer.
 
 **DataHub Standard is a yes/no that the tool records and does not act on.** It applies an uplift to
 the message *rate* in the Configurator. It does not change the message *count*, so it changes nothing
@@ -581,8 +622,8 @@ page supports this table.
 - Total messages/month split by counter and by machine type, with the naive baseline alongside.
 - The per-machine-per-month figure — the number architects actually reason with.
 - Average and peak messages/second: a throughput sanity check.
-- Stored values per month, as a count. No byte or GiB estimate — there is no fixed relation between
-  payload and stored size, so the tool does not invent one (§4.4).
+- Stored values per month, as a count, and the operational storage they imply as a GiB **range** with
+  its assumptions attached (§4.6). Both ends, never a midpoint.
 - A per-period ramp of message volume as the fleet rolls out.
 
 Deliberately absent: billable units, utilisation, headroom, commit recommendations, overage warnings.
@@ -814,7 +855,7 @@ the invoice does, because it buys query latency, headroom and a database that st
 | **Does a batch help?** | **No.** Ten measurements in one batch request counts as **ten messages**. | Removed the `bulkCounting` switch. Added the *batch for the network, bundle for the count* rule (§2) |
 | **What is a month?** | **Calendar month.** | Removed the month-basis setting; the engine works in real month lengths and sizes on the longest month (§2, §9) |
 | **Do no-op `PUT`s count?** | **Yes. Every `PUT` counts.** | New guard-rail (§3) and lint rule L10 |
-| **Bytes per stored value?** | **No fixed relation between payload and storage.** | Dropped the GiB estimate entirely; §4.4 now rests on message count and transition timing, not on a storage saving |
+| **Bytes per stored value?** | **100–400 B in MongoDB, unverified** (StorageCalculation.txt). | §4.6 reports the full range and its provenance; §4.4 still rests on message count and transition timing, not on a storage saving, because a 4x spread cannot carry an argument |
 | **Maximum series per measurement?** | **Do not exceed 100.** | L6 now fires above 100, as a platform recommendation rather than our guess |
 | **Do failed requests count?** | **No.** Only successful writes. | A retry loop costs network, not messages (§2). The no-op `PUT` rule stands — a *successful* write that changes nothing still counts |
 | **Reads?** | **Confirmed not counted.** | — |

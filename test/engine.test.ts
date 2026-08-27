@@ -12,7 +12,12 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  BYTES_PER_GIB,
+  BYTES_PER_VALUE_HIGH,
+  BYTES_PER_VALUE_LOW,
   COUNTER_KEYS,
+  DATAHUB_SHARE_HIGH,
+  DATAHUB_SHARE_LOW,
   computeScenario,
   computeMachineTypeMonth,
   daysInMonth,
@@ -588,13 +593,16 @@ describe('lib/ imports nothing but itself', () => {
     // The engine has to run in Node for the tests, in a preact app today and in
     // an Angular app later, so it can assume none of them.
     const banned: Array<[RegExp, string]> = [
-      [/\bdocument\s*\./, 'document'],
-      [/\bwindow\s*\./, 'window'],
+      // The dot has to touch a property name. "the retention window. So ..." in
+      // a comment is prose, and a guard that flags English gets worked around
+      // rather than obeyed; a property access never has a space before its name.
+      [/\bdocument\.[A-Za-z_$]/, 'document'],
+      [/\bwindow\.[A-Za-z_$]/, 'window'],
       [/\blocalStorage\b/, 'localStorage'],
-      [/\bnavigator\s*\./, 'navigator'],
+      [/\bnavigator\.[A-Za-z_$]/, 'navigator'],
       [/\bfetch\s*\(/, 'fetch'],
       [/\bBlob\s*\(/, 'Blob'],
-      [/\bprocess\s*\./, 'process'],
+      [/\bprocess\.[A-Za-z_$]/, 'process'],
       [/@angular\//, '@angular'],
       [/@c8y\//, '@c8y'],
       [/\bpreact\b/, 'preact'],
@@ -607,3 +615,119 @@ describe('lib/ imports nothing but itself', () => {
     }
   });
 })
+
+describe('operational storage', () => {
+  const flat = (): Scenario => {
+    const s = conceptSection9Scenario();
+    // One period, so every month writes the same amount and the arithmetic is
+    // checkable by hand.
+    return { ...s, periods: [{ ...s.periods[0]!, months: 6 }] };
+  };
+
+  test('the quantity is what is on disk, not what the month wrote', () => {
+    const result = computeScenario(flat());
+    const first = result.storage[0]!;
+    const month = result.months[0]!;
+    // 30 days kept out of a 31-day month: a month's worth of writes, less a day.
+    assert.equal(first.retentionDays, 30);
+    assert.equal(first.daysCovered, 30);
+    assert.ok(
+      Math.abs(first.retained - (month.storedValues / month.days) * 30) < 1,
+      `${first.retained} vs ${month.storedValues}`,
+    );
+    assert.ok(first.retained < first.written, 'less than the month wrote, because a day fell out');
+  });
+
+  test('GiB is the values on disk at 100 and at 400 bytes, and nothing in between', () => {
+    const peak = computeScenario(flat()).peakStorage!;
+    assert.equal(peak.lowGiB, (peak.retained * BYTES_PER_VALUE_LOW) / BYTES_PER_GIB);
+    assert.equal(peak.highGiB, (peak.retained * BYTES_PER_VALUE_HIGH) / BYTES_PER_GIB);
+    assert.equal(peak.highGiB / peak.lowGiB, 4, 'the spread in the source, carried through');
+    // DataHub extracts are a fifth to a quarter of it.
+    assert.equal(peak.dataHubLowGiB, peak.lowGiB * DATAHUB_SHARE_LOW);
+    assert.equal(peak.dataHubHighGiB, peak.highGiB * DATAHUB_SHARE_HIGH);
+  });
+
+  test('retention scales it, and the message count does not move', () => {
+    const base = flat();
+    const long = { ...base, settings: { ...base.settings, retentionDays: 90 } };
+    const short = computeScenario(base);
+    const kept = computeScenario(long);
+
+    assert.equal(kept.peakMonth.total, short.peakMonth.total, 'retention is not traffic');
+    assert.ok(
+      Math.abs(kept.peakStorage!.retained / short.peakStorage!.retained - 3) < 0.02,
+      'three times the days, three times the disk',
+    );
+  });
+
+  test('a fleet that has only just started has less history than its retention allows', () => {
+    const s = flat();
+    const long = { ...s, settings: { ...s.settings, retentionDays: 90 } };
+    const storage = computeScenario(long).storage;
+    assert.ok(storage[0]!.daysCovered < 90, 'one month in, there is one month of data');
+    assert.equal(storage[0]!.daysCovered, computeScenario(long).months[0]!.days);
+    assert.equal(storage[3]!.daysCovered, 90, 'and by month four the period is full');
+    assert.ok(storage[3]!.retained > storage[0]!.retained * 2.5);
+  });
+
+  test('storage keeps climbing after the messages have levelled off', () => {
+    const s = conceptSection9Scenario();
+    const growing: Scenario = {
+      ...s,
+      // Four times the fleet from month 4, and a period kept long enough that
+      // the old, smaller months are still on disk when the new rate starts.
+      settings: { ...s.settings, retentionDays: 90 },
+      periods: [
+        { ...s.periods[0]!, months: 3 },
+        {
+          ...s.periods[0]!,
+          index: 2,
+          months: 4,
+          machineCountOverrides: Object.fromEntries(
+            s.machineTypes.map((mt) => [mt.id, mt.machineCount * 4]),
+          ),
+        },
+      ],
+    };
+    const result = computeScenario(growing);
+
+    // Messages step once and then hold: month 4 already sends what month 6 does,
+    // give or take the registrations that land in the first month of a period.
+    const settled = result.months[5]!.total / result.months[3]!.total;
+    assert.ok(Math.abs(settled - 1) < 0.01, `messages moved by ${(settled - 1) * 100} %`);
+    // Storage does not, because month 4 still had two thin months behind it.
+    // This is the whole reason the retention period is walked back rather than
+    // multiplied out, and getting it wrong over-states period 1 by 4x here.
+    assert.ok(
+      result.storage[5]!.retained > result.storage[3]!.retained * 1.5,
+      `${result.storage[3]!.retained} -> ${result.storage[5]!.retained}`,
+    );
+    const peak = result.peakStorage!;
+    const last = result.storage[result.storage.length - 1]!;
+    assert.equal(peak.retained, last.retained, 'the fullest month is the last one');
+  });
+
+  test('bundling is visible in the storage figure, not just the message count', () => {
+    const result = computeScenario(flat());
+    const peak = result.peakStorage!;
+    // The four climate readings travel together, so a measurement carries about
+    // four values -- the ratio that decides where in the range the truth sits.
+    assert.ok(peak.valuesPerMeasurement > 3.5, `${peak.valuesPerMeasurement}`);
+    assert.ok(peak.valuesPerMeasurement < 4, 'the two flags travel alone and pull it under four');
+    // And measurements are what this fleet writes, which is what makes
+    // "measurements only" a fair simplification here.
+    assert.ok(peak.nonMeasurementShare < 0.01, `${peak.nonMeasurementShare}`);
+  });
+
+  test('nothing to store, nothing to report', () => {
+    const empty = blankScenario();
+    const result = computeScenario(empty);
+    assert.equal(result.storage.length, result.months.length);
+    for (const month of result.storage) {
+      assert.equal(month.retained, 0);
+      assert.equal(month.lowGiB, 0);
+      assert.equal(month.valuesPerMeasurement, 0);
+    }
+  });
+});

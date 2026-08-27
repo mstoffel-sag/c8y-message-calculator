@@ -23,6 +23,7 @@ import { formatRatePeriod } from './cadence.js';
 import { formatMonth } from './calendar.js';
 import { measurementView } from './diagram.js';
 import { machineCountIn } from './compute.js';
+import { DEFAULT_RETENTION_DAYS, STORAGE_SOURCE_NOTE } from './storage.js';
 import type { MetricKind, Period, Scenario, ScenarioResult } from './types.js';
 import type { Cell, Row, Sheet } from '../xlsx/writer.js';
 
@@ -326,6 +327,83 @@ function monthsSheet(result: ScenarioResult, scenario: Scenario): Sheet {
   };
 }
 
+/**
+ * Sheet 5: operational storage, as a range with its assumptions attached.
+ *
+ * Two columns for one quantity, because the source figure spans 4x and says
+ * "to be verified" twice. Whoever fills in the ODS line picks a number from
+ * this; the file will not pick one for them.
+ */
+function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
+  const peak = result.peakStorage;
+  const retention = scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
+
+  const rows: Row[] = [
+    row(1, [text(1, 'Operational storage', 'title')]),
+    row(2, [text(1, STORAGE_SOURCE_NOTE, 'note')]),
+    row(3, [
+      text(
+        1,
+        `Retention: ${retention} days, from the scenario. The platform bills the daily maximum, so ` +
+          'the quantity is what is still on disk on the fullest day of the month -- not what the ' +
+          'month wrote. Measurements only: events, alarms, inventory writes and operations are ' +
+          'stored too, but the source figure was measured on datapoints.',
+        'note',
+      ),
+    ]),
+    row(5, [
+      text(1, 'Month', 'heading'),
+      text(2, 'Values written', 'heading'),
+      text(3, 'Values on disk', 'heading'),
+      text(4, 'Days of history', 'heading'),
+      text(5, 'GiB at 100 B', 'heading'),
+      text(6, 'GiB at 400 B', 'heading'),
+      text(7, 'DataHub GiB, low', 'heading'),
+      text(8, 'DataHub GiB, high', 'heading'),
+    ]),
+  ];
+
+  result.storage.forEach((month, i) => {
+    const isPeak = peak !== undefined && month.year === peak.year && month.month === peak.month;
+    rows.push(
+      row(6 + i, [
+        text(1, `${formatMonth(month.year, month.month)}${isPeak ? ' (fullest)' : ''}`),
+        num(2, Math.round(month.written)),
+        num(3, Math.round(month.retained), isPeak ? 'numberBold' : 'number'),
+        num(4, Math.round(month.daysCovered)),
+        { col: 5, value: Number(month.lowGiB.toFixed(2)) },
+        { col: 6, value: Number(month.highGiB.toFixed(2)) },
+        { col: 7, value: Number(month.dataHubLowGiB.toFixed(2)) },
+        { col: 8, value: Number(month.dataHubHighGiB.toFixed(2)) },
+      ]),
+    );
+  });
+
+  const after = 7 + result.storage.length;
+  if (peak !== undefined) {
+    rows.push(
+      row(after, [
+        text(
+          1,
+          `Fullest month ${formatMonth(peak.year, peak.month)}: ` +
+            `${peak.lowGiB.toFixed(1)} to ${peak.highGiB.toFixed(1)} GiB. ` +
+            `Each measurement carried ${peak.valuesPerMeasurement.toFixed(1)} values on average, ` +
+            'and the envelope is paid once per measurement rather than once per value -- so a ' +
+            'bundled fleet sits nearer the bottom of the range than the top.',
+          'note',
+        ),
+      ]),
+    );
+  }
+
+  return {
+    name: 'Storage',
+    columnWidths: [20, 16, 16, 15, 14, 14, 17, 18],
+    freezeRows: 5,
+    rows,
+  };
+}
+
 /** Sheet 4: the guidance, so a reviewer sees what the tool flagged. */
 function guidanceSheet(result: ScenarioResult): Sheet {
   const rows: Row[] = [
@@ -604,6 +682,7 @@ export function workbookSheets(scenario: Scenario, result: ScenarioResult): Shee
     quoteSheet(scenario, result),
     designSheet(scenario),
     monthsSheet(result, scenario),
+    storageSheet(result, scenario),
     guidanceSheet(result),
   ];
 }
