@@ -185,13 +185,16 @@ function designSheet(scenario: Scenario): Sheet {
     row(4, [
       text(1, 'Machine type', 'heading'),
       text(2, 'Machines', 'heading'),
-      text(3, 'Reading', 'heading'),
-      text(4, 'Unit', 'heading'),
-      text(5, 'Kind', 'heading'),
-      text(6, 'How often', 'heading'),
-      text(7, 'Travels in', 'heading'),
-      text(8, 'Shared', 'heading'),
-      text(9, 'Msg / machine / month', 'heading'),
+      // Descriptive: no counter reads it. It is here because the first question
+      // anyone asks of a finished estimate is how the data gets in.
+      text(3, 'Talks', 'heading'),
+      text(4, 'Reading', 'heading'),
+      text(5, 'Unit', 'heading'),
+      text(6, 'Kind', 'heading'),
+      text(7, 'How often', 'heading'),
+      text(8, 'Travels in', 'heading'),
+      text(9, 'Shared', 'heading'),
+      text(10, 'Msg / machine / month', 'heading'),
     ]),
   ];
 
@@ -209,15 +212,16 @@ function designSheet(scenario: Scenario): Sheet {
           row(r++, [
             text(1, k === 0 ? mt.name || 'Unnamed' : ''),
             k === 0 ? num(2, mt.machineCount) : text(2, ''),
-            text(3, m.name),
-            text(4, m.unit),
-            text(5, metric?.kind ?? ''),
-            text(6, group.cadence),
-            text(7, group.fragmentName),
-            text(8, group.shared ? 'shared' : 'alone'),
+            text(3, k === 0 ? mt.protocol?.trim() || '' : ''),
+            text(4, m.name),
+            text(5, m.unit),
+            text(6, metric?.kind ?? ''),
+            text(7, group.cadence),
+            text(8, group.fragmentName),
+            text(9, group.shared ? 'shared' : 'alone'),
             // The message cost belongs to the measurement, not to each reading
             // in it -- so it is stated once, against the first row.
-            k === 0 ? num(9, group.messagesPerMonth) : text(9, ''),
+            k === 0 ? num(10, group.messagesPerMonth) : text(10, ''),
           ]),
         );
       });
@@ -230,13 +234,14 @@ function designSheet(scenario: Scenario): Sheet {
         row(r++, [
           text(1, ''),
           text(2, ''),
-          text(3, metric.name),
-          text(4, metric.unit),
-          text(5, metric.kind),
-          text(6, formatRatePeriod(metric.cadence)),
-          text(7, ELEMENT_OF[metric.kind] ?? ''),
-          text(8, 'alone'),
-          text(9, ''),
+          text(3, ''),
+          text(4, metric.name),
+          text(5, metric.unit),
+          text(6, metric.kind),
+          text(7, formatRatePeriod(metric.cadence)),
+          text(8, ELEMENT_OF[metric.kind] ?? ''),
+          text(9, 'alone'),
+          text(10, ''),
         ]),
       );
     }
@@ -255,7 +260,7 @@ function designSheet(scenario: Scenario): Sheet {
 
   return {
     name: 'Design',
-    columnWidths: [22, 10, 26, 8, 12, 18, 26, 9, 21],
+    columnWidths: [22, 10, 22, 26, 8, 12, 18, 26, 9, 21],
     freezeRows: 4,
     rows,
   };

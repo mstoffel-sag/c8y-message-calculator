@@ -167,6 +167,7 @@ export function Machine({
           <span class="mt-name">{mt.name || 'Unnamed machine type'}</span>
           <span class="mt-tag">{n(mt.machineCount)} machines</span>
           {mt.onlinePct < 100 && <span class="mt-tag">{n(mt.onlinePct)} % online</span>}
+          {mt.protocol?.trim() && <span class="mt-tag">{mt.protocol}</span>}
         </span>
         <MachineSummary summary={summary} metrics={metrics} only={only} />
       </summary>

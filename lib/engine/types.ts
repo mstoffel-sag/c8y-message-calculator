@@ -95,6 +95,17 @@ export interface MachineType {
   machineCount: number;
   /** Duty cycle / connectivity availability, 0-100. */
   onlinePct: number;
+  /**
+   * How this machine's data reaches Cumulocity -- OPC UA, Modbus TCP, native
+   * MQTT, a custom agent. Free text, from a catalogue that can be escaped.
+   *
+   * Descriptive only: it is deliberately absent from every counter, because a
+   * message is one request to the platform however it was produced. What it
+   * changes is who builds what, and whether bundling is work or a setting --
+   * which is advice, not arithmetic. Blank means "not decided yet", which is a
+   * perfectly common answer at estimate time.
+   */
+  protocol?: string;
   metrics: Metric[];
   bundles: Bundle[];
 }

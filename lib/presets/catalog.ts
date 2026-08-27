@@ -19,6 +19,53 @@ export interface Choice<T> {
   group?: string;
 }
 
+/* -------------------------------------------------------------- protocols */
+
+/**
+ * How a machine's data reaches Cumulocity.
+ *
+ * None of these changes the message count -- a message is one request to the
+ * platform however the reading was produced -- so the field is descriptive, and
+ * the tool does not pretend otherwise by attaching a multiplier to it. It is
+ * asked because it is the first thing the solution architect reading the
+ * finished workbook wants to know, and because one answer carries a real
+ * consequence: SmartREST's static measurement templates carry one series per
+ * row, so bundling several series into one message needs a custom template.
+ *
+ * Grouped by who does the talking: straight to the platform, through a
+ * shop-floor protocol, through building services, or over a low-power network.
+ */
+export const PROTOCOLS: Array<Choice<string>> = [
+  { value: '', label: 'Not decided yet' },
+
+  { value: 'MQTT (Cumulocity SmartREST 2.0)', label: 'MQTT — Cumulocity SmartREST 2.0', group: 'Straight to Cumulocity' },
+  { value: 'HTTP / REST (Cumulocity API)', label: 'HTTP / REST — Cumulocity API', group: 'Straight to Cumulocity' },
+  { value: 'MQTT (Sparkplug B)', label: 'MQTT — Sparkplug B', group: 'Straight to Cumulocity' },
+  { value: 'LwM2M', label: 'LwM2M', group: 'Straight to Cumulocity' },
+
+  { value: 'OPC UA', label: 'OPC UA', group: 'Shop floor' },
+  { value: 'Modbus TCP', label: 'Modbus TCP', group: 'Shop floor' },
+  { value: 'Modbus RTU', label: 'Modbus RTU (serial)', group: 'Shop floor' },
+  { value: 'Siemens S7', label: 'Siemens S7', group: 'Shop floor' },
+  { value: 'EtherNet/IP', label: 'EtherNet/IP', group: 'Shop floor' },
+  { value: 'PROFINET', label: 'PROFINET', group: 'Shop floor' },
+  { value: 'PROFIBUS DP', label: 'PROFIBUS DP', group: 'Shop floor' },
+  { value: 'IO-Link', label: 'IO-Link', group: 'Shop floor' },
+  { value: 'CAN bus / J1939', label: 'CAN bus / J1939', group: 'Shop floor' },
+  { value: 'OPC DA', label: 'OPC DA (legacy)', group: 'Shop floor' },
+
+  { value: 'BACnet/IP', label: 'BACnet/IP', group: 'Building and metering' },
+  { value: 'KNX', label: 'KNX', group: 'Building and metering' },
+  { value: 'M-Bus', label: 'M-Bus', group: 'Building and metering' },
+  { value: 'DLMS/COSEM', label: 'DLMS/COSEM', group: 'Building and metering' },
+
+  { value: 'LoRaWAN', label: 'LoRaWAN', group: 'Low-power WAN' },
+  { value: 'NB-IoT / LTE-M', label: 'NB-IoT / LTE-M', group: 'Low-power WAN' },
+
+  { value: 'Custom agent or SDK', label: 'Custom agent or SDK', group: 'Something else' },
+  { value: 'File / CSV import', label: 'File / CSV import', group: 'Something else' },
+];
+
 /* ------------------------------------------------------------- datapoints */
 
 export interface DatapointSeed {

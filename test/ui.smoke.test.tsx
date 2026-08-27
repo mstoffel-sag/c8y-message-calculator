@@ -39,6 +39,20 @@ describe('the wizard renders', () => {
     assert.match(html, /machine type/i);
   });
 
+  test('1 asks how the machine talks, from a list that can be escaped', () => {
+    const html = render(<StepFleet {...props} />);
+    assert.match(html, /<th[^>]*>Talks<\/th>/);
+    assert.match(html, /<optgroup label="Shop floor"/, 'grouped by who does the talking');
+    for (const protocol of ['OPC UA', 'Modbus TCP', 'PROFINET', 'BACnet\/IP', 'LoRaWAN']) {
+      assert.match(html, new RegExp(`>${protocol}<`), `no ${protocol} option`);
+    }
+    assert.match(html, /Something else…/, 'and a way out of the list');
+    // The preset arrives with one, and it is the selected value rather than a
+    // free-text field: a name in the list means the dropdown is enough.
+    assert.match(html, /<option selected value="BACnet\/IP">/);
+    assert.doesNotMatch(html, /placeholder="Name the protocol"/);
+  });
+
   test('2 measurements teaches bundling and shows the proposal', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /one timestamp/i);

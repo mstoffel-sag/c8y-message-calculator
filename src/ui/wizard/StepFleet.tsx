@@ -2,8 +2,9 @@
 
 import { machineTypeSummary, type Scenario } from '../../../lib/engine/index.js';
 import { PRESETS, blankMachineType } from '../../../lib/presets/index.js';
+import { PROTOCOLS } from '../../../lib/presets/catalog.js';
 import { addMachineType, patchMachineType, removeMachineType } from '../store.js';
-import { Num, Teach, Txt, Empty } from '../parts.js';
+import { Choice, Num, Teach, Txt, Empty } from '../parts.js';
 import { machineStructure } from '../Machine.js';
 import { n } from '../format.js';
 
@@ -37,6 +38,7 @@ export function StepFleet({ scenario, onChange }: Props) {
             <thead>
               <tr>
                 <th>Machine type</th>
+                <th style="width:230px">Talks</th>
                 <th class="num" style="width:150px">How many</th>
                 <th class="num" style="width:150px">Online %</th>
                 <th style="width:90px" />
@@ -59,6 +61,18 @@ export function StepFleet({ scenario, onChange }: Props) {
                         ? 'nothing modelled yet'
                         : machineStructure(machineTypeSummary(mt))}
                     </div>
+                  </td>
+                  <td>
+                    {/* Descriptive, and the dropdown says so: no counter reads
+                        this field. It is here because it is the first thing the
+                        person who receives the finished workbook asks. */}
+                    <Choice
+                      value={mt.protocol ?? ''}
+                      options={PROTOCOLS}
+                      placeholder="Name the protocol"
+                      otherLabel="Something else…"
+                      onChange={(protocol) => onChange(patchMachineType(scenario, mt.id, { protocol }))}
+                    />
                   </td>
                   <td class="num">
                     <Num
@@ -84,6 +98,7 @@ export function StepFleet({ scenario, onChange }: Props) {
               ))}
               <tr class="total">
                 <td>{scenario.machineTypes.length} types</td>
+                <td />
                 <td class="num">{n(total)}</td>
                 <td colSpan={2} />
               </tr>

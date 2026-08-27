@@ -34,6 +34,8 @@ interface Seed {
   blurb: string;
   machineCount: number;
   onlinePct: number;
+  /** What this kind of machine usually talks, so a preset arrives complete. */
+  protocol: string;
   bundles: Array<{ fragmentName: string; intervalSeconds: number }>;
   metrics: MetricSeed[];
 }
@@ -88,6 +90,7 @@ export function instantiate(seed: Seed): MachineType {
     name: seed.label,
     machineCount: seed.machineCount,
     onlinePct: seed.onlinePct,
+    protocol: seed.protocol,
     metrics,
     bundles,
   };
@@ -100,6 +103,7 @@ export const SEEDS: Seed[] = [
     blurb: 'Four climate readings on one tick, two states that sit still for hours.',
     machineCount: 1000,
     onlinePct: 100,
+    protocol: 'BACnet/IP',
     bundles: [{ fragmentName: 'acme_Climate', intervalSeconds: 60 }],
     metrics: [
       { name: 'Supply air temp', unit: 'C', kind: 'continuous', semanticGroup: 'climate', interval: 60, bundle: 'acme_Climate' },
@@ -120,6 +124,7 @@ export const SEEDS: Seed[] = [
     blurb: 'Register reads on a 15-minute interval; almost nothing else.',
     machineCount: 50_000,
     onlinePct: 98,
+    protocol: 'DLMS/COSEM',
     bundles: [{ fragmentName: 'acme_Energy', intervalSeconds: 900 }],
     metrics: [
       { name: 'Active energy import', unit: 'kWh', kind: 'continuous', semanticGroup: 'energy', interval: 900, bundle: 'acme_Energy' },
@@ -135,6 +140,7 @@ export const SEEDS: Seed[] = [
     blurb: 'Position and battery together; movement start and stop as events.',
     machineCount: 5000,
     onlinePct: 85,
+    protocol: 'NB-IoT / LTE-M',
     bundles: [{ fragmentName: 'acme_Position', intervalSeconds: 300 }],
     metrics: [
       { name: 'Latitude', unit: 'deg', kind: 'continuous', semanticGroup: 'position', interval: 300, bundle: 'acme_Position' },
@@ -151,6 +157,7 @@ export const SEEDS: Seed[] = [
     blurb: 'Aggregates a line and forwards a summary -- the biggest volume lever there is.',
     machineCount: 200,
     onlinePct: 99,
+    protocol: 'OPC UA',
     bundles: [
       { fragmentName: 'acme_LineSummary', intervalSeconds: 60 },
       { fragmentName: 'acme_GatewayHealth', intervalSeconds: 300 },
@@ -172,6 +179,7 @@ export const SEEDS: Seed[] = [
     blurb: 'Fast process readings, a shift state, and alarms an operator has to act on.',
     machineCount: 400,
     onlinePct: 90,
+    protocol: 'OPC UA',
     bundles: [{ fragmentName: 'acme_Process', intervalSeconds: 10 }],
     metrics: [
       { name: 'Spindle speed', unit: 'rpm', kind: 'continuous', semanticGroup: 'process', interval: 10, bundle: 'acme_Process' },

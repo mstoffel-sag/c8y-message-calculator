@@ -237,6 +237,21 @@ describe('the workbook content', () => {
     assert.equal(Math.min(...totals), 41_528_000, 'February');
   });
 
+  test('the Design sheet carries how each machine talks', () => {
+    const design = sheet('Design');
+    assert.ok(
+      design.rows.some((r) => r.cells.some((c) => c.col === 3 && c.value === 'Talks')),
+      'the heading',
+    );
+    // It follows the machine name exactly: repeated at the head of each
+    // measurement block, blank on the rows inside one.
+    const cells = design.rows.flatMap((r) => r.cells);
+    const named = cells.filter((c) => c.col === 1 && c.value === 'Rooftop HVAC unit').length;
+    const talks = cells.filter((c) => c.col === 3 && c.value === 'BACnet/IP').length;
+    assert.ok(named > 0);
+    assert.equal(talks, named, `named ${named} times, protocol ${talks}`);
+  });
+
   test('the Design sheet says which readings share a measurement', () => {
     const design = sheet('Design');
     const shared = design.rows.filter((r) =>
@@ -248,7 +263,7 @@ describe('the workbook content', () => {
 
     // The message cost belongs to the measurement, so it is stated once.
     const costs = design.rows
-      .map((r) => r.cells.find((c) => c.col === 9)?.value)
+      .map((r) => r.cells.find((c) => c.col === 10)?.value)
       .filter((v): v is number => typeof v === 'number');
     assert.equal(costs.filter((c) => c === 44_640).length, 1, 'the bundle is counted once, not four times');
   });

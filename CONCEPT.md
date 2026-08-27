@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 13 — every measurement type is named in the row that sends it, bundled or alone · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
+**Status:** draft for review, rev 14 — step 1 asks what each machine talks; descriptive, and no counter reads it · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
 
 ---
 
@@ -445,13 +445,23 @@ every input visibly moves the number.
 
 | Step | Screen | What it asks, and what it teaches |
 |---|---|---|
-| 1 | **Machines** | Machine types, counts, online %. A type is a group that behaves identically; split only where the *data* differs. |
+| 1 | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
 | 2 | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. |
 | 3 | **Events, alarms & facts** | The three non-measurement elements, each with its own explanation and the mistake it invites. An event is something that happened; an alarm is something that is wrong; a fact is something true about the machine right now. |
 | 4 | **Commands** | Operations, outbound. Asks for the status-transition count, because one command is three or four messages. |
 | 5 | **Deployment & add-ons** | Every Configurator line item the fleet cannot imply, with its cell reference. Quantities only. |
 | 6 | **Rollout** | Periods, month counts, the ramp, and where it starts on the calendar. |
 | 7 | **Results** | §7. |
+
+**The protocol is asked, and deliberately does not count.** Step 1 asks what each machine type talks
+— OPC UA, Modbus TCP, BACnet/IP, native MQTT, a custom agent, or something the customer types in
+themselves. It is the first question anyone asks of a finished estimate, it travels to the Design
+sheet of the workbook, and it appears on the machine type's folded header. It appears in **no
+counter**: a message is one request to the platform however the reading was produced, and attaching a
+multiplier to a protocol would be inventing arithmetic the price list does not have. What it does
+change is who builds what — and one answer carries a consequence the payload examples already state,
+since SmartREST's static measurement templates carry one series per row, so bundling several series
+into one message needs a custom template. Advice, not arithmetic.
 
 **The vocabulary is the platform's.** What the industry calls a "datapoint" is a **series** — one
 named value over time — and the fragment that carries a set of series under one timestamp is a

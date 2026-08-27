@@ -433,6 +433,7 @@ export function normalise(input: unknown): Scenario {
     name: mt?.name ?? '',
     machineCount: typeof mt?.machineCount === 'number' ? mt.machineCount : 0,
     onlinePct: typeof mt?.onlinePct === 'number' ? mt.onlinePct : 100,
+    protocol: typeof mt?.protocol === 'string' ? mt.protocol : undefined,
     bundles: (Array.isArray(mt?.bundles) ? mt.bundles : []).map((b) => ({
       id: b?.id ?? nextId('b'),
       fragmentName: b?.fragmentName ?? 'acme_Readings',
