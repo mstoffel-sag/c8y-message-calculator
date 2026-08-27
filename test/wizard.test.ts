@@ -231,6 +231,30 @@ describe('scenario normalisation', () => {
     assert.doesNotThrow(() => computeScenario(fixed));
   });
 
+  test("a metric saved as a 'fact' loads as inventory, and still bills", async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    // The kind was renamed with the step. A saved scenario that quietly lost its
+    // managed-object writes would under-count, which is the one failure this
+    // tool cannot have.
+    const saved = {
+      name: 'Before the rename',
+      settings: { peakFactor: 3, startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
+      periods: [{ index: 1, months: 12, machineCountOverrides: {}, commercial: {} }],
+      machineTypes: [
+        {
+          id: 'mt', name: 'Pump', machineCount: 100, onlinePct: 100, bundles: [],
+          metrics: [{
+            id: 'm', name: 'Firmware version', unit: '', kind: 'fact',
+            cadence: { mode: 'perMonth', count: 1 }, semanticGroup: 'identity', bundleId: null,
+          }],
+        },
+      ],
+    };
+    const fixed = normalise(saved);
+    assert.equal(fixed.machineTypes[0]?.metrics[0]?.kind, 'inventory');
+    assert.equal(computeScenario(fixed).peakMonth.counters.inventoriesUpdated, 100);
+  });
+
   test('garbage in does not take the page down', async () => {
     const { normalise } = await import('../src/ui/store.js');
     for (const junk of [null, undefined, {}, { periods: 'nope' }, { machineTypes: [null] }]) {
@@ -244,7 +268,7 @@ describe('scenario normalisation', () => {
 describe('the catalogue behind the dropdowns', () => {
   test('every kind offers options, and names are unique within a kind', async () => {
     const { catalogFor } = await import('../lib/presets/catalog.js');
-    for (const kind of ['continuous', 'state', 'occurrence', 'condition', 'fact', 'command']) {
+    for (const kind of ['continuous', 'state', 'occurrence', 'condition', 'inventory', 'command']) {
       const seeds = catalogFor(kind);
       assert.ok(seeds.length >= 8, `${kind} offers only ${seeds.length}`);
       const names = seeds.map((s) => s.name);
@@ -354,7 +378,7 @@ describe('a machine type in one line', () => {
     const s = machineTypeSummary(hvac);
     assert.deepEqual(
       s.parts.map((p) => `${p.count} ${p.kind}`),
-      ['4 continuous', '2 state', '1 occurrence', '1 condition', '1 fact', '1 command'],
+      ['4 continuous', '2 state', '1 occurrence', '1 condition', '1 inventory', '1 command'],
     );
   });
 

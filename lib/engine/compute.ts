@@ -185,8 +185,8 @@ export function computeMachineTypeMonth(
         break;
       }
 
-      case 'fact': {
-        // A fact may be quoted per month (firmware version) or per day (a
+      case 'inventory': {
+        // An inventory write may be quoted per month (a firmware version) or per day (a
         // config block re-sent nightly). A daily rate scales with month length;
         // a monthly count does not.
         const writes =

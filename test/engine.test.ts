@@ -383,8 +383,8 @@ describe('lint rules', () => {
   test('L5 and L10 catch inventory misuse', () => {
     const findings = lintScenario(
       withMetrics([
-        { id: 'a', name: 'Runtime hours', unit: 'h', kind: 'fact', cadence: { mode: 'onChange', perDay: 2000 }, semanticGroup: 'identity', bundleId: null },
-        { id: 'b', name: 'Config block', unit: '', kind: 'fact', cadence: { mode: 'onChange', perDay: 1 }, semanticGroup: 'identity', bundleId: null, resentOnTimer: true },
+        { id: 'a', name: 'Runtime hours', unit: 'h', kind: 'inventory', cadence: { mode: 'onChange', perDay: 2000 }, semanticGroup: 'identity', bundleId: null },
+        { id: 'b', name: 'Config block', unit: '', kind: 'inventory', cadence: { mode: 'onChange', perDay: 1 }, semanticGroup: 'identity', bundleId: null, resentOnTimer: true },
       ]),
     );
     assert.ok(findings.some((f) => f.rule === 'L5'), '2,000 a day is more than one a minute');

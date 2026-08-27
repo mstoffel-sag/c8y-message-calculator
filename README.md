@@ -16,7 +16,7 @@ npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 ```
 
 ```
-npm test         # 242 tests: the engine, the cell map, the xlsx writer, and every wizard step
+npm test         # 244 tests: the engine, the cell map, the xlsx writer, and every wizard step
 npm run typecheck
 npm run build    # static bundle in dist/
 npm run package  # dist-package/message-calculator-<version>.zip, ready to upload
@@ -92,7 +92,7 @@ src/ui/Machine.tsx  the collapsible machine-type block, and the summary its head
 src/ui/collapse.ts  which machine types are folded -- a viewer preference, never scenario data
 src/ui/styles.css the Cumulocity design tokens, and this app's semantic layer over them
 src/ui/fonts/     Public Sans, self-hosted -- a tenant may not reach a font CDN
-src/ui/wizard/    the seven steps and the hand-off table
+src/ui/wizard/    the six steps and the hand-off table
 test/             the CONCEPT.md section 9 acceptance test, and a render pass over every step
 tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurator
 ```
@@ -103,11 +103,10 @@ tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurato
 |---|---|
 | 1 Machines | machine types, counts, online %, and what each machine talks — a protocol list you can always escape. Descriptive: no counter reads it. |
 | 2 Measurements | one row per series; its rhythm — on a timer, or when the value moves — is a column. Timed series are grouped by interval into one measurement type each, as you type, and that type's fragment name is editable in the row. Splitting one out creates its own measurement type there and then; an on-change series always travels alone — the row says why, and still lets you name the type it sends in. |
-| 3 Events, alarms & facts | the three non-measurement elements, each explained |
-| 4 Commands | operations, with the status-transition count |
-| 5 Deployment & add-ons | every Configurator line item the fleet cannot imply |
-| 6 Rollout | periods, the ramp, and where it starts on the calendar |
-| 7 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
+| 3 Events, alarms, inventory & commands | everything that is not a measurement, one panel each. Commands close the step, with the status-transition count, because the contrast between three inbound elements and one outbound one is the thing being taught |
+| 4 Deployment & add-ons | every Configurator line item the fleet cannot imply |
+| 5 Rollout | periods, the ramp, and where it starts on the calendar |
+| 6 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
 
 ### Operational storage is a range, not a number
 
@@ -149,14 +148,15 @@ green-60 -- and `--on-brand` flips with it, because white on a light-green butto
 
 ### Machine types fold
 
-Steps 2, 3 and 4 all edit the same machine types from different angles, so past
-two types every one of them was a page nobody reads. Each block is a `<details>`
+Steps 2 and 3 both edit the same machine types from different angles, so past
+two types either of them was a page nobody reads. Each block is a `<details>`
 whose `<summary>` carries what is inside it and what it costs:
 
 ```
-▸ Rooftop HVAC unit  1,000 machines    4 time series, 2 states, 1 event, 1 alarm, 1 fact,        46 M
-                                       1 command · every 1 min · 3 measurement types   MESSAGES / MONTH ·
-                                       Measurements 45.9 M · Events 31 k · Alarms 31 k   45,977 PER MACHINE
+▸ Rooftop HVAC unit  1,000 machines    4 time series, 2 states, 1 event, 1 alarm,               46 M
+                                       1 inventory entry, 1 command · every 1 min ·      MESSAGES / MONTH ·
+                                       3 measurement types                              45,977 PER MACHINE
+                                       Measurements 45.9 M · Events 31 k · Alarms 31 k
 ```
 
 `machineTypeSummary` in the engine produces every figure there, and step 1's
@@ -167,8 +167,8 @@ things it gets right that the old hand-rolled line did not:
   making that bundle's series set vary, so the section 9 HVAC unit sends three
   measurements, not one. The count now matches the diagram directly beneath it.
 - **The parts come before the measurement count.** "10 datapoints in 3
-  measurement types" would be false -- the event, alarm, fact and command are not
-  in a measurement at all.
+  measurement types" would be false -- the event, alarm, inventory entry and
+  command are not in a measurement at all.
 
 Figures are per `REFERENCE_DAYS` (31) month at the type's own count and online
 percentage, which is deliberately *not* the peak-month total in the header: this

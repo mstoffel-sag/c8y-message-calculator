@@ -13,7 +13,6 @@ import { STEPS } from '../src/ui/wizard/steps.js';
 import { StepFleet } from '../src/ui/wizard/StepFleet.js';
 import { StepTimeSeries } from '../src/ui/wizard/StepTimeSeries.js';
 import { StepDiscrete } from '../src/ui/wizard/StepDiscrete.js';
-import { StepCommands } from '../src/ui/wizard/StepCommands.js';
 import { StepCommercial } from '../src/ui/wizard/StepCommercial.js';
 import { StepRollout } from '../src/ui/wizard/StepRollout.js';
 import { StepResults } from '../src/ui/wizard/StepResults.js';
@@ -31,7 +30,7 @@ describe('the wizard renders', () => {
   test('the step list is the order a customer can answer in', () => {
     assert.deepEqual(
       STEPS.map((s) => s.key),
-      ['fleet', 'series', 'discrete', 'commands', 'commercial', 'rollout', 'results'],
+      ['fleet', 'series', 'discrete', 'commercial', 'rollout', 'results'],
     );
   });
 
@@ -148,12 +147,20 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(html, /Delete bundle/);
   });
 
-  test('3 and 4 use the same dropdowns', () => {
-    const discrete = render(<StepDiscrete {...props} />);
-    assert.match(discrete, /<optgroup label="Maintenance"/, 'alarm and event catalogues');
+  test('3 names all four elements, and commands are one of them', () => {
+    const html = render(<StepDiscrete {...props} />);
+    for (const heading of ['Events', 'Alarms', 'Inventory', 'Commands']) {
+      assert.match(html, new RegExp(`<h3[^>]*>${heading}`), `missing the ${heading} section`);
+    }
+    // The step that used to be step 4, now the last section of step 3.
+    assert.match(html, /Operations Created \+ Operations Updated/);
+    assert.doesNotMatch(html, /\bfacts?\b/i, 'inventory is called inventory');
+  });
 
-    const commands = render(<StepCommands {...props} />);
-    assert.match(commands, /PENDING, EXECUTING, SUCCESSFUL — 4 messages/,
+  test('3 uses one catalogue dropdown per element', () => {
+    const html = render(<StepDiscrete {...props} />);
+    assert.match(html, /<optgroup label="Maintenance"/, 'alarm and event catalogues');
+    assert.match(html, /PENDING, EXECUTING, SUCCESSFUL — 4 messages/,
       'the transition option states the total so nobody has to add one');
   });
 
@@ -162,7 +169,6 @@ describe('the wizard renders', () => {
     for (const html of [
       render(<StepTimeSeries {...props} />),
       render(<StepDiscrete {...props} />),
-      render(<StepCommands {...props} />),
     ]) {
       assert.match(html, /class="duration"/);
       assert.match(html, /class="prefix">every</);
@@ -173,17 +179,16 @@ describe('the wizard renders', () => {
     const discrete = render(<StepDiscrete {...props} />);
     assert.match(discrete, /<option[^>]*value="week"/);
 
-    // Facts and commands reach months and years, because a monthly campaign
+    // Inventory and commands reach months and years, because a monthly campaign
     // genuinely does not scale with month length.
     assert.match(discrete, /<option[^>]*value="month"/);
-    const commands = render(<StepCommands {...props} />);
-    assert.match(commands, /<option[^>]*value="year"/);
+    assert.match(discrete, /<option[^>]*value="year"/);
 
     // And every field shows what it works out to.
     assert.match(discrete, /per machine in a 31-day month/);
   });
 
-  test('the fact "Quoted per month / per day" column is gone', () => {
+  test('the inventory "Quoted per month / per day" column is gone', () => {
     // The unit in the period carries that choice now.
     assert.doesNotMatch(render(<StepDiscrete {...props} />), /Quoted/);
   });
@@ -214,13 +219,13 @@ describe('the wizard renders', () => {
     assert.match(html, /lifecycle/i);
   });
 
-  test('4 commands states the real cost', () => {
-    const html = render(<StepCommands {...props} />);
+  test('3 states the real cost of a command', () => {
+    const html = render(<StepDiscrete {...props} />);
     assert.match(html, /PENDING/);
     assert.match(html, /three or four messages/i);
   });
 
-  test('5 deployment and add-ons lists every asked line item with its cell', () => {
+  test('4 deployment and add-ons lists every asked line item with its cell', () => {
     const html = render(<StepCommercial {...props} result={result} />);
     for (const label of [
       'Public/Shared Cloud', 'Dedicated - Production', 'Operational Data Store',
@@ -233,19 +238,19 @@ describe('the wizard renders', () => {
     assert.match(html, /commit-to-consume/i);
   });
 
-  test('5 shows no price, rate or currency', () => {
+  test('4 shows no price, rate or currency', () => {
     const html = render(<StepCommercial {...props} result={result} />);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/);
     assert.doesNotMatch(html, /\bprice\b/i);
   });
 
-  test('6 rollout', () => {
+  test('5 rollout', () => {
     const html = render(<StepRollout {...props} />);
     assert.match(html, /11 %/);
     assert.match(html, /Period 1/);
   });
 
-  test('7 results carries every counter cell and the hand-off', () => {
+  test('6 results carries every counter cell and the hand-off', () => {
     const html = render(<StepResults scenario={scenario} result={result} expert />);
     for (const cell of ['D28', 'D29', 'D30', 'D31', 'D32', 'D33', 'D34', 'D35', 'D36']) {
       assert.match(html, new RegExp(cell), `missing ${cell}`);
@@ -262,7 +267,6 @@ describe('the wizard renders', () => {
     assert.doesNotThrow(() => render(<StepFleet {...p} />));
     assert.doesNotThrow(() => render(<StepTimeSeries {...p} />));
     assert.doesNotThrow(() => render(<StepDiscrete {...p} />));
-    assert.doesNotThrow(() => render(<StepCommands {...p} />));
     assert.doesNotThrow(() => render(<StepCommercial {...p} result={emptyResult} />));
     assert.doesNotThrow(() => render(<StepRollout {...p} />));
     assert.doesNotThrow(() => render(<StepResults scenario={empty} result={emptyResult} expert />));
@@ -571,21 +575,17 @@ describe('machine types fold away', () => {
   const openCount = (html: string) => (html.match(/<details class="mt" open/g) ?? []).length;
   const blockCount = (html: string) => (html.match(/<details class="mt"/g) ?? []).length;
 
-  test('every step that edits machines uses the same disclosure', () => {
-    for (const [name, html] of [
-      ['datapoints', render(<StepTimeSeries scenario={two} onChange={noop} />)],
-      ['commands', render(<StepCommands scenario={two} onChange={noop} />)],
-    ] as const) {
-      assert.equal(blockCount(html), 2, `${name}: one block per machine type`);
-      assert.equal(openCount(html), 1, `${name}: the first is open, the rest folded`);
-    }
+  test('step 2 folds every machine type but the first', () => {
+    const html = render(<StepTimeSeries scenario={two} onChange={noop} />);
+    assert.equal(blockCount(html), 2, 'one block per machine type');
+    assert.equal(openCount(html), 1, 'the first is open, the rest folded');
   });
 
   test('step 3 folds each machine type inside every element panel', () => {
     const html = render(<StepDiscrete scenario={two} onChange={noop} />);
-    // Events, alarms and facts, two machine types each.
-    assert.equal(blockCount(html), 6);
-    assert.equal(openCount(html), 3, 'the first type stays open in each panel');
+    // Events, alarms, inventory and commands, two machine types each.
+    assert.equal(blockCount(html), 8);
+    assert.equal(openCount(html), 4, 'the first type stays open in each panel');
   });
 
   test('one machine type stays open', () => {
@@ -597,7 +597,7 @@ describe('machine types fold away', () => {
 
   test('the folded header carries the summary, not just the name', () => {
     const html = render(<StepTimeSeries scenario={two} onChange={noop} />);
-    assert.match(html, /4 time series, 2 on-change series, 1 event, 1 alarm, 1 fact, 1 command/);
+    assert.match(html, /4 time series, 2 on-change series, 1 event, 1 alarm, 1 inventory entry, 1 command/);
     assert.match(html, /3 measurement types/, 'the two flags are measurements of their own');
     assert.match(html, /every 1 min/, 'the sampling rhythm');
     assert.match(html, /Measurements 45\.9 M/, 'the message mix by element');

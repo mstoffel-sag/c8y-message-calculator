@@ -18,7 +18,6 @@ import { STEPS } from './wizard/steps.js';
 import { StepFleet } from './wizard/StepFleet.js';
 import { StepTimeSeries } from './wizard/StepTimeSeries.js';
 import { StepDiscrete } from './wizard/StepDiscrete.js';
-import { StepCommands } from './wizard/StepCommands.js';
 import { StepCommercial } from './wizard/StepCommercial.js';
 import { StepRollout } from './wizard/StepRollout.js';
 import { StepResults } from './wizard/StepResults.js';
@@ -113,7 +112,6 @@ function App() {
         {def.key === 'fleet' && <StepFleet {...props} />}
         {def.key === 'series' && <StepTimeSeries {...props} />}
         {def.key === 'discrete' && <StepDiscrete {...props} />}
-        {def.key === 'commands' && <StepCommands {...props} />}
         {def.key === 'commercial' && <StepCommercial {...props} result={result} />}
         {def.key === 'rollout' && <StepRollout {...props} />}
         {def.key === 'results' && (

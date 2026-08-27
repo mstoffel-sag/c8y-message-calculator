@@ -164,7 +164,7 @@ export const ALARMS: DatapointSeed[] = [
   { name: 'Geofence breach', unit: '', group: 'Security' },
 ];
 
-export const FACTS: DatapointSeed[] = [
+export const INVENTORY: DatapointSeed[] = [
   { name: 'Firmware version', unit: '', group: 'Identity' },
   { name: 'Hardware revision', unit: '', group: 'Identity' },
   { name: 'Serial number', unit: '', group: 'Identity' },
@@ -193,7 +193,7 @@ export function catalogFor(kind: string): DatapointSeed[] {
     case 'state': return STATES;
     case 'occurrence': return EVENTS;
     case 'condition': return ALARMS;
-    case 'fact': return FACTS;
+    case 'inventory': return INVENTORY;
     case 'command': return COMMANDS;
     default: return [];
   }

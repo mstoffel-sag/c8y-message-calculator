@@ -1,10 +1,15 @@
 /**
- * Step 3: events, alarms and inventory. CONCEPT.md section 3.
+ * Step 3: everything that is not a measurement. CONCEPT.md section 3.
  *
- * These three get confused with each other constantly, and each confusion has a
- * cost: alarms used as events produce noise, events used for numbers produce
- * data nobody can chart, and inventory used as a time series bills every write
- * while overwriting the value it just stored.
+ * Events, alarms and inventory get confused with each other constantly, and each
+ * confusion has a cost: alarms used as events produce noise, events used for
+ * numbers produce data nobody can chart, and inventory used as a time series
+ * bills every write while overwriting the value it just stored.
+ *
+ * Commands close the step from `Commands.tsx`. They are the same subject seen
+ * from the other end -- the platform talking to the machine rather than the
+ * machine talking to the platform -- and that contrast is easier to teach on one
+ * screen than across two.
  */
 
 import type { ComponentChildren } from 'preact';
@@ -20,6 +25,7 @@ import {
 import { Choice, Every, Teach, Empty } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
+import { Commands } from './Commands.js';
 import { nf1 } from '../format.js';
 
 interface Props {
@@ -92,14 +98,14 @@ const SPECS: KindSpec[] = [
     ),
   },
   {
-    kind: 'fact',
-    heading: 'Inventory &mdash; facts about the machine',
+    kind: 'inventory',
+    heading: 'Inventory &mdash; what the machine is, right now',
     element: 'Inventory',
     counters: 'Inventories Updated',
-    question: 'A fact about the machine itself, rather than a reading over time.',
+    question: 'Something that is simply true about the machine, rather than a reading over time.',
     rateLabel: 'Changes',
     placeholder: 'Firmware version',
-    addLabel: '+ Machine fact',
+    addLabel: '+ Inventory entry',
     teach: (
       <>
         <p>
@@ -137,16 +143,17 @@ export function StepDiscrete({ scenario, onChange }: Props) {
 
   return (
     <>
-      <Teach title="Three different things, and the difference matters">
+      <Teach title="Four different things, and the difference matters">
         <p>
-          Everything so far was a number over time. What is left is everything else a machine
-          reports, and Cumulocity has three places to put it. Picking the wrong one is not just a
-          modelling nicety: it changes what you can do with the data afterwards, and it changes what
-          you pay.
+          Everything so far was a number over time. What is left is everything else that travels
+          between a machine and Cumulocity: three places to put what the machine reports, and one for
+          what gets sent back to it. Picking the wrong one is not just a modelling nicety &mdash; it
+          changes what you can do with the data afterwards, and it changes what you pay.
         </p>
         <p>
           The one-line test: <b>an event is something that happened</b>, <b>an alarm is something
-          that is wrong</b>, and <b>a fact is something that is true about the machine right now</b>.
+          that is wrong</b>, <b>inventory is something that is true about the machine right now</b>,
+          and <b>a command is something you want the machine to do</b>.
         </p>
       </Teach>
 
@@ -173,6 +180,8 @@ export function StepDiscrete({ scenario, onChange }: Props) {
           </div>
         </section>
       ))}
+
+      <Commands scenario={scenario} onChange={onChange} collapse={collapse} />
     </>
   );
 }
@@ -204,7 +213,7 @@ function KindTable({
               <tr>
                 <th style="min-width:200px">{spec.heading.replace(/&mdash;.*/, '').trim()}</th>
                 <th style="min-width:230px">{spec.rateLabel}</th>
-                {spec.kind === 'fact' && <th style="width:210px">Sent on a timer?</th>}
+                {spec.kind === 'inventory' && <th style="width:210px">Sent on a timer?</th>}
                 <th style="width:34px" />
               </tr>
             </thead>
@@ -227,7 +236,7 @@ function KindTable({
                       onChange={(cadence) => onChange(setCadence(scenario, mt.id, metric.id, cadence))}
                     />
                   </td>
-                  {spec.kind === 'fact' && (
+                  {spec.kind === 'inventory' && (
                     <td>
                       <label class="check">
                         <input

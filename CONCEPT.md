@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 18 — the hand-off's copy buttons work off a file:// origin, and say so · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-26
+**Status:** draft for review, rev 19 — an inventory entry is called inventory, and commands close step 3 · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
 
 ---
 
@@ -171,7 +171,7 @@ kind selection (§5) is the centre of the interface rather than a dropdown in a 
 | A number or code that holds steady for long stretches, then changes | Status flag 0/1, mode, error code | **Measurement** | Created | **On change**, own fragment |
 | Something happened, worth recording, nobody needs to act | Door opened, GPS fix, config applied, shift started | **Event** | Created | On occurrence |
 | Something is wrong and somebody must act | Sensor failure, threshold breach, offline | **Alarm** | Created, then Updated on clear or re-raise | On raise / clear |
-| A fact about the machine itself, not a reading over time | Firmware version, serial, location, config, capability | **Inventory** | Created once at onboarding, Updated on change | On change only |
+| Something simply true about the machine, not a reading over time | Firmware version, serial, location, config, capability | **Inventory** | Created once at onboarding, Updated on change | On change only |
 | Something Cumulocity sends *to* the machine | Firmware update, restart, setpoint change | **Operations** | Created, then Updated per status transition | Per command |
 
 ### Guard-rails the tool enforces
@@ -385,7 +385,7 @@ Add machine type          "Rooftop HVAC unit"     how many · % online · rollou
                           ▸ State or flag         → on change, own fragment
                           ▸ Occurrence            → Event
                           ▸ Condition             → Alarm
-                          ▸ Machine fact          → Inventory
+                          ▸ Inventory entry       → Inventory
                           ▸ Command               → Operations
 ```
 
@@ -403,7 +403,7 @@ API, because a customer who already knows which API to use does not need this to
 | **State or flag** | "Does it hold steady for long stretches, then change?" | Measurement | Created | Changes per day |
 | **Occurrence** | "Did something happen that's worth recording, with nobody needing to act?" | Event | Created (+ Updated if amended) | Occurrences per day |
 | **Condition** | "Is something wrong that somebody has to act on?" | Alarm | Created + Updated on clear | Raises per day |
-| **Machine fact** | "Is it a fact about the machine itself rather than a reading over time?" | Inventory | Updated (+ one Created at onboarding) | Changes per month |
+| **Inventory entry** | "Is it simply true about the machine rather than a reading over time?" | Inventory | Updated (+ one Created at onboarding) | Changes per month |
 | **Command** | "Does Cumulocity send this *to* the machine?" | Operations | Created + N × Updated | Commands per month, transitions each |
 
 Two things the selector does that a plain dropdown would not:
@@ -412,7 +412,7 @@ Two things the selector does that a plain dropdown would not:
   an interval; a state is asked how often it changes. Asking "how many per second" for a status flag
   is how customers end up sampling flags on a timer.
 - **It only offers bundling where bundling is valid** — continuous readings, and only those. State,
-  occurrence, condition, fact and command metrics never enter an interval bundle, which makes §4.3's
+  occurrence, condition, inventory and command metrics never enter an interval bundle, which makes §4.3's
   hard error structurally unreachable rather than merely warned about.
 
 ### Data model
@@ -437,10 +437,10 @@ MachineType
 
 Metric
   name, unit
-  kind:    'continuous' | 'state' | 'occurrence' | 'condition' | 'fact' | 'command'
+  kind:    'continuous' | 'state' | 'occurrence' | 'condition' | 'inventory' | 'command'
   cadence: { mode: 'interval',  seconds }        // continuous
-         | { mode: 'onChange',  perDay }         // state, occurrence, condition, fact
-         | { mode: 'perMonth',  count }          // fact
+         | { mode: 'onChange',  perDay }         // state, occurrence, condition, inventory
+         | { mode: 'perMonth',  count }          // inventory
          | { mode: 'command',   perMonth, transitions }   // command
   semanticGroup                          // free text; drives bundle proposal
   bundleId?                              // continuous only; null = own measurement
@@ -464,7 +464,7 @@ bundle      → N × SPM / intervalSeconds        → Measurements Created
 state       → N × perDay × DPM                 → Measurements Created
 occurrence  → N × perDay × DPM                 → Events Created
 condition   → N × perDay × DPM × 2             → Alarms Created + Alarms Updated
-fact        → N × count                        → Inventories Updated   // quoted per month
+inventory   → N × count                        → Inventories Updated   // quoted per month
             → N × perDay × DPM                 → Inventories Updated   // quoted per day
 command     → N × perMonth × (1 + transitions) → Operations Created + Updated
 onboarding  → machineCount, once, in its period → Inventories Created
@@ -492,20 +492,19 @@ produces 222 million fewer messages in your peak month — 83 % less volume — 
 
 ## 6. User flow — a guided wizard
 
-Seven steps, in the order a customer can actually answer them: what the machines are, what they
-measure, what else they report, what gets sent *to* them, and only then the commercial line items
-that have nothing to do with the fleet. A running total stays pinned to the screen throughout, so
+Six steps, in the order a customer can actually answer them: what the machines are, what they
+measure, everything else that travels between machine and platform, and only then the commercial line
+items that have nothing to do with the fleet. A running total stays pinned to the screen throughout, so
 every input visibly moves the number.
 
 | Step | Screen | What it asks, and what it teaches |
 |---|---|---|
 | 1 | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
 | 2 | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. |
-| 3 | **Events, alarms & facts** | The three non-measurement elements, each with its own explanation and the mistake it invites. An event is something that happened; an alarm is something that is wrong; a fact is something true about the machine right now. |
-| 4 | **Commands** | Operations, outbound. Asks for the status-transition count, because one command is three or four messages. |
-| 5 | **Deployment & add-ons** | Every Configurator line item the fleet cannot imply, with its cell reference. Quantities only. |
-| 6 | **Rollout** | Periods, month counts, the ramp, and where it starts on the calendar. |
-| 7 | **Results** | §7. |
+| 3 | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. |
+| 4 | **Deployment & add-ons** | Every Configurator line item the fleet cannot imply, with its cell reference. Quantities only. |
+| 5 | **Rollout** | Periods, month counts, the ramp, and where it starts on the calendar. |
+| 6 | **Results** | §7. |
 
 **The protocol is asked, and deliberately does not count.** Step 1 asks what each machine type talks
 — OPC UA, Modbus TCP, BACnet/IP, native MQTT, a custom agent, or something the customer types in
@@ -565,16 +564,17 @@ questions you would otherwise have to open it for: **what did I model here, and 
 volume is it.**
 
 ```
-▸ Rooftop HVAC unit  1,000 machines    4 time series, 2 states, 1 event, 1 alarm, 1 fact,        46 M
-                                       1 command · every 1 min · 3 measurement types   MESSAGES / MONTH ·
-                                       Measurements 45.9 M · Events 31 k · Alarms 31 k   45,977 PER MACHINE
+▸ Rooftop HVAC unit  1,000 machines    4 time series, 2 states, 1 event, 1 alarm,               46 M
+                                       1 inventory entry, 1 command · every 1 min ·      MESSAGES / MONTH ·
+                                       3 measurement types                              45,977 PER MACHINE
+                                       Measurements 45.9 M · Events 31 k · Alarms 31 k
 ```
 
 One machine type stays open; the rest start folded, and after that it follows whatever the reader
 did. Three things this pins down:
 
 - **The parts come before the measurement count.** "10 datapoints in 3 measurement types" would be
-  false — the event, alarm, fact and command are not inside a measurement at all.
+  false — the event, alarm, inventory entry and command are not inside a measurement at all.
 - **A state counts as a measurement of its own**, per §4.4. The §9 HVAC unit sends three, not one,
   and the summary now agrees with the diagram directly beneath it.
 - **Messages are grouped by element, not by counter.** The nine counters split created from updated,
@@ -709,7 +709,7 @@ asserted.
 | L7 | One fragment name, two different series sets — bundled or solo, since a lone series carries a fragment name the customer can type | **Error** — variable bundle |
 | L8 | Alarm rate implies repeatedly re-raising the same alarm type | Suggestion — use alarm lifecycle |
 | L9 | Command transitions unmodelled, or more than 4 per command | Warning — each update bills (§3) |
-| L10 | A machine fact is re-sent on a timer or at every boot rather than on change | Warning — every successful `PUT` counts, even a no-op |
+| L10 | An inventory entry is re-sent on a timer or at every boot rather than on change | Warning — every successful `PUT` counts, even a no-op |
 
 **Copy to clipboard.** The hand-off table offers two copies per period: the nine counters as one
 column, ready to paste into that period's `D28:D36` in one action, and every line as *cell, value,
@@ -826,7 +826,7 @@ and an order-of-magnitude larger bundle for a presales calculator that already r
 | Phase | Content | Rough size |
 |---|---|---|
 | P0 | ~~`/lib/engine`: the nine counters, kind→counter mapping, lint rules, payload generator, tests, validated against §9~~ **done** — plus the bundle proposal and the Configurator cell map | — |
-| P1 | ~~The seven wizard steps and results~~ · ~~deployable into a tenant~~ **done** — `npm run package` produces the hosted-application zip; manifest at `cumulocity.json` | — |
+| P1 | ~~The wizard steps and results~~ · ~~deployable into a tenant~~ **done** — `npm run package` produces the hosted-application zip; manifest at `cumulocity.json` | — |
 | P2 | ~~Explainer, quantified guidance report, machine presets~~ **done** | — |
 | P3 | Persistence, export, standalone build | ~1 week |
 | P4 | Pre-fill from tenant statistics; A/B scenario comparison | later |
@@ -846,7 +846,7 @@ for a **31-day peak month** with the February figure alongside.
 | Events Created | service events — occurrence, 1/machine/day | 31,000 | 28,000 |
 | Alarms Created | condition, 0.5/machine/day | 15,500 | 14,000 |
 | Alarms Updated | the matching clears | 15,500 | 14,000 |
-| Inventories Updated | firmware + config — facts, 1/machine/day | 31,000 | 28,000 |
+| Inventories Updated | firmware + config — inventory, 1/machine/day | 31,000 | 28,000 |
 | Operations Created | 1 command/machine/month | 1,000 | 1,000 |
 | Operations Updated | 3 status transitions per command | 3,000 | 3,000 |
 | **Total messages** | | **45,977,000** | **41,528,000** |
@@ -893,7 +893,7 @@ the invoice does, because it buys query latency, headroom and a database that st
   invisible in the output. Mitigation: the §5 plain-language questions, an inline example per kind,
   and L2/L5 catching the two common mistakes after the fact.
 - **Over-optimisation.** Bundling purely for volume can produce fragments that make no sense to a
-  dashboard builder. Mitigation: the semantic-group split in step 4, and L6.
+  dashboard builder. Mitigation: the semantic-group split in step 2, and L6.
 - **Overselling savings.** A volume reduction is not automatically a cost reduction. Mitigation: the
   §9 caveat, and the discipline of never computing a bill (§2).
 - **Definition drift.** The Configurator changes yearly. Mitigation: counting rules in one module,

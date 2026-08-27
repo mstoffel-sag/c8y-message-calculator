@@ -193,7 +193,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
 
   /* -- L5 / L10: inventory misuse ----------------------------------------- */
   for (const metric of machineType.metrics) {
-    if (metric.kind !== 'fact') continue;
+    if (metric.kind !== 'inventory') continue;
     const writesPerMonth =
       metric.cadence.mode === 'perMonth'
         ? metric.cadence.count

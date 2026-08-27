@@ -1,14 +1,19 @@
 /**
- * Step 4: operations. The one element that runs the other way, and the one
- * people leave out of estimates entirely.
+ * Commands: the closing section of step 3. CONCEPT.md section 3.
+ *
+ * The one element that runs the other way, and the one people leave out of
+ * estimates entirely. It sits with events, alarms and inventory rather than in a
+ * step of its own -- the four together are "everything that is not a
+ * measurement", and putting commands last is what makes the direction visible:
+ * three sections of the machine talking, then one of the platform talking back.
  */
 
 import { perMonthEquivalent, type MachineType, type Scenario } from '../../../lib/engine/index.js';
 import { COMMANDS, TRANSITIONS } from '../../../lib/presets/catalog.js';
 import { addDatapoint, patchCadence, removeMetric, setCadence, setDatapointName } from '../store.js';
-import { Choice, Every, Teach, Empty } from '../parts.js';
+import { Choice, Every, Teach } from '../parts.js';
 import { Machine } from '../Machine.js';
-import { useCollapse, type Collapse } from '../collapse.js';
+import { type Collapse } from '../collapse.js';
 import { nf1 } from '../format.js';
 
 interface Props {
@@ -21,42 +26,47 @@ const COMMAND_OPTIONS = [
   ...COMMANDS.map((seed) => ({ value: seed.name, label: seed.name, group: seed.group })),
 ];
 
-export function StepCommands({ scenario, onChange }: Props) {
-  const collapse = useCollapse(scenario.machineTypes.map((mt) => mt.id));
-
-  if (scenario.machineTypes.length === 0) return <Empty>Add a machine type first.</Empty>;
-
+/**
+ * Rendered by StepDiscrete, and given its collapse state, so a machine type
+ * folded away in one section of the step is folded away in all four.
+ */
+export function Commands({ scenario, onChange, collapse }: Props & { collapse: Collapse }) {
   return (
-    <>
-      <Teach title="Operations run outbound, and they cost more than they look">
-        <p>
-          Everything else in this wizard is the machine talking to Cumulocity. An{' '}
-          <b>operation</b> goes the other way: a firmware update, a configuration push, a reboot, a
-          setpoint change.
-        </p>
-        <p>
-          <b>One command is not one message.</b> Creating the operation counts, and then every status
-          the device reports back counts as well &mdash; <code>PENDING</code>,{' '}
-          <code>EXECUTING</code>, <code>SUCCESSFUL</code> is three more. A single command is
-          realistically <b>three or four messages</b>, which is why an estimate that models a
-          firmware campaign as one message per machine is out by a factor of four.
-        </p>
-        <p>
-          If your device reports fine-grained progress through the operation status, count those
-          too. That pattern gets expensive quickly, and progress usually belongs in an event.
-        </p>
-      </Teach>
+    <section class="panel sub">
+      <header>
+        <h3>Commands</h3>
+        <span class="sub">Operation &rarr; Operations Created + Operations Updated</span>
+      </header>
+      <div class="body">
+        <Teach title="This one runs outbound, and it costs more than it looks">
+          <p>
+            Everything above is the machine talking to Cumulocity. An <b>operation</b> goes the other
+            way: a firmware update, a configuration push, a reboot, a setpoint change.
+          </p>
+          <p>
+            <b>One command is not one message.</b> Creating the operation counts, and then every
+            status the device reports back counts as well &mdash; <code>PENDING</code>,{' '}
+            <code>EXECUTING</code>, <code>SUCCESSFUL</code> is three more. A single command is
+            realistically <b>three or four messages</b>, which is why an estimate that models a
+            firmware campaign as one message per machine is out by a factor of four.
+          </p>
+          <p>
+            If your device reports fine-grained progress through the operation status, count those
+            too. That pattern gets expensive quickly, and progress usually belongs in an event.
+          </p>
+        </Teach>
 
-      {scenario.machineTypes.map((mt) => (
-        <CommandTable
-          key={mt.id}
-          machineType={mt}
-          scenario={scenario}
-          onChange={onChange}
-          collapse={collapse}
-        />
-      ))}
-    </>
+        {scenario.machineTypes.map((mt) => (
+          <CommandTable
+            key={mt.id}
+            machineType={mt}
+            scenario={scenario}
+            onChange={onChange}
+            collapse={collapse}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 

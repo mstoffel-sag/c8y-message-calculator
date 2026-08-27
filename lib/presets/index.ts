@@ -48,13 +48,13 @@ function cadenceFor(seed: MetricSeed): Metric['cadence'] {
     case 'occurrence':
     case 'condition':
       return { mode: 'onChange', perDay: seed.perDay ?? 1 };
-    case 'fact':
+    case 'inventory':
       return seed.perDay !== undefined
         ? { mode: 'onChange', perDay: seed.perDay }
         : { mode: 'perMonth', count: seed.perMonth ?? 1 };
     case 'command':
       // A command quoted per day scales with month length; one quoted per month
-      // does not. Same two rhythms as 'fact'.
+      // does not. Same two rhythms as 'inventory'.
       return seed.perDay !== undefined
         ? { mode: 'command', perDay: seed.perDay, transitions: seed.transitions ?? 3 }
         : { mode: 'command', perMonth: seed.perMonth ?? 1, transitions: seed.transitions ?? 3 };
@@ -114,7 +114,7 @@ export const SEEDS: Seed[] = [
       { name: 'Filter status', unit: '', kind: 'state', semanticGroup: 'status', perDay: 20 },
       { name: 'Service event', unit: '', kind: 'occurrence', semanticGroup: 'service', perDay: 1 },
       { name: 'Fault condition', unit: '', kind: 'condition', semanticGroup: 'fault', perDay: 0.5 },
-      { name: 'Firmware and config', unit: '', kind: 'fact', semanticGroup: 'identity', perDay: 1 },
+      { name: 'Firmware and config', unit: '', kind: 'inventory', semanticGroup: 'identity', perDay: 1 },
       { name: 'Setpoint change', unit: '', kind: 'command', semanticGroup: 'control', perMonth: 1, transitions: 3 },
     ],
   },
@@ -131,7 +131,7 @@ export const SEEDS: Seed[] = [
       { name: 'Active energy export', unit: 'kWh', kind: 'continuous', semanticGroup: 'energy', interval: 900, bundle: 'acme_Energy' },
       { name: 'Voltage L1', unit: 'V', kind: 'continuous', semanticGroup: 'energy', interval: 900, bundle: 'acme_Energy' },
       { name: 'Tamper detected', unit: '', kind: 'condition', semanticGroup: 'fault', perDay: 0.01 },
-      { name: 'Firmware version', unit: '', kind: 'fact', semanticGroup: 'identity', perMonth: 1 },
+      { name: 'Firmware version', unit: '', kind: 'inventory', semanticGroup: 'identity', perMonth: 1 },
     ],
   },
   {
@@ -170,7 +170,7 @@ export const SEEDS: Seed[] = [
       { name: 'Memory used', unit: '%', kind: 'continuous', semanticGroup: 'gateway health', interval: 300, bundle: 'acme_GatewayHealth' },
       { name: 'Uplink state', unit: '', kind: 'state', semanticGroup: 'status', perDay: 4 },
       { name: 'Firmware update', unit: '', kind: 'command', semanticGroup: 'control', perMonth: 0.5, transitions: 3 },
-      { name: 'Inventory sync', unit: '', kind: 'fact', semanticGroup: 'identity', perMonth: 1 },
+      { name: 'Inventory sync', unit: '', kind: 'inventory', semanticGroup: 'identity', perMonth: 1 },
     ],
   },
   {

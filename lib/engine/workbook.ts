@@ -36,7 +36,7 @@ const COL = { category: 2, label: 3, value: 4, unit: 6, note: 7 } as const;
 const ELEMENT_OF: Partial<Record<MetricKind, string>> = {
   occurrence: 'an event',
   condition: 'an alarm (raise + clear)',
-  fact: 'the managed object',
+  inventory: 'the managed object',
   command: 'an operation (+ status updates)',
 };
 

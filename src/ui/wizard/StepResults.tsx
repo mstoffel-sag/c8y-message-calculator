@@ -1,4 +1,4 @@
-/** Step 7: what the wizard produces. */
+/** Step 6: what the wizard produces. */
 
 import {
   measurementView,

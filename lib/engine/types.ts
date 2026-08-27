@@ -12,7 +12,7 @@ export type MetricKind =
   | 'state'
   | 'occurrence'
   | 'condition'
-  | 'fact'
+  | 'inventory'
   | 'command';
 
 /**
@@ -28,14 +28,14 @@ export type Cadence =
    * Exactly one of perMonth / perDay is set. A monthly firmware campaign
    * happens once per calendar month whatever its length, so perMonth does not
    * scale with days; a command sent most working days does, so perDay is the
-   * honest form for it. Same two-rhythm choice as 'fact'.
+   * honest form for it. Same two-rhythm choice as 'inventory'.
    */
   | { mode: 'command'; transitions: number; perMonth?: number; perDay?: number };
 
 /**
  * The cadence modes each kind may carry.
  *
- * Only 'fact' has a choice, and it needs one: a firmware version changes a
+ * Only 'inventory' has a choice, and it needs one: a firmware version changes a
  * couple of times a year, while a config block re-sent nightly changes once a
  * day -- and a daily rate has to scale with month length to stay honest, which
  * a monthly count cannot do.
@@ -45,7 +45,7 @@ export const CADENCE_FOR_KIND: Record<MetricKind, Array<Cadence['mode']>> = {
   state: ['onChange'],
   occurrence: ['onChange'],
   condition: ['onChange'],
-  fact: ['perMonth', 'onChange'],
+  inventory: ['perMonth', 'onChange'],
   command: ['command'],
 };
 

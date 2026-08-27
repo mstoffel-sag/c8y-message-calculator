@@ -95,7 +95,7 @@ describe('the view model', () => {
     assert.equal(view.messagesPerMonth, 0);
   });
 
-  test('events, alarms, facts and commands are absent -- they have nothing to group', () => {
+  test('events, alarms, inventory and commands are absent -- they have nothing to group', () => {
     const hvac = presetByKey('hvac')!;
     const view = measurementView(hvac, 'acme');
     const drawn = view.groups.flatMap((g) => g.members.map((m) => m.metricId));

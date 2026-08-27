@@ -1,8 +1,8 @@
 /**
  * A machine type's editing block, folded down to one readable header.
  *
- * Steps 2, 3 and 4 all edit the same machine types from different angles, and
- * all three used to open with a full-height block per type. Past two types that
+ * Steps 2 and 3 both edit the same machine types from different angles, and
+ * both used to open with a full-height block per type. Past two types that
  * is a page nobody reads. So the block collapses, and the header carries the
  * summary: what was modelled, and what it costs in messages.
  *
@@ -30,7 +30,7 @@ const KIND_WORDS: Record<MetricKind, [string, string]> = {
   state: ['on-change series', 'on-change series'],
   occurrence: ['event', 'events'],
   condition: ['alarm', 'alarms'],
-  fact: ['fact', 'facts'],
+  inventory: ['inventory entry', 'inventory entries'],
   command: ['command', 'commands'],
 };
 
@@ -40,7 +40,7 @@ const ELEMENT_FOR_KIND: Record<MetricKind, SummaryElement['element']> = {
   state: 'Measurements',
   occurrence: 'Events',
   condition: 'Alarms',
-  fact: 'Inventory',
+  inventory: 'Inventory',
   command: 'Operations',
 };
 
@@ -65,8 +65,8 @@ function intervalPhrase(intervals: number[]): string | null {
  * The composition line: the parts, the rhythm, then the measurement design.
  *
  * In that order on purpose. "10 datapoints in 3 measurement types" would be a
- * lie -- only the series and states are measurements; the event, alarm, fact
- * and command are not in a measurement at all. Listing the parts first and the
+ * lie -- only the series and states are measurements; the event, alarm, inventory
+ * entry and command are not in a measurement at all. Listing the parts first and the
  * measurement count last claims nothing about what contains what.
  */
 export function machineStructure(s: MachineTypeSummary): string {

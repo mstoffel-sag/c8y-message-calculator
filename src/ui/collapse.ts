@@ -7,7 +7,7 @@
  *
  * Kept outside the scenario on purpose. Whether a block is folded is not part of
  * the estimate, must not travel in an exported scenario, and must not mark the
- * scenario dirty. It is also shared across steps 2, 3 and 4 by machine type id,
+ * scenario dirty. It is also shared across steps 2 and 3 by machine type id,
  * so folding the HVAC block away stays folded as you walk the wizard.
  *
  * Same shape as useExpert: a viewer preference in localStorage, and every access

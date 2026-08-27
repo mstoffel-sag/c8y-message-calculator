@@ -35,7 +35,7 @@ export function isDayScaled(unit: RateUnit): boolean {
  *
  * States, events and alarms only have a day-scaled counter, so they stop at
  * weeks -- "once a month" is said as "every 30 days", which is what the engine
- * actually computes. Facts have both rhythms. Commands are offered from days up,
+ * actually computes. Inventory has both rhythms. Commands are offered from days up,
  * because sub-daily commands to every machine in a fleet is not a pattern worth
  * making easy to express.
  */
@@ -45,7 +45,7 @@ export function unitsForKind(kind: MetricKind): RateUnit[] {
     case 'occurrence':
     case 'condition':
       return ['s', 'min', 'h', 'day', 'week'];
-    case 'fact':
+    case 'inventory':
       return ['min', 'h', 'day', 'week', 'month', 'year'];
     case 'command':
       return ['day', 'week', 'month', 'year'];

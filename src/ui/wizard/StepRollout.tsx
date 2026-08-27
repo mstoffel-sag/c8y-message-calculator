@@ -1,4 +1,4 @@
-/** Step 6: periods, the ramp, and the calendar. */
+/** Step 5: periods, the ramp, and the calendar. */
 
 import {
   BYTES_PER_VALUE_HIGH,

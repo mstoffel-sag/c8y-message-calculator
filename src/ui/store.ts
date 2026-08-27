@@ -35,7 +35,7 @@ export function defaultCadence(kind: MetricKind): Cadence {
       return { mode: 'onChange', perDay: 1 };
     case 'condition':
       return { mode: 'onChange', perDay: 0.5 };
-    case 'fact':
+    case 'inventory':
       return { mode: 'perMonth', count: 1 };
     case 'command':
       return { mode: 'command', perMonth: 1, transitions: 3 };
@@ -185,7 +185,7 @@ export function setRhythm(
   );
 }
 
-/** Facts may be quoted per month or per day; nothing else has a choice. */
+/** Inventory may be quoted per month or per day; nothing else has a choice. */
 export function setCadenceMode(
   scenario: Scenario,
   machineTypeId: string,
@@ -415,6 +415,20 @@ export function load(): Scenario | null {
  * with no `commercial` on its periods used to be valid and would now throw on
  * first render.
  */
+/**
+ * The kind, with the one rename this format has had.
+ *
+ * 'fact' was what the wizard called an inventory write until the step was
+ * renamed after the element it actually bills to. Scenarios saved before that
+ * are still in browsers and in files on disk, and a scenario that loses its
+ * managed-object writes on load loses messages silently -- which is the one
+ * failure mode this tool cannot have.
+ */
+function metricKind(raw: unknown): MetricKind {
+  if (raw === 'fact') return 'inventory';
+  return (raw ?? 'continuous') as MetricKind;
+}
+
 export function normalise(input: unknown): Scenario {
   const raw = (input ?? {}) as Partial<Scenario>;
   const fallback = blankScenario();
@@ -441,7 +455,7 @@ export function normalise(input: unknown): Scenario {
       metricIds: Array.isArray(b?.metricIds) ? b.metricIds : [],
     })),
     metrics: (Array.isArray(mt?.metrics) ? mt.metrics : []).map((m) => {
-      const kind: MetricKind = m?.kind ?? 'continuous';
+      const kind = metricKind(m?.kind);
       return {
         id: m?.id ?? nextId('m'),
         name: m?.name ?? '',

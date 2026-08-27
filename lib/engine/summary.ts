@@ -44,7 +44,7 @@ export interface MachineTypeSummary {
    * Distinct measurements a machine sends: shared bundles, plus every series
    * travelling alone, plus every state -- a state cannot join an interval
    * bundle without making the bundle's series set vary, so it is always its own
-   * fragment. Events, alarms, facts and commands are not measurements and are
+   * fragment. Events, alarms, inventory and commands are not measurements and are
    * not counted here.
    */
   measurementTypes: number;
@@ -65,7 +65,7 @@ export interface MachineTypeSummary {
 }
 
 /** The order the wizard asks for them in, so the summary reads in step order. */
-const KIND_ORDER: MetricKind[] = ['continuous', 'state', 'occurrence', 'condition', 'fact', 'command'];
+const KIND_ORDER: MetricKind[] = ['continuous', 'state', 'occurrence', 'condition', 'inventory', 'command'];
 
 const ELEMENT_OF: Array<{ element: SummaryElement['element']; keys: Array<keyof Counters> }> = [
   { element: 'Measurements', keys: ['measurementsCreated'] },

@@ -212,7 +212,7 @@ function alarmExample(metric: Metric, prefix: string): PayloadExample {
   };
 }
 
-function factExample(metric: Metric, prefix: string): PayloadExample {
+function inventoryExample(metric: Metric, prefix: string): PayloadExample {
   const name = derivedTypeName(prefix, metric.name);
   const body = JSON.stringify({ [name]: '<value>' }, null, 2);
   return {
@@ -252,7 +252,7 @@ export function payloadsFor(machineType: MachineType, prefix = 'acme'): PayloadE
     if (metric.kind === 'state') out.push(stateExample(metric, prefix));
     if (metric.kind === 'occurrence') out.push(eventExample(metric, prefix));
     if (metric.kind === 'condition') out.push(alarmExample(metric, prefix));
-    if (metric.kind === 'fact') out.push(factExample(metric, prefix));
+    if (metric.kind === 'inventory') out.push(inventoryExample(metric, prefix));
   }
   return out;
 }
