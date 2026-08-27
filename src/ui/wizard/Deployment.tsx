@@ -1,10 +1,15 @@
 /**
- * Deployment and add-ons.
+ * Deployment and add-ons: the second section of StepContract.
  *
  * These are the Configurator line items the fleet cannot imply. The tool
  * collects quantities and hands them back with their cell references so nobody
  * retypes the quote from memory. It does not price them, rank them or
  * recommend one -- CONCEPT.md section 1.
+ *
+ * Every column here is a contract period, which is why this is a section and not
+ * a screen: the periods it is asking about are defined immediately above it.
+ * Asked on its own page, it wanted a number per period while the periods
+ * themselves were still one screen further on.
  */
 
 import {
@@ -28,83 +33,89 @@ type RowProps = Props & { item: LineItem; result: ScenarioResult };
 
 const GROUPS = ['Deployment', 'Core Metrics', 'Add-Ons', 'Support'] as const;
 
-export function StepCommercial({ scenario, onChange, result }: Props & { result: ScenarioResult }) {
+export function Deployment({ scenario, onChange, result }: Props & { result: ScenarioResult }) {
   return (
-    <>
-      <Teach title="The parts of the quote the fleet cannot tell you">
-        <p>
-          Message volume comes out of the machines. Everything on this page does not: how many
-          deployments, which add-ons, how many tenants. Somebody has to state them, so the wizard
-          asks rather than guessing.
-        </p>
-        <p>
-          Cumulocity is <b>commit-to-consume</b>. A customer commits to a spend amount, not to
-          quantities &mdash; there is no bill of materials, usage is metered daily and drawn down
-          against the commitment. So nothing here is an order; it is the shape of the estimate.
-        </p>
-        <p>
-          <b>This tool shows no prices.</b> It collects the quantities and tells you which cell each
-          one belongs in. What they cost is the Sales Configurator&rsquo;s job.
-        </p>
-      </Teach>
+    <section class="panel sub">
+      <header>
+        <h3>Deployment &amp; add-ons</h3>
+        <span class="sub">One column per period &rarr; Configurator rows 23&ndash;26</span>
+      </header>
+      <div class="body">
+        <Teach title="The parts of the quote the fleet cannot tell you">
+          <p>
+            Message volume comes out of the machines. Everything in this section does not: how many
+            deployments, which add-ons, how many tenants. Somebody has to state them, so the wizard
+            asks rather than guessing.
+          </p>
+          <p>
+            Cumulocity is <b>commit-to-consume</b>. A customer commits to a spend amount, not to
+            quantities &mdash; there is no bill of materials, usage is metered daily and drawn down
+            against the commitment. So nothing here is an order; it is the shape of the estimate.
+          </p>
+          <p>
+            <b>This tool shows no prices.</b> It collects the quantities and tells you which cell each
+            one belongs in. What they cost is the Sales Configurator&rsquo;s job.
+          </p>
+        </Teach>
 
-      <div class="scroll">
-        <table>
-          <thead>
-            <tr>
-              <th style="min-width:280px">Line item</th>
-              <th>Unit</th>
-              {scenario.periods.map((p) => (
-                <th class="num" key={p.index} style="min-width:110px">
-                  Period {p.index}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {GROUPS.map((group) => {
-              const items = ASKED_LINE_ITEMS.filter((i) => i.group === group);
-              if (items.length === 0) return null;
-              return (
-                <>
-                  <tr key={group}>
-                    <td colSpan={2 + scenario.periods.length} class="group-row">
-                      {group}
-                    </td>
-                  </tr>
-                  {items.map((item) => (
-                    <Row
-                      key={item.key}
-                      item={item}
-                      scenario={scenario}
-                      onChange={onChange}
-                      result={result}
-                    />
-                  ))}
-                </>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {scenario.periods.length > 1 && (
-        <div class="row" style="margin-top:14px">
-          <button onClick={() => onChange(copyCommercialAcross(scenario, 1))}>
-            Copy period 1 across all periods
-          </button>
-          <span class="hint" style="margin:0">
-            Most quotes repeat the same deployment every period; the fleet is what ramps.
-          </span>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th style="min-width:280px">Line item</th>
+                <th>Unit</th>
+                {scenario.periods.map((p) => (
+                  <th class="num" key={p.index} style="min-width:110px">
+                    Period {p.index}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {GROUPS.map((group) => {
+                const items = ASKED_LINE_ITEMS.filter((i) => i.group === group);
+                if (items.length === 0) return null;
+                return (
+                  <>
+                    <tr key={group}>
+                      <td colSpan={2 + scenario.periods.length} class="group-row">
+                        {group}
+                      </td>
+                    </tr>
+                    {items.map((item) => (
+                      <Row
+                        key={item.key}
+                        item={item}
+                        scenario={scenario}
+                        onChange={onChange}
+                        result={result}
+                      />
+                    ))}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
 
-      <p class="hint" style="margin-top:16px">
-        <b>Not asked for, deliberately:</b> discounts, currency, minimum commitments and approval
-        thresholds. Those live in the Configurator and are nobody&rsquo;s business inside a tool that
-        may be shown to a customer.
-      </p>
-    </>
+        {scenario.periods.length > 1 && (
+          <div class="row" style="margin-top:14px">
+            <button onClick={() => onChange(copyCommercialAcross(scenario, 1))}>
+              Copy period 1 across all periods
+            </button>
+            <span class="hint" style="margin:0">
+              Most quotes repeat the same deployment every period; the fleet is what ramps.
+            </span>
+          </div>
+        )}
+
+        <p class="hint" style="margin-top:16px">
+          <b>Not asked for, deliberately:</b> discounts, currency, minimum commitments and approval
+          thresholds. Those live in the Configurator and are nobody&rsquo;s business inside a tool that
+          may be shown to a customer.
+        </p>
+      </div>
+    </section>
   );
 }
 

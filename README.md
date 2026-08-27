@@ -92,7 +92,7 @@ src/ui/Machine.tsx  the collapsible machine-type block, and the summary its head
 src/ui/collapse.ts  which machine types are folded -- a viewer preference, never scenario data
 src/ui/styles.css the Cumulocity design tokens, and this app's semantic layer over them
 src/ui/fonts/     Public Sans, self-hosted -- a tenant may not reach a font CDN
-src/ui/wizard/    the six steps and the hand-off table
+src/ui/wizard/    the five steps and the hand-off table
 test/             the CONCEPT.md section 9 acceptance test, and a render pass over every step
 tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurator
 ```
@@ -104,9 +104,8 @@ tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurato
 | 1 Machines | machine types, counts, online %, and what each machine talks — a protocol list you can always escape. Descriptive: no counter reads it. |
 | 2 Measurements | one row per series; its rhythm — on a timer, or when the value moves — is a column. Timed series are grouped by interval into one measurement type each, as you type, and that type's fragment name is editable in the row. Splitting one out creates its own measurement type there and then; an on-change series always travels alone — the row says why, and still lets you name the type it sends in. |
 | 3 Events, alarms, inventory & commands | everything that is not a measurement, one panel each. Commands close the step, with the status-transition count, because the contrast between three inbound elements and one outbound one is the thing being taught |
-| 4 Deployment & add-ons | every Configurator line item the fleet cannot imply |
-| 5 Rollout | periods, the ramp, and where it starts on the calendar |
-| 6 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
+| 4 Contract & deployment | periods, the ramp and the calendar, then every Configurator line item the fleet cannot imply — one column per period, right under the table that decides how many periods there are |
+| 5 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
 
 ### Operational storage is a range, not a number
 
@@ -119,7 +118,7 @@ are always shown and no midpoint ever is.
 The Configurator's ODS cell (`D37`) is filled in from it, at the assumed bytes per value — **400 B by
 default, the top of the range**, because under-stating usage on a commit-to-consume contract depletes
 the commitment early rather than saving anything. The note beside the cell carries the whole range,
-and typing a figure on the Deployment step overrides it.
+and typing a figure in the deployment panel overrides it.
 
 The retention period is walked backwards through the months the ramp produced, so a fleet three
 months into a rollout is not credited with a full period of history, and storage keeps climbing after

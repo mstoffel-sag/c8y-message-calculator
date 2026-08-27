@@ -1,0 +1,66 @@
+/**
+ * Renders one wizard step to a standalone HTML file, for a WebKit snapshot.
+ *
+ *   npm test                                   # builds dist-test/, which this reads
+ *   node tools/render_step.mjs contract /tmp/c.html [scrollPx]
+ *   qlmanage -t -s 1100 -o /tmp /tmp/c.html
+ *
+ * There is no browser in the loop here, so this plus qlmanage is how a layout
+ * change gets looked at rather than reasoned about. `scrollPx` shifts the page up
+ * so a snapshot can reach content below the first screenful.
+ */
+
+import { h } from 'preact';
+import { render } from 'preact-render-to-string';
+import { readFileSync, writeFileSync } from 'node:fs';
+
+import { STEPS } from '../dist-test/src/ui/wizard/steps.js';
+import { StepFleet } from '../dist-test/src/ui/wizard/StepFleet.js';
+import { StepTimeSeries } from '../dist-test/src/ui/wizard/StepTimeSeries.js';
+import { StepDiscrete } from '../dist-test/src/ui/wizard/StepDiscrete.js';
+import { StepContract } from '../dist-test/src/ui/wizard/StepContract.js';
+import { StepResults } from '../dist-test/src/ui/wizard/StepResults.js';
+import { computeScenario } from '../dist-test/lib/engine/index.js';
+import { conceptSection9Scenario } from '../dist-test/lib/presets/index.js';
+
+const COMPONENTS = {
+  fleet: StepFleet,
+  series: StepTimeSeries,
+  discrete: StepDiscrete,
+  contract: StepContract,
+  results: StepResults,
+};
+
+const [key, out, scroll = '0'] = process.argv.slice(2);
+const Step = COMPONENTS[key];
+if (!Step || !out) {
+  console.error(`usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx]`);
+  process.exit(1);
+}
+
+const scenario = conceptSection9Scenario();
+const result = computeScenario(scenario);
+const index = STEPS.findIndex((s) => s.key === key);
+const def = STEPS[index];
+
+// Every step takes scenario/onChange; the ones that report take result, and the
+// results step takes the expert flag. Passing all of them is harmless.
+const body = render(h(Step, { scenario, result, expert: true, onChange: () => {} }));
+const rail = STEPS.map(
+  (s, i) => `<button class="rail-step ${i === index ? 'on' : ''}"><i>${i + 1}</i>${s.title}</button>`,
+).join('');
+
+writeFileSync(
+  out,
+  `<!doctype html><html><head><meta charset="utf-8"><style>
+${readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8')}
+.shell { margin-top: -${Number(scroll) || 0}px; }
+</style></head><body>
+<div class="topbar"><div class="rail">${rail}</div></div>
+<div class="shell">
+  <div class="step-head"><h1>${def.title}</h1><p>${def.lead}</p></div>
+  ${body}
+</div>
+</body></html>`,
+);
+console.log(out);

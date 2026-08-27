@@ -43,8 +43,9 @@ npm run dev      # http://127.0.0.1:5173
 There is no browser here. Every UI check is `preact-render-to-string` plus a WebKit snapshot:
 
 ```
-qlmanage -t -s 1100 -o <outdir> <file.html>     # renders HTML and .xlsx
-python3 tools/xlsx_dump.py <file.xlsx>          # stdlib-only; pipe through sed to redact prices
+node tools/render_step.mjs contract /tmp/c.html   # any step key; reads dist-test/, so run npm test first
+qlmanage -t -s 1100 -o /tmp /tmp/c.html           # WebKit; renders HTML and .xlsx
+python3 tools/xlsx_dump.py <file.xlsx>            # stdlib-only; pipe through sed to redact prices
 ```
 
 Worth the round trip when **layout or wording** changed, or when two figures could disagree with each
@@ -78,11 +79,13 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 - **CONCEPT.md** is the design doc: bump the rev line and say what changed when the design does, not
   when an implementation detail does. **README.md** is orientation for a new reader.
 - **No step ordinals outside the wizard table in CONCEPT.md §6.** That table's `Key` column
-  (`fleet`, `series`, `discrete`, `commercial`, `rollout`, `results`) is the stable handle: code
+  (`fleet`, `series`, `discrete`, `contract`, `results`) is the stable handle: code
   comments name the component, tests are named after the key, prose names the screen. Reordering the
   wizard should touch `steps.ts` and one table row.
 - **No counts that go stale in docs** — test totals, finding totals, line counts. They are a
   mandatory edit on every change and nobody acts on them.
+- **An input is asked once, in the place it is used.** Two steps merged because one asked for a
+  quantity per contract period while the next was where periods were created.
 - Comments in this repo say *why*, at length, where the reasoning is not obvious from the code. Match
   that when editing them; do not add a comment that only restates the line beneath it.
 

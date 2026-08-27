@@ -357,7 +357,7 @@ function Storage({ result }: { result: ScenarioResult }) {
               times what it does at 30. This uses{' '}
               <b>{n(peak.retentionDays)} days</b>
               {peak.retentionDays === DEFAULT_RETENTION_DAYS && ' (the starting assumption)'} &mdash;
-              set that and the bytes per value to the tenant's own figures on the Rollout step.
+              set that and the bytes per value to the tenant's own figures on the Contract step.
             </p>
             <p style="font-size:13px;color:var(--ink-mute)">
               Measurements only. Events, alarms, inventory writes and operations are stored too, but

@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 19 — an inventory entry is called inventory, and commands join the elements that surround them · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
+**Status:** draft for review, rev 20 — every input is asked once, in the place it is used · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
 
 ---
 
@@ -335,7 +335,7 @@ the assumed **bytes per value**, which defaults to **400 B — the top of the ra
 and not the bottom: on a commit-to-consume contract, under-stating usage saves the customer nothing,
 it depletes the commitment early and triggers an automatic top-up. The assumption is a scenario
 setting beside retention, the whole range travels in the note column next to the cell, and a customer
-who has measured their own tenant overrides it on the Deployment step — their figure wins.
+who has measured their own tenant overrides it in the deployment panel — their figure wins.
 
 That makes storage the tool's only `estimated` line item, a third kind alongside `calculated` and
 `asked`: derived, but on assumptions worth overriding. `calculated` would claim the fleet implies it;
@@ -492,9 +492,9 @@ produces 222 million fewer messages in your peak month — 83 % less volume — 
 
 ## 6. User flow — a guided wizard
 
-Six steps, in the order a customer can actually answer them: what the machines are, what they
-measure, everything else that travels between machine and platform, and only then the commercial line
-items that have nothing to do with the fleet. A running total stays pinned to the screen throughout, so
+Five steps, in the order a customer can actually answer them: what the machines are, what they
+measure, everything else that travels between machine and platform, and then the contract — its
+periods, the ramp across them, and what is deployed in each. A running total stays pinned to the screen throughout, so
 every input visibly moves the number.
 
 | # | Key | Screen | What it asks, and what it teaches |
@@ -502,9 +502,13 @@ every input visibly moves the number.
 | 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
 | 2 | `series` | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. |
 | 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. |
-| 4 | `commercial` | **Deployment & add-ons** | Every Configurator line item the fleet cannot imply, with its cell reference. Quantities only. |
-| 5 | `rollout` | **Rollout** | Periods, month counts, the ramp, and where it starts on the calendar. |
-| 6 | `results` | **Results** | §7. |
+| 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
+| 5 | `results` | **Results** | §7. |
+
+**An input is asked once, in the place it is used.** Deployment & add-ons and Rollout were two
+screens, and the first asked for a quantity per contract period while the second was where periods
+were created — so adding a fifth period meant leaving the screen that needed it, adding it, and
+walking back. They are one step, periods first.
 
 The **key** is the handle: it is what `steps.ts` stores, what the tests are named after, and what
 everything outside this table refers to. The number is a property of this table only, so reordering
@@ -666,7 +670,7 @@ a test pins the order.
 
 **The hand-off table** — the primary artefact. Every number the tool produces, next to the exact
 Configurator cell it belongs in, per period: the nine counters, the period length, and every
-deployment and add-on quantity collected on **Deployment & add-ons**. Two copy actions per period — the nine counters
+deployment and add-on quantity collected in the **Deployment & add-ons** panel. Two copy actions per period — the nine counters
 as one pasteable column for `D28:D36`, and everything as cell/value pairs. Everything else on the
 page supports this table.
 

@@ -16,8 +16,7 @@ import { STEPS } from '../src/ui/wizard/steps.js';
 import { StepFleet } from '../src/ui/wizard/StepFleet.js';
 import { StepTimeSeries } from '../src/ui/wizard/StepTimeSeries.js';
 import { StepDiscrete } from '../src/ui/wizard/StepDiscrete.js';
-import { StepCommercial } from '../src/ui/wizard/StepCommercial.js';
-import { StepRollout } from '../src/ui/wizard/StepRollout.js';
+import { StepContract } from '../src/ui/wizard/StepContract.js';
 import { StepResults } from '../src/ui/wizard/StepResults.js';
 import { Results } from '../src/ui/Results.js';
 import { Handoff } from '../src/ui/wizard/Handoff.js';
@@ -27,7 +26,7 @@ const noop = () => {};
 
 /**
  * Test names carry the step's key from steps.ts -- fleet, series, discrete,
- * commercial, rollout, results -- and never its position. Reordering the wizard
+ * contract, results -- and never its position. Reordering the wizard
  * used to rename every test in this file, which made a diff that moved one step
  * look like a rewrite of the suite.
  */
@@ -39,7 +38,7 @@ describe('the wizard renders', () => {
   test('the step list is the order a customer can answer in', () => {
     assert.deepEqual(
       STEPS.map((s) => s.key),
-      ['fleet', 'series', 'discrete', 'commercial', 'rollout', 'results'],
+      ['fleet', 'series', 'discrete', 'contract', 'results'],
     );
   });
 
@@ -234,8 +233,8 @@ describe('the wizard renders', () => {
     assert.match(html, /three or four messages/i);
   });
 
-  test('commercial: lists every asked line item with its cell', () => {
-    const html = render(<StepCommercial {...props} result={result} />);
+  test('contract: lists every asked line item with its cell', () => {
+    const html = render(<StepContract {...props} result={result} />);
     for (const label of [
       'Public/Shared Cloud', 'Dedicated - Production', 'Operational Data Store',
       'Streaming Analytics', 'DataHub - Standard Deployment', 'Microservice Hosting',
@@ -247,16 +246,29 @@ describe('the wizard renders', () => {
     assert.match(html, /commit-to-consume/i);
   });
 
-  test('commercial: shows no price, rate or currency', () => {
-    const html = render(<StepCommercial {...props} result={result} />);
+  test('contract: shows no price, rate or currency', () => {
+    const html = render(<StepContract {...props} result={result} />);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/);
     assert.doesNotMatch(html, /\bprice\b/i);
   });
 
-  test('rollout: the ramp, on the real calendar', () => {
-    const html = render(<StepRollout {...props} />);
+  test('contract: the ramp, on the real calendar', () => {
+    const html = render(<StepContract {...props} result={result} />);
     assert.match(html, /11 %/);
     assert.match(html, /Period 1/);
+  });
+
+  test('contract: periods are decided and spent on one screen', () => {
+    // The deployment table asks for a quantity per period; the table that
+    // decides how many periods there are is directly above it. They were two
+    // screens, and adding a period meant leaving the one that needed it.
+    const html = render(<StepContract {...props} result={result} />);
+    assert.match(html, /Add period/);
+    assert.match(html, /Periods and the ramp/);
+    assert.match(html, /Deployment &amp; add-ons/);
+    // One column per period in the line-item table, and one row per period in
+    // the ramp table, from the same scenario.
+    assert.match(html, /D23/, 'period 1 shared cloud cell');
   });
 
   test('results: carries every counter cell and the hand-off', () => {
@@ -276,8 +288,7 @@ describe('the wizard renders', () => {
     assert.doesNotThrow(() => render(<StepFleet {...p} />));
     assert.doesNotThrow(() => render(<StepTimeSeries {...p} />));
     assert.doesNotThrow(() => render(<StepDiscrete {...p} />));
-    assert.doesNotThrow(() => render(<StepCommercial {...p} result={emptyResult} />));
-    assert.doesNotThrow(() => render(<StepRollout {...p} />));
+    assert.doesNotThrow(() => render(<StepContract {...p} result={emptyResult} />));
     assert.doesNotThrow(() => render(<StepResults scenario={empty} result={emptyResult} expert />));
   });
 });
@@ -381,7 +392,7 @@ describe('the storage estimate shows its working', () => {
   });
 
   test('the ODS cell is filled in for every period, and stays overridable', () => {
-    const html = render(<StepCommercial scenario={scenario} result={result} onChange={noop} />);
+    const html = render(<StepContract scenario={scenario} result={result} onChange={noop} />);
     // Empty box, estimate as the placeholder: nobody has stated this, and this
     // is what the workbook will use if nobody does.
     assert.match(html, /placeholder="64\.82"/);
