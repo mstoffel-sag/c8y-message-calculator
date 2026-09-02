@@ -23,13 +23,13 @@ describe('the view model', () => {
     assert.equal(bundle?.shared, true);
     assert.equal(bundle?.timed, true);
     assert.equal(bundle?.seriesCount, 4);
-    assert.equal(bundle?.cadence, 'every 1 min');
+    assert.equal(bundle?.intervalSeconds, 60);
     assert.equal(bundle?.messagesPerMonth, 44_640);
 
     for (const group of solo) {
       assert.equal(group.shared, false, `${group.fragmentName} should be alone`);
       assert.equal(group.timed, false, 'flags are sent on change');
-      assert.equal(group.cadence, 'on change');
+      assert.equal(group.intervalSeconds, undefined, 'no interval to state');
       assert.equal(group.messagesPerMonth, 620);
     }
   });
@@ -38,8 +38,8 @@ describe('the view model', () => {
     const view = measurementView(presetByKey('gateway')!, 'acme');
     const timed = view.groups.filter((g) => g.timed);
     assert.deepEqual(
-      timed.map((g) => g.cadence),
-      ['every 1 min', 'every 5 min'],
+      timed.map((g) => g.intervalSeconds),
+      [60, 300],
     );
     // On-change groups sort last, so connectors never cross.
     assert.equal(view.groups[view.groups.length - 1]?.timed, false);

@@ -74,6 +74,24 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 - The metric kinds are `continuous | state | occurrence | condition | inventory | command`. `'fact'`
   was the old name for `inventory` and is still accepted on load.
 
+## Strings, and the two languages
+
+- **No prose in a component.** Every user-visible string lives in `lib/i18n/en.ts` (the source of
+  truth) with a German twin in `de.ts`, typed `Record<Key, string>` so a missing translation is a
+  compile error. Components call `t('key')`, `<Rich k="key" />` for one marked-up string, or
+  `<Prose k="key" />` for paragraphs.
+- The catalogue's markup is `**bold**`, `*emphasis*`, `` `code` `` and a blank line between
+  paragraphs. Punctuation is literal — em dashes and curly quotes, not HTML entities.
+- Engine-side prose travels as keys plus parameters, never as sentences: `Finding.titleKey`,
+  `PayloadExample.noteKeys`, `LineItem.helpKey`, `Seed.blurbKey`.
+- **What stays English** (`NOT_TRANSLATED` in `lib/i18n/index.ts`): Configurator row labels and
+  units, counter names, the metric catalogue, REST paths, and the generated workbook, which reads
+  the English catalogue directly rather than keeping a second copy of it.
+- Numbers and month names come from `Intl` via `src/ui/format.ts`, which holds the session locale as
+  module state — `setFormatLocale` — so `n()` and `compact()` did not each grow a parameter.
+- `test/i18n.test.tsx` enforces the rest: no empty or copy-pasted German, matching placeholders, no
+  dead keys, and no English function words left on a German render of any step.
+
 ## Docs, and keeping the cost of a change down
 
 - **CONCEPT.md** is the design doc: bump the rev line and say what changed when the design does, not

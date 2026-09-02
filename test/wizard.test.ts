@@ -3,6 +3,7 @@
  * numbers to Configurator cells.
  */
 
+import { en } from '../lib/i18n/index.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -193,8 +194,10 @@ describe('Configurator cells', () => {
     // 'estimated' rather than 'calculated': the tool has a figure, but it rests
     // on an unverified rule of thumb, so it is offered and not imposed.
     assert.equal(ods.source, 'estimated');
-    assert.match(ods.help ?? '', /overridable/);
-    assert.match(ods.help ?? '', /to be verified/);
+    // The sentence itself lives in the catalogue now; the item points at it.
+    const help = ods.helpKey ? en[ods.helpKey] : '';
+    assert.match(help, /overridable/);
+    assert.match(help, /to be verified/);
     // Still asked-for in the wizard, so a customer with real numbers can say so.
     assert.ok(ASKED_LINE_ITEMS.some((i) => i.key === 'ods'));
   });
@@ -653,7 +656,7 @@ describe('naming the measurement type a lone series sends in', () => {
     const clash = setSeriesFragmentName(scenario, hvac.id, flag.id, 'acme_Climate');
     const findings = lintScenario(clash).filter((f) => f.rule === 'L7');
     assert.equal(findings.length, 1, 'a solo measurement type is a fragment name like any other');
-    assert.match(findings[0]!.title, /acme_Climate/);
+    assert.equal(findings[0]!.titleParams?.name, 'acme_Climate');
     assert.deepEqual(findings[0]!.metricIds, [flag.id]);
     // And a clean scenario still says nothing.
     assert.deepEqual(lintScenario(scenario).filter((f) => f.rule === 'L7'), []);

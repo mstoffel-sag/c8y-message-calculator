@@ -13,7 +13,6 @@ import {
   COUNTER_LABELS,
   LINE_ITEMS,
   cellFor,
-  formatMonth,
   periodMonthsCell,
   storageGiBForPeriod,
   type PeriodResult,
@@ -22,7 +21,9 @@ import {
 } from '../../../lib/engine/index.js';
 import { commercialBool, commercialNumber } from '../store.js';
 import { CopyButton } from '../parts.js';
-import { n, nf1 } from '../format.js';
+import { monthYear, n, nf1 } from '../format.js';
+import { Rich, useT } from '../i18n.js';
+import type { T } from '../../../lib/i18n/index.js';
 
 interface Props {
   scenario: Scenario;
@@ -41,6 +42,7 @@ type Origin = 'calculated' | 'estimated' | 'stated' | 'none';
  * the file it hands off is worse than one that says nothing.
  */
 function valueFor(
+  t: T,
   scenario: Scenario,
   result: ScenarioResult,
   periodResult: PeriodResult,
@@ -54,7 +56,10 @@ function valueFor(
 
   const item = LINE_ITEMS.find((i) => i.key === key);
   if (item?.source === 'choice') {
-    return { text: commercialBool(period, key) ? 'Yes' : 'No', origin: 'stated' };
+    return {
+      text: commercialBool(period, key) ? t('deployment.yes') : t('deployment.no'),
+      origin: 'stated',
+    };
   }
 
   const value = commercialNumber(period, key);
@@ -68,14 +73,17 @@ function valueFor(
 }
 
 export function Handoff({ scenario, result }: Props) {
+  const t = useT();
   const tsvFor = (periodResult: PeriodResult): string => {
     const period = scenario.periods.find((p) => p.index === periodResult.index);
     const lines: string[] = [
-      `${periodMonthsCell(periodResult.index)}\t${period?.months ?? ''}\tPeriod ${periodResult.index} length in months`,
+      `${periodMonthsCell(periodResult.index)}	${period?.months ?? ''}	${t('handoff.lengthLabel', {
+        index: periodResult.index,
+      })}`,
     ];
     for (const item of LINE_ITEMS) {
       if (item.key === 'messages') continue; // D27 is a formula in the workbook.
-      const { text } = valueFor(scenario, result, periodResult, item.key);
+      const { text } = valueFor(t, scenario, result, periodResult, item.key);
       if (text !== '—') lines.push(`${cellFor(item.baseRow, periodResult.index)}\t${text.replace(/,/g, '')}\t${item.label}`);
     }
     COUNTER_KEYS.forEach((key, i) => {
@@ -89,19 +97,22 @@ export function Handoff({ scenario, result }: Props) {
   return (
     <section class="panel">
       <header>
-        <h2>Hand-off to the Sales Configurator</h2>
-        <span class="sub">Peak calendar month of each period</span>
+        <h2>{t('handoff.heading')}</h2>
+        <span class="sub">{t('handoff.sub')}</span>
       </header>
       <div class="body tight scroll">
         <table>
           <thead>
             <tr>
-              <th style="min-width:240px">Line item</th>
+              <th style="min-width:240px">{t('handoff.col.item')}</th>
               {result.periods.map((p) => (
                 <th class="num" key={p.index} style="min-width:130px">
-                  Period {p.index}
+                  {t('contract.periodN', { index: p.index })}
                   <div style="font-weight:400;text-transform:none;letter-spacing:0">
-                    {formatMonth(p.peak.year, p.peak.month)} &middot; {p.peak.days} days
+                    {t('handoff.periodPeak', {
+                      month: monthYear(p.peak.year, p.peak.month),
+                      days: p.peak.days,
+                    })}
                   </div>
                 </th>
               ))}
@@ -110,8 +121,8 @@ export function Handoff({ scenario, result }: Props) {
           <tbody>
             <tr>
               <td>
-                Period length
-                <div class="hint" style="margin:0">months</div>
+                {t('handoff.periodLength')}
+                <div class="hint" style="margin:0">{t('handoff.months')}</div>
               </td>
               {result.periods.map((p) => {
                 const period = scenario.periods.find((s) => s.index === p.index);
@@ -131,12 +142,12 @@ export function Handoff({ scenario, result }: Props) {
                     {item.label}
                     <div class="hint" style="margin:0">
                       {item.unit}
-                      {item.source === 'calculated' && ' · calculated'}
-                      {item.source === 'estimated' && ' · estimated, overridable'}
+                      {item.source === 'calculated' && t('handoff.calculated')}
+                      {item.source === 'estimated' && t('handoff.estimated')}
                     </div>
                   </td>
                   {result.periods.map((p) => {
-                    const { text, origin } = valueFor(scenario, result, p, item.key);
+                    const { text, origin } = valueFor(t, scenario, result, p, item.key);
                     return (
                       <td class="num" key={p.index}>
                         <span
@@ -149,7 +160,7 @@ export function Handoff({ scenario, result }: Props) {
                                   ? 'font-style:italic'
                                   : ''
                           }
-                          title={origin === 'estimated' ? 'the tool\'s estimate; state a figure on the Deployment step to override it' : undefined}
+                          title={origin === 'estimated' ? t('handoff.estimateTitle') : undefined}
                         >
                           {text}
                         </span>
@@ -182,29 +193,30 @@ export function Handoff({ scenario, result }: Props) {
                   used to be labelled "Counters" and "All" against one run-on
                   sentence, which is not an explanation of either. */}
               <td class="hint">
-                <b>Counters</b> copies the nine numbers above as a single column, in Configurator
-                order. Select that period&rsquo;s counter block &mdash;{' '}
-                <code>
-                  {cellFor(COUNTER_BASE_ROWS[0]!, 1)}:{cellFor(COUNTER_BASE_ROWS[8]!, 1)}
-                </code>{' '}
-                in period 1, and {PERIOD_ROW_STRIDE} rows lower for each period after &mdash; and
-                paste once.
+                <Rich
+                  k="handoff.counters.explain"
+                  p={{
+                    range: `${cellFor(COUNTER_BASE_ROWS[0]!, 1)}:${cellFor(COUNTER_BASE_ROWS[8]!, 1)}`,
+                    stride: PERIOD_ROW_STRIDE,
+                  }}
+                />
                 <div style="margin-top:5px">
-                  <b>All</b> copies every row as <em>cell, value, label</em>, tab separated. Not a
-                  paste target &mdash; the cells are not contiguous &mdash; but a checklist to work
-                  down and tick off.
+                  <Rich k="handoff.all.explain" />
                 </div>
               </td>
               {result.periods.map((p) => (
                 <td class="num" key={p.index}>
                   <CopyButton
-                    label="Counters"
-                    title={`Nine counters for period ${p.index}, ready to paste at ${cellFor(COUNTER_BASE_ROWS[0]!, p.index)}`}
+                    label={t('handoff.counters')}
+                    title={t('handoff.counters.title', {
+                      index: p.index,
+                      cell: cellFor(COUNTER_BASE_ROWS[0]!, p.index),
+                    })}
                     text={() => COUNTER_KEYS.map((k) => Math.round(p.peak.counters[k])).join('\n')}
                   />{' '}
                   <CopyButton
-                    label="All"
-                    title={`Every cell, value and label for period ${p.index}`}
+                    label={t('handoff.all')}
+                    title={t('handoff.all.title', { index: p.index })}
                     text={() => tsvFor(p)}
                   />
                 </td>

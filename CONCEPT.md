@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 20 — every input is asked once, in the place it is used · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
+**Status:** draft for review, rev 21 — English and German, from one catalogue; no burst multiplier · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
 
 ---
 
@@ -763,9 +763,43 @@ scenario leaves the tenant.
 /lib/engine       pure TS: the nine counters, bundle proposal, lint rules, payload generator,
                   and the Configurator cell map. Unit tested, imports nothing but itself.
 /lib/presets      machine archetypes — HVAC, meter, tracker, gateway, production machine
+/lib/i18n         every word the user reads, in English and German
 /src/ui           the wizard. Currently preact + esbuild (see below); one Scenario in a store.
-/src/ui/wizard    the seven step components and the hand-off table
+/src/ui/wizard    the five step components and the hand-off table
 ```
+
+### 8.1 The string catalogue
+
+Two languages, one file each, and the components hold no prose at all. `en.ts` is the source of
+truth: `de.ts` is typed `Record<Key, string>` against it, so a string added without a translation
+does not compile — which matters more than it sounds, because the failure mode of a half-translated
+tool is an English paragraph appearing in the middle of a German explanation, and nobody reports it.
+
+**No framework.** The whole surface is `t(key, params)` plus a two-branch plural rule, which is all
+English and German need. A dependency that has to be learned before a sentence can be corrected is a
+dependency that stops sentences being corrected. The Angular port swaps this file for
+`@ngx-translate` and keeps every word (§8, the port table).
+
+**The prose keeps its emphasis.** Half the teaching in this tool is in the bold: *"one **POST** is
+**one message**"*. Taking the JSX out meant putting something back that a translator can retype, so
+the catalogue carries four marks — `**bold**`, `*emphasis*`, `` `code` `` and a blank line for a
+paragraph — and `rich.ts` turns them into elements. Deliberately not Markdown: a link or a heading
+inside a UI string is a sign the string should have been a component.
+
+**What stays English in every language**, and why — asserted by test as `NOT_TRANSLATED`:
+
+| Kept | Reason |
+|---|---|
+| Configurator row labels (`Public/Shared Cloud`) and their unit column | They name a row in an English workbook. Translating them breaks the only thing they are for |
+| Counter names (`Measurements Created`) | The platform's own, and what a tenant's usage screen shows |
+| The metric catalogue (`Filter blocked`, `Firmware version`) | Not UI text: a chosen name becomes the metric's name, travels into fragment names, payload examples and the workbook. Otherwise a scenario would mean different things depending on the language it was built in |
+| The generated workbook | It mirrors an English Configurator. It renders the findings from the English catalogue rather than keeping a second copy of them |
+| REST paths and MQTT topics | API surface |
+
+Numbers and month names come from `Intl`, not from the catalogue: 1,000.5 and 1.000,5 are the same
+number, and the browser already knows every language's months. The lint findings travel as keys plus
+parameters rather than sentences (`Finding.titleKey`, `titleParams`), so the guidance panel is not
+the one English island left on a German screen.
 
 **On the UI framework.** The first draft is preact so it could be built and clicked immediately
 rather than after an Angular install. The target remains Angular + `@c8y/ngx-components`; when that

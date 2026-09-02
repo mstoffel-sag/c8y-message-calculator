@@ -20,10 +20,12 @@ import {
 } from './configurator.js';
 import { COUNTER_KEYS, COUNTER_LABELS } from './types.js';
 import { formatRatePeriod } from './cadence.js';
+import { formatDuration } from './duration.js';
 import { formatMonth } from './calendar.js';
 import { measurementView } from './diagram.js';
 import { machineCountIn } from './compute.js';
-import { DEFAULT_RETENTION_DAYS, STORAGE_SOURCE_NOTE, peakStorageForPeriod } from './storage.js';
+import { DEFAULT_RETENTION_DAYS, peakStorageForPeriod } from './storage.js';
+import { en, translate } from '../i18n/index.js';
 import type { MetricKind, Period, Scenario, ScenarioResult } from './types.js';
 import { colName } from '../xlsx/writer.js';
 import type { Cell, Row, Sheet } from '../xlsx/writer.js';
@@ -287,7 +289,9 @@ function designSheet(scenario: Scenario): Sheet {
             text(4, m.name),
             text(5, m.unit),
             text(6, metric?.kind ?? ''),
-            text(7, group.cadence),
+            text(7, group.intervalSeconds === undefined
+              ? 'on change'
+              : `every ${formatDuration(group.intervalSeconds)}`),
             text(8, group.fragmentName),
             text(9, group.shared ? 'shared' : 'alone'),
             // The message cost belongs to the measurement, not to each reading
@@ -410,7 +414,7 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
 
   const rows: Row[] = [
     row(1, [text(1, 'Operational storage', 'title')]),
-    row(2, [text(1, STORAGE_SOURCE_NOTE, 'note')]),
+    row(2, [text(1, en['engine.storageSourceNote'], 'note')]),
     row(3, [
       text(
         1,
@@ -495,8 +499,8 @@ function guidanceSheet(result: ScenarioResult): Sheet {
         row(4 + i, [
           text(1, finding.rule),
           text(2, finding.severity),
-          text(3, finding.title),
-          text(4, finding.detail),
+          text(3, translate('en', finding.titleKey, finding.titleParams)),
+          text(4, translate('en', finding.detailKey, finding.detailParams)),
           finding.messageDelta === undefined
             ? text(5, '')
             : num(5, Math.round(finding.messageDelta)),

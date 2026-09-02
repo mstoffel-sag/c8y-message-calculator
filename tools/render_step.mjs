@@ -2,7 +2,7 @@
  * Renders one wizard step to a standalone HTML file, for a WebKit snapshot.
  *
  *   npm test                                   # builds dist-test/, which this reads
- *   node tools/render_step.mjs contract /tmp/c.html [scrollPx]
+ *   node tools/render_step.mjs contract /tmp/c.html [scrollPx] [locale]
  *   qlmanage -t -s 1100 -o /tmp /tmp/c.html
  *
  * There is no browser in the loop here, so this plus qlmanage is how a layout
@@ -14,12 +14,16 @@ import { h } from 'preact';
 import { render } from 'preact-render-to-string';
 import { readFileSync, writeFileSync } from 'node:fs';
 
+import { h as _h } from 'preact';
+import { LocaleContext } from '../dist-test/src/ui/i18n.js';
+import { setFormatLocale } from '../dist-test/src/ui/format.js';
 import { STEPS } from '../dist-test/src/ui/wizard/steps.js';
 import { StepFleet } from '../dist-test/src/ui/wizard/StepFleet.js';
 import { StepTimeSeries } from '../dist-test/src/ui/wizard/StepTimeSeries.js';
 import { StepDiscrete } from '../dist-test/src/ui/wizard/StepDiscrete.js';
 import { StepContract } from '../dist-test/src/ui/wizard/StepContract.js';
 import { StepResults } from '../dist-test/src/ui/wizard/StepResults.js';
+import { makeT } from '../dist-test/lib/i18n/index.js';
 import { computeScenario } from '../dist-test/lib/engine/index.js';
 import { conceptSection9Scenario } from '../dist-test/lib/presets/index.js';
 
@@ -31,7 +35,7 @@ const COMPONENTS = {
   results: StepResults,
 };
 
-const [key, out, scroll = '0'] = process.argv.slice(2);
+const [key, out, scroll = '0', locale = 'en'] = process.argv.slice(2);
 const Step = COMPONENTS[key];
 if (!Step || !out) {
   console.error(`usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx]`);
@@ -45,9 +49,13 @@ const def = STEPS[index];
 
 // Every step takes scenario/onChange; the ones that report take result, and the
 // results step takes the expert flag. Passing all of them is harmless.
-const body = render(h(Step, { scenario, result, expert: true, onChange: () => {} }));
+setFormatLocale(locale);
+const t = makeT(locale);
+const body = render(
+  _h(LocaleContext.Provider, { value: locale }, h(Step, { scenario, result, expert: true, onChange: () => {} })),
+);
 const rail = STEPS.map(
-  (s, i) => `<button class="rail-step ${i === index ? 'on' : ''}"><i>${i + 1}</i>${s.title}</button>`,
+  (s, i) => `<button class="rail-step ${i === index ? 'on' : ''}"><i>${i + 1}</i>${t(s.titleKey)}</button>`,
 ).join('');
 
 writeFileSync(
@@ -58,7 +66,7 @@ ${readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8')}
 </style></head><body>
 <div class="topbar"><div class="rail">${rail}</div></div>
 <div class="shell">
-  <div class="step-head"><h1>${def.title}</h1><p>${def.lead}</p></div>
+  <div class="step-head"><h1>${t(def.titleKey)}</h1><p>${t(def.leadKey)}</p></div>
   ${body}
 </div>
 </body></html>`,

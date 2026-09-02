@@ -25,10 +25,18 @@ export * from './rich.js';
 
 export type Locale = 'en' | 'de';
 
-/** In their own language, which is the only way a language switch is readable. */
-export const LOCALES: Array<{ code: Locale; label: string; numbers: string }> = [
-  { code: 'en', label: 'English', numbers: 'en-GB' },
-  { code: 'de', label: 'Deutsch', numbers: 'de-DE' },
+/**
+ * Named in their own language, which is the only way a language switch is
+ * readable: the reader who needs it is the one who cannot read the current one.
+ *
+ * `short` is what the top bar shows. That row is the most crowded in the app --
+ * a scenario name, three figures and the expert switch, all of them longer in
+ * German than in English -- and a full "Deutsch" pushed the switch onto a second
+ * line. Two letters, with the full name in the control's title.
+ */
+export const LOCALES: Array<{ code: Locale; label: string; short: string; numbers: string }> = [
+  { code: 'en', label: 'English', short: 'EN', numbers: 'en-GB' },
+  { code: 'de', label: 'Deutsch', short: 'DE', numbers: 'de-DE' },
 ];
 
 export const CATALOGUES: Record<Locale, Record<Key, string>> = { en, de };

@@ -110,7 +110,9 @@ function Row({ item, scenario, onChange, result }: RowProps) {
     <tr>
       <td>
         <div style="font-weight:500">{item.label}</div>
-        {item.help && <div class="hint" style="margin:3px 0 0;max-width:60ch">{item.help}</div>}
+        {item.helpKey && (
+          <div class="hint" style="margin:3px 0 0;max-width:60ch">{t(item.helpKey)}</div>
+        )}
       </td>
       <td class="hint" style="white-space:nowrap">{item.unit}</td>
       {scenario.periods.map((p) => (

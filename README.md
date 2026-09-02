@@ -93,6 +93,7 @@ src/ui/collapse.ts  which machine types are folded -- a viewer preference, never
 src/ui/styles.css the Cumulocity design tokens, and this app's semantic layer over them
 src/ui/fonts/     Public Sans, self-hosted -- a tenant may not reach a font CDN
 src/ui/wizard/    the five steps and the hand-off table
+lib/i18n/         every word the user reads, in English and German
 test/             the CONCEPT.md section 9 acceptance test, and a render pass over every step
 tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurator
 ```
@@ -106,6 +107,20 @@ tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurato
 | 3 Events, alarms, inventory & commands | everything that is not a measurement, one panel each. Commands close the step, with the status-transition count, because the contrast between three inbound elements and one outbound one is the thing being taught |
 | 4 Contract & deployment | periods, the ramp and the calendar, then every Configurator line item the fleet cannot imply — one column per period, right under the table that decides how many periods there are |
 | 5 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
+
+### English and German, from one catalogue
+
+Every word the user reads comes from `lib/i18n`, and the language switch is in the top bar. `en.ts`
+is the source of truth; `de.ts` is typed against it, so a string added without a translation does
+not compile. The prose keeps its emphasis through four marks the catalogue understands —
+`**bold**`, `*emphasis*`, `` `code` ``, and a blank line for a paragraph — rather than through JSX
+that no translator can retype.
+
+Four things stay English in both languages, because they are not really UI text: **Configurator row
+labels** and their unit column (they name a row in an English workbook), **counter names**
+(`Measurements Created` is what a tenant reports), the **metric catalogue** (a chosen name becomes
+scenario data and travels into fragment names, payloads and the workbook), and the **generated
+workbook** itself. Numbers and month names come from `Intl`.
 
 ### Operational storage is a range, not a number
 

@@ -55,11 +55,6 @@ export const DEFAULT_RETENTION_DAYS = 30;
 
 export const BYTES_PER_GIB = 1024 ** 3;
 
-/** Every figure here is unverified; the UI and the workbook must say so. */
-export const STORAGE_SOURCE_NOTE =
-  '100-400 bytes per stored value in MongoDB, and a DataHub extract at 20-25 % of it. Both are ' +
-  'rules of thumb from tests on Edge and one proof of concept, both marked "to be verified" at ' +
-  'source. The spread is the evidence, not a rounding: treat the range as the answer.';
 
 
 function gib(values: number, bytesPerValue: number): number {

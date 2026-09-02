@@ -6,6 +6,7 @@
  * is messages per calendar month and that is the whole output (section 2).
  */
 
+import { en } from '../i18n/index.js';
 import {
   type Bundle,
   type Counters,
@@ -356,7 +357,4 @@ export { SECONDS_PER_DAY };
  * What the naive baseline assumes, in words, so the UI can state its own
  * counterfactual instead of asking the reader to trust a ratio.
  */
-export const NAIVE_BASELINE_RULE =
-  'Every series in its own measurement, and every state or flag sampled on a timer at the machine ' +
-  "type's fastest interval rather than sent on change. Events, alarms, inventory writes and " +
-  'operations are identical in both models -- the whole difference is in the Measurement API.';
+export const NAIVE_BASELINE_RULE = en['engine.naiveBaselineRule'];

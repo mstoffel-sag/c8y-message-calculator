@@ -15,7 +15,6 @@
 import type { MachineType, Metric } from './types.js';
 import { resolveBundles } from './compute.js';
 import { REFERENCE_DAYS, SECONDS_PER_DAY } from './calendar.js';
-import { formatDuration } from './duration.js';
 import { ownFragmentName, seriesNameOf } from './payload.js';
 import { fragmentNameFor } from './bundling.js';
 
@@ -32,7 +31,11 @@ export interface ViewGroup {
   /** The measurement fragment these readings travel in. */
   fragmentName: string;
   /** "every 1 min" or "on change". */
-  cadence: string;
+  /**
+   * Sampling interval in seconds, or undefined for on-change -- not a phrase.
+   * The UI says "every 15 min" or "alle 15 min" from this.
+   */
+  intervalSeconds?: number;
   /** True when more than one reading shares the envelope. */
   shared: boolean;
   /** True for interval sampling, false for on-change. */
@@ -91,7 +94,7 @@ export function measurementView(
     groups.push({
       id: bundle.id,
       fragmentName: bundle.fragmentName.trim() || fragmentNameFor(prefix, machineType.name, bundle.intervalSeconds),
-      cadence: `every ${formatDuration(bundle.intervalSeconds)}`,
+      intervalSeconds: bundle.intervalSeconds,
       shared: members.length > 1,
       timed: true,
       members: members.map(member),
@@ -107,7 +110,7 @@ export function measurementView(
     groups.push({
       id: metric.id,
       fragmentName: ownFragmentName(prefix, metric),
-      cadence: `every ${formatDuration(seconds)}`,
+      intervalSeconds: seconds,
       shared: false,
       timed: true,
       members: [member(metric)],
@@ -123,7 +126,7 @@ export function measurementView(
     groups.push({
       id: metric.id,
       fragmentName: ownFragmentName(prefix, metric),
-      cadence: 'on change',
+      intervalSeconds: undefined,
       shared: false,
       timed: false,
       members: [member(metric)],

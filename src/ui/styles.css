@@ -247,8 +247,14 @@ a { color: var(--accent); }
   max-width: 1240px; margin: 0 auto; padding: calc(var(--u) * 1.5) calc(var(--u) * 2.5);
   display: flex; gap: calc(var(--u) * 2.5); align-items: center; flex-wrap: wrap;
 }
-.brand { display: flex; flex-direction: column; gap: 1px; margin-right: auto; }
-.brand small { color: var(--ink-faint); font-size: var(--c8y-font-size-small); }
+/* min-width:0 so the tagline can give way rather than pushing the language
+   switch onto a second row: German is a fifth longer than English here, and the
+   bar is capped at 1240px on every screen. */
+.brand { display: flex; flex-direction: column; gap: 1px; margin-right: auto; min-width: 0; }
+.brand small {
+  color: var(--ink-faint); font-size: var(--c8y-font-size-small);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .brand input {
   border: 0; background: transparent; color: var(--ink);
   font: 600 var(--c8y-font-size-h3) / var(--c8y-line-height-headings) var(--sans);
@@ -713,7 +719,8 @@ label.locale select:hover { color: var(--ink); }
   font-size: var(--c8y-font-size-small); color: var(--ink-faint);
 }
 .dg-legend b { color: var(--ink); font-family: var(--mono); }
-.dg-legend b.saves { color: var(--good); }
+/* The bold number inside the saving line, which the catalogue emphasises. */
+.dg-legend .saves b { color: var(--good); }
 .dg-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .dg-legend i.key { width: 22px; height: 12px; border-radius: 2px; display: inline-block; }
 .dg-legend i.key.shared { background: var(--accent-soft); border: 1.5px solid var(--brand); }

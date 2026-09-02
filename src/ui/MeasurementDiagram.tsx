@@ -9,7 +9,9 @@
  */
 
 import type { MeasurementView, ViewGroup } from '../../lib/engine/index.js';
-import { compact, n } from './format.js';
+import { compact, duration, n } from './format.js';
+import { Rich, useT } from './i18n.js';
+import type { T } from '../../lib/i18n/index.js';
 
 /** Geometry, exported so the layout tests use these numbers, not a copy. */
 export const DG = {
@@ -51,7 +53,15 @@ function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
+/** "every 15 min", or the on-change phrase where there is no interval. */
+function cadenceOf(t: T, seconds: number | undefined): string {
+  return seconds === undefined
+    ? t('diagram.onChange')
+    : t('format.interval', { duration: duration(seconds) });
+}
+
 export function MeasurementDiagram({ view }: { view: MeasurementView }) {
+  const t = useT();
   if (view.groups.length === 0) return null;
 
   const spans = rowSpans(view);
@@ -63,13 +73,17 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
       <svg
         viewBox={`0 0 ${DG.width} ${height}`}
         role="img"
-        aria-label={`${view.groups.length} measurements carrying ${n(view.storedPerMonth)} readings a month in ${n(view.messagesPerMonth)} messages, per machine.`}
+        aria-label={t('diagram.alt', {
+          measurements: view.groups.length,
+          readings: n(view.storedPerMonth),
+          messages: n(view.messagesPerMonth),
+        })}
       >
         <text x={DG.labelX} y={13} class="dg-cap">
-          EVERY READING
+          {t('diagram.everyReading')}
         </text>
         <text x={DG.boxX} y={13} class="dg-cap">
-          TRAVELS IN
+          {t('diagram.travelsIn')}
         </text>
 
         {spans.map(({ group, from }) =>
@@ -85,7 +99,7 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
               />
               <circle cx={DG.labelX + 15} cy={rowCentre(from + k)} r={4} class="dg-dot" />
               <text x={DG.labelX + 27} y={rowCentre(from + k) + 4} class="dg-label">
-                {truncate(m.name || 'unnamed', 22)}
+                {truncate(m.name || t('diagram.unnamed'), 22)}
                 {m.unit && <tspan class="dg-unit"> {truncate(m.unit, 8)}</tspan>}
               </text>
             </g>
@@ -101,7 +115,7 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
               y={rowCentre(to) + 4}
               class="dg-more"
             >
-              + {group.hiddenMembers} more reading{group.hiddenMembers === 1 ? '' : 's'}
+              {t.plural('diagram.more', group.hiddenMembers)}
             </text>
           ) : null,
         )}
@@ -139,7 +153,10 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
                     {truncate(group.fragmentName, 26)}
                   </text>
                   <text x={DG.boxX + DG.boxW - 12} y={top + h / 2 + 4} class="dg-rate" text-anchor="end">
-                    {group.cadence} &middot; {compact(group.messagesPerMonth)} msg
+                    {t('diagram.compact', {
+                      cadence: cadenceOf(t, group.intervalSeconds),
+                      messages: compact(group.messagesPerMonth),
+                    })}
                   </text>
                 </>
               ) : (
@@ -148,13 +165,15 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
                     {truncate(group.fragmentName, 26)}
                   </text>
                   <text x={DG.boxX + 16} y={top + 39} class="dg-rate">
-                    {group.cadence} &middot; one timestamp &middot; {group.seriesCount} readings
+                    {t.plural('diagram.oneTimestamp', group.seriesCount, {
+                      cadence: cadenceOf(t, group.intervalSeconds),
+                    })}
                   </text>
                   <text x={DG.boxX + DG.boxW - 12} y={top + 26} class="dg-count" text-anchor="end">
                     {compact(group.messagesPerMonth)}
                   </text>
                   <text x={DG.boxX + DG.boxW - 12} y={top + 40} class="dg-rate" text-anchor="end">
-                    msg / month
+                    {t('diagram.msgPerMonth')}
                   </text>
                 </>
               )}
@@ -165,18 +184,25 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
 
       <div class="dg-legend">
         <span>
-          <i class="key shared" /> shared &mdash; readings on the same tick, one message
+          <i class="key shared" /> {t('diagram.legend.shared')}
         </span>
         <span>
-          <i class="key solo" /> alone &mdash; one message all to itself
+          <i class="key solo" /> {t('diagram.legend.alone')}
         </span>
         <span class="spacer" />
-        <b>{compact(view.messagesPerMonth)}</b> messages per machine per month, carrying{' '}
-        <b>{compact(view.storedPerMonth)}</b> readings
+        <Rich
+          k="diagram.legend.total"
+          p={{
+            messages: compact(view.messagesPerMonth),
+            readings: compact(view.storedPerMonth),
+          }}
+        />
         {saving > 1 && (
           <>
             {' '}
-            &mdash; <b class="saves">{compact(saving)} fewer</b> than one measurement per reading
+            <span class="saves">
+              <Rich k="diagram.legend.saving" p={{ count: compact(saving) }} />
+            </span>
           </>
         )}
       </div>

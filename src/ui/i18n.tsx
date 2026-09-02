@@ -120,11 +120,8 @@ export function Prose({ k, p }: { k: Key; p?: Params }) {
 }
 
 /**
- * The language switch.
- *
- * Each language is named in itself -- "Deutsch", not "German" -- because the
- * reader who needs the switch is by definition the one who cannot read the
- * current language.
+ * The language switch: two letters in the top bar, the full name in its title.
+ * See LOCALES for why it is not spelled out.
  */
 export function LocaleSwitch({
   locale,
@@ -135,7 +132,10 @@ export function LocaleSwitch({
 }) {
   const t = useT();
   return (
-    <label class="locale" title={t('app.language')}>
+    <label
+      class="locale"
+      title={`${t('app.language')}: ${LOCALES.map((l) => l.label).join(' · ')}`}
+    >
       <span class="sr">{t('app.language')}</span>
       <select
         value={locale}
@@ -144,9 +144,12 @@ export function LocaleSwitch({
           if (isLocale(picked)) onChange(picked);
         }}
       >
+        {/* No `label` attribute on the option: where it is set the browser
+            shows it instead of the content, which is how "Deutsch" came back
+            after being shortened. The full names are in the label's title. */}
         {LOCALES.map((entry) => (
           <option key={entry.code} value={entry.code}>
-            {entry.label}
+            {entry.short}
           </option>
         ))}
       </select>

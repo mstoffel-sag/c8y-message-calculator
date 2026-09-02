@@ -5,7 +5,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render } from 'preact-render-to-string';
@@ -342,7 +342,8 @@ describe('the hand-off row explains its own buttons', () => {
     // show a dash there, which made the two disagree about the same cell.
     assert.match(html, /64\.8/);
     assert.match(html, /estimated, overridable/);
-    assert.match(html, /title="the tool's estimate; state a figure/);
+    // The catalogue writes punctuation literally, curly apostrophe included.
+    assert.match(html, /title="the tool’s estimate; state a figure/);
   });
 
   test('and the copied cell/value list carries it too', async () => {
@@ -644,7 +645,16 @@ describe('machine types fold away', () => {
 
 
 describe('a step is never named by its number', () => {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  // The compiled test runs from dist-test/, so the sources are two levels up --
+  // and a guard that reads the wrong directory reads nothing and passes.
+  const root = (() => {
+    let at = dirname(fileURLToPath(import.meta.url));
+    for (let up = 0; up < 6; up += 1) {
+      if (existsSync(join(at, 'package.json')) && existsSync(join(at, 'lib', 'engine'))) return at;
+      at = dirname(at);
+    }
+    throw new Error('cannot find the repo root from the compiled test');
+  })();
 
   function sources(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

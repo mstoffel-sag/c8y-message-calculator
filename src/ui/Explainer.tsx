@@ -13,6 +13,8 @@
 
 import { useState } from 'preact/hooks';
 import { compact, n } from './format.js';
+import { Prose, Rich, useT } from './i18n.js';
+import type { T } from '../../lib/i18n/index.js';
 
 const SERIES = [
   { name: 'Supply air temp', short: '21.4 °C' },
@@ -67,6 +69,7 @@ export function boxFor(members: readonly number[]): { top: number; height: numbe
 }
 
 export function Explainer() {
+  const t = useT();
   // Starts at one reading per measurement -- the way it gets built when nobody
   // thinks about it. Dragging right makes the number fall, which is the demo.
   const [perMessage, setPerMessage] = useState(1);
@@ -81,18 +84,15 @@ export function Explainer() {
 
   return (
     <details class="panel explain" open>
-      <summary>How volume actually works &mdash; 90 seconds</summary>
+      <summary>{t('explain.summary')}</summary>
       <div class="body">
         <p class="note">
-          A measurement carries <b>one timestamp</b> and any number of readings underneath it. One
-          request is <b>one message</b> however many readings it carries. So the question is never
-          &ldquo;how much data&rdquo; &mdash; it is{' '}
-          <b>how many requests the same data is spread across</b>.
+          <Rich k="explain.note" />
         </p>
 
         <div class="row" style="margin-bottom:6px;align-items:center">
           <label class="field" style="max-width:320px">
-            <span>Readings per measurement &mdash; drag right to bundle</span>
+            <span>{t('explain.slider')}</span>
             <input
               type="range"
               min={1}
@@ -104,45 +104,37 @@ export function Explainer() {
           </label>
           <div class="spacer" />
           <div class="stat" style="min-width:200px">
-            <span>Messages / month</span>
+            <span>{t('explain.messages')}</span>
             <b style="color:var(--accent)">{compact(messages)}</b>
             <small>
-              {n(MACHINES)} machines, every {INTERVAL} s, {DAYS}-day month
+              {t('explain.messages.sub', {
+                machines: n(MACHINES),
+                interval: INTERVAL,
+                days: DAYS,
+              })}
             </small>
           </div>
           <div class="stat" style="min-width:200px">
-            <span>Readings stored</span>
+            <span>{t('explain.stored')}</span>
             <b>{compact(storedValues)}</b>
-            <small>the same at every setting &mdash; the information never changes</small>
+            <small>{t('explain.stored.sub')}</small>
           </div>
         </div>
 
-        <Diagram groups={groups} />
+        <Diagram groups={groups} t={t} />
 
         <div class="grid two" style="margin-top:6px">
           <div>
-            <h4>What the picture says</h4>
-            <p class="hint">
-              The dots never change. Drag the slider and the same four readings, on the same tick,
-              arrive at the same platform &mdash; but the number of envelopes goes from one to four,
-              and <b>you are billed per envelope</b>.
-            </p>
-            <p class="hint">
-              This is not compression and it is not batching. Putting ten measurements in one request
-              is still ten messages: <b>batch for the network, bundle for the count.</b>
-            </p>
+            <h4>{t('explain.picture.heading')}</h4>
+            <div class="hint">
+              <Prose k="explain.picture.body" />
+            </div>
           </div>
           <div>
-            <h4>The one rule that comes with it</h4>
-            <p class="hint">
-              <b>Send the same readings every time.</b> An envelope whose contents change from one
-              send to the next is what degrades write and query performance later.
-            </p>
-            <p class="hint">
-              Which is why a flag that changes twice an hour does not belong in a bundle sampled
-              every minute &mdash; it would force the envelope to change shape. It gets its own,
-              sent when it actually changes.
-            </p>
+            <h4>{t('explain.rule.heading')}</h4>
+            <div class="hint">
+              <Prose k="explain.rule.body" />
+            </div>
           </div>
         </div>
       </div>
@@ -150,15 +142,15 @@ export function Explainer() {
   );
 }
 
-function Diagram({ groups }: { groups: number[][] }) {
+function Diagram({ groups, t }: { groups: number[][]; t: T }) {
   return (
     <div class="diagram">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={ariaLabel(groups)}>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={t.plural('explain.alt', groups.length)}>
         <text x={SENSOR_X} y={12} class="dg-cap">
-          ON THE MACHINE
+          {t('explain.onTheMachine')}
         </text>
         <text x={BOX_X} y={12} class="dg-cap">
-          SENT TO CUMULOCITY
+          {t('explain.sentTo')}
         </text>
 
         {/* One pill per sensor reading. */}
@@ -204,20 +196,20 @@ function Diagram({ groups }: { groups: number[][] }) {
               {height < STACK_MIN_HEIGHT ? (
                 <>
                   <text x={BOX_X + 18} y={top + height / 2 + 4} class="dg-msg-title">
-                    1 message
+                    {t('explain.oneMessage')}
                   </text>
                   <circle cx={BOX_X + 108} cy={top + height / 2} r={4.5} class="dg-dot" />
                   <text x={BOX_X + 120} y={top + height / 2 + 4} class="dg-msg-sub">
-                    1 reading &middot; 09:30:00
+                    {t('explain.oneReadingAt', { time: '09:30:00' })}
                   </text>
                 </>
               ) : (
                 <>
                   <text x={BOX_X + 18} y={top + 24} class="dg-msg-title">
-                    1 message
+                    {t('explain.oneMessage')}
                   </text>
                   <text x={BOX_X + 18} y={top + 41} class="dg-msg-sub">
-                    one timestamp &middot; 09:30:00
+                    {t('explain.oneTimestampAt', { time: '09:30:00' })}
                   </text>
                   {/* The readings inside, as dots: the payload without the syntax. */}
                   {members.map((m, k) => (
@@ -234,7 +226,7 @@ function Diagram({ groups }: { groups: number[][] }) {
                     y={top + height - 14}
                     class="dg-msg-sub"
                   >
-                    {members.length} readings
+                    {t.plural('explain.readings', members.length)}
                   </text>
                 </>
               )}
@@ -249,18 +241,13 @@ function Diagram({ groups }: { groups: number[][] }) {
           {groups.length}
         </text>
         <text x={TALLY_X} y={TOP + 40} class="dg-msg-sub">
-          message{groups.length === 1 ? '' : 's'}
+          {t.plural('explain.tally', groups.length)}
         </text>
         <text x={TALLY_X} y={TOP + 54} class="dg-msg-sub">
-          per tick
+          {t('explain.perTick')}
         </text>
       </svg>
     </div>
   );
 }
 
-function ariaLabel(groups: number[][]): string {
-  return `Four sensor readings on the same tick, travelling in ${groups.length} ${
-    groups.length === 1 ? 'measurement' : 'measurements'
-  }, costing ${groups.length} ${groups.length === 1 ? 'message' : 'messages'}.`;
-}

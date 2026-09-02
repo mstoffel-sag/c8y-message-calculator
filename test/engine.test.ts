@@ -326,7 +326,7 @@ describe('lint rules', () => {
       withMetrics(metrics, [{ id: 'bun', fragmentName: 'acme_Wide', intervalSeconds: 60, metricIds: metrics.map((m) => m.id) }]),
     );
     must(
-      findings.find((f) => f.rule === 'L6' && f.title.includes('101 series')),
+      findings.find((f) => f.rule === 'L6' && f.titleParams?.count === 101),
       'the platform recommendation is 100',
     );
   });
@@ -410,7 +410,7 @@ describe('lint rules', () => {
     const l9 = findings.filter((f) => f.rule === 'L9');
     assert.equal(l9.length, 2);
     assert.equal(
-      must(l9.find((f) => f.title.includes('no status transitions')), 'expected the unmodelled case')
+      must(l9.find((f) => f.titleKey === 'lint.L9.none.title'), 'expected the unmodelled case')
         .messageDelta,
       100 * 4 * 3,
     );

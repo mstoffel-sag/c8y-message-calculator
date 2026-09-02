@@ -54,6 +54,7 @@ import { Choice, Duration, Every, Teach, Txt, Empty } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
 import { compact, interval as fmtInterval, nf1 } from '../format.js';
+import { Prose, Rich, useT } from '../i18n.js';
 import { Explainer } from '../Explainer.js';
 import { MeasurementDiagram } from '../MeasurementDiagram.js';
 
@@ -81,50 +82,26 @@ const nameOptions = (seeds: typeof DATAPOINTS, prompt: string) => [
  * open/closed left on a one-minute timer is the mistake this step exists to
  * prevent.
  */
-const SERIES_OPTIONS = nameOptions([...DATAPOINTS, ...STATES], 'Choose a series…');
+const SERIES_SEEDS = [...DATAPOINTS, ...STATES];
 
 /** What decides the timestamp. The whole difference, asked once per row. */
 const RHYTHMS = [
-  { value: 'interval' as const, label: 'On a timer' },
-  { value: 'onChange' as const, label: 'When it changes' },
+  { value: 'interval' as const, labelKey: 'series.rhythm.interval' as const },
+  { value: 'onChange' as const, labelKey: 'series.rhythm.onChange' as const },
 ];
 
 export function StepTimeSeries({ scenario, onChange }: Props) {
+  const t = useT();
   const collapse = useCollapse(scenario.machineTypes.map((mt) => mt.id));
 
   if (scenario.machineTypes.length === 0) {
-    return <Empty>Add a machine type first &mdash; a series belongs to a machine.</Empty>;
+    return <Empty>{t('series.empty')}</Empty>;
   }
 
   return (
     <>
-      <Teach title="One measurement, one timestamp, one message">
-        <p>
-          A measurement carries <b>one timestamp</b> and any number of series underneath it. One{' '}
-          <code>POST</code> is <b>one message</b> whether it carries one series or forty. So the
-          question that decides your volume is not how much data you send &mdash; it is{' '}
-          <b>how many requests you spread it across</b>.
-        </p>
-        <p>
-          That makes the sampling interval the natural grouping: everything sampled on the same tick
-          shares a timestamp, so it can share a measurement. Readings on <em>different</em> intervals
-          can never share one, however related they are.
-        </p>
-        <p>
-          <b>A flag or a state is a measurement too</b> &mdash; one series, sent when the value moves
-          instead of on a tick. That is the only difference, so it is a column here rather than a
-          section of its own. <b>Do not put one on a timer:</b> sent on change, the timestamp is the
-          moment it flipped, which is the information you wanted; sampled every minute, that moment
-          is lost between two ticks and you pay for thousands of identical readings. It also travels
-          alone &mdash; its timestamps are its own and can never line up with a shared tick.
-        </p>
-        <p>
-          <b>So tell the tool the rhythm and it will design the measurement type.</b> Every timed
-          series you add drops into the measurement type for its interval automatically, under a
-          suggested name. Both halves of that are yours to change in the <em>Measurement type</em>{' '}
-          column: rename the fragment your devices actually send, or move one series into a
-          measurement type of its own.
-        </p>
+      <Teach title={t('series.teach.title')}>
+        <Prose k="series.teach.body" />
       </Teach>
 
       <Explainer />
@@ -174,6 +151,7 @@ function Solo({
 function MachineBlock({
   machineType: mt, scenario, onChange, collapse,
 }: Props & { machineType: MachineType; collapse: Collapse }) {
+  const t = useT();
   // Both rhythms, one list: everything this machine measures.
   const series = mt.metrics.filter((m) => m.kind === 'continuous' || m.kind === 'state');
   const proposals = proposeBundles(mt, scenario.settings.fragmentPrefix);
@@ -191,23 +169,19 @@ function MachineBlock({
       collapsed={collapse.isCollapsed(mt.id)}
       onToggle={(collapsed) => collapse.toggle(mt.id, collapsed)}
     >
-      <h4>Series &mdash; what this machine measures</h4>
+      <h4>{t('series.heading')}</h4>
       {series.length === 0 ? (
-        <p class="hint">
-          None yet. A series is one named value over time: a temperature, a pressure, a motor
-          current, a compressor on/off. Sampled on a timer or sent when it moves &mdash; either way
-          it travels in a measurement.
-        </p>
+        <p class="hint">{t('series.none')}</p>
       ) : (
         <>
         <div class="scroll">
           <table class="dp">
             <thead>
               <tr>
-                <th style="min-width:190px">Series</th>
-                <th style="min-width:150px">Unit</th>
-                <th style="min-width:230px">How often</th>
-                <th style="min-width:250px">Measurement type</th>
+                <th style="min-width:190px">{t('series.col.series')}</th>
+                <th style="min-width:150px">{t('series.col.unit')}</th>
+                <th style="min-width:230px">{t('series.col.howOften')}</th>
+                <th style="min-width:250px">{t('series.col.type')}</th>
                 <th style="width:34px" />
               </tr>
             </thead>
@@ -230,8 +204,8 @@ function MachineBlock({
                     <td>
                       <Choice
                         value={metric.name}
-                        options={SERIES_OPTIONS}
-                        placeholder="Name it yourself"
+                        options={nameOptions(SERIES_SEEDS, t('series.choose'))}
+                        placeholder={t('series.namePlaceholder')}
                         onChange={(name) => onChange(setDatapointName(scenario, mt.id, metric.id, name))}
                       />
                     </td>
@@ -239,7 +213,7 @@ function MachineBlock({
                       <Choice
                         value={metric.unit}
                         options={UNITS}
-                        placeholder="Unit"
+                        placeholder={t('series.unitPlaceholder')}
                         onChange={(unit) => onChange(patchUnit(scenario, mt.id, metric.id, unit))}
                       />
                     </td>
@@ -254,15 +228,17 @@ function MachineBlock({
                         {timed ? (
                           <Duration
                             seconds={seconds}
-                            prefix="every"
-                            hint={`${compact(2_678_400 / seconds)} samples / machine / month`}
+                            prefix={t('every.prefix')}
+                            hint={t('series.samplesPerMonth', { count: compact(2_678_400 / seconds) })}
                             onChange={(s) => onChange(setMetricInterval(scenario, mt.id, metric.id, s))}
                           />
                         ) : (
                           <Every
                             cadence={metric.cadence}
                             kind="state"
-                            hint={`${nf1.format(perMonthEquivalent(metric.cadence))} messages / machine / month`}
+                            hint={t('series.messagesPerMonth', {
+                              count: nf1.format(perMonthEquivalent(metric.cadence)),
+                            })}
                             onChange={(cadence) => onChange(setCadence(scenario, mt.id, metric.id, cadence))}
                           />
                         )}
@@ -278,7 +254,7 @@ function MachineBlock({
                         <Solo
                           metric={metric}
                           prefix={prefix}
-                          hint="one message per change; nothing can share an on-change timestamp"
+                          hint={t('series.solo.onChange')}
                           onChange={(name) => onChange(setSeriesFragmentName(scenario, mt.id, metric.id, name))}
                         />
                       ) : (
@@ -289,12 +265,18 @@ function MachineBlock({
                             options={[
                               ...siblings.map((b) => ({
                                 value: b.id,
-                                label: `${b.fragmentName.trim() || 'unnamed'} · ${b.metricIds.length} series`,
-                                group: 'Measurement types on this interval',
+                                label: t('series.typeOption', {
+
+                                  name: b.fragmentName.trim() || t('series.typeUnnamed'),
+
+                                  series: t.plural('series.count', b.metricIds.length),
+
+                                }),
+                                group: t('series.typesOnInterval'),
                               })),
                               ...(alone
                                 ? []
-                                : [{ value: '', label: 'A measurement type of its own', group: 'On its own' }]),
+                                : [{ value: '', label: t('series.ownType'), group: t('series.onItsOwn') }]),
                             ]}
                             onChange={(id) =>
                               onChange(
@@ -308,7 +290,7 @@ function MachineBlock({
                             <Solo
                               metric={metric}
                               prefix={prefix}
-                              hint="one message per sample, on its own"
+                              hint={t('series.solo.timed')}
                               onChange={(name) => onChange(setSeriesFragmentName(scenario, mt.id, metric.id, name))}
                             />
                           ) : names ? (
@@ -325,12 +307,12 @@ function MachineBlock({
                               />
                               <div class="hint" style="margin:3px 0 0">
                                 {bundle.metricIds.length > 1
-                                  ? `one message for all ${bundle.metricIds.length} series in it`
-                                  : 'one message per sample'}
+                                  ? t('series.oneMessageForAll', { count: bundle.metricIds.length })
+                                  : t('series.oneMessagePerSample')}
                               </div>
                             </div>
                           ) : (
-                            <div class="hint" style="margin:3px 0 0">in that same message</div>
+                            <div class="hint" style="margin:3px 0 0">{t('series.sameMessage')}</div>
                           )}
                         </>
                       )}
@@ -347,21 +329,21 @@ function MachineBlock({
           </table>
         </div>
         <p class="hint" style="margin:8px 0 0">
-          A measurement type is the fragment your device sends. Pick something a dashboard builder
-          will recognise &mdash; and then <b>do not change the series inside it</b>: a fragment whose
-          shape varies from one message to the next is what degrades write and query performance.
+          <Rich k="series.namingNote" />
         </p>
         </>
       )}
 
       <div class="row" style="margin-top:14px">
-        <button onClick={() => onChange(addDatapoint(scenario, mt.id, 'continuous'))}>+ Series</button>
+        <button onClick={() => onChange(addDatapoint(scenario, mt.id, 'continuous'))}>
+          {t('series.add')}
+        </button>
       </div>
 
       {/* The configuration, in the same shape as the explainer's example. */}
       {view.groups.length > 0 && (
         <>
-          <h4 style="margin-top:18px">What one of these machines sends</h4>
+          <h4 style="margin-top:18px">{t('series.whatItSends')}</h4>
           <MeasurementDiagram view={view} />
         </>
       )}
@@ -371,15 +353,23 @@ function MachineBlock({
           <div>
             <b>
               {applied
-                ? `Bundled into ${proposals.length} measurement type${proposals.length === 1 ? '' : 's'}, one per interval`
-                : `Suggestion: ${proposals.length} measurement type${proposals.length === 1 ? '' : 's'}, one per interval`}
+                ? t.plural('series.bundled', proposals.length)
+                : t.plural('series.suggestion', proposals.length)}
             </b>
             <div class="hint" style="margin-top:4px">
               {proposals.map((p) => (
                 <div key={p.intervalSeconds}>
                   <code>{p.fragmentName}</code> &middot; {fmtInterval(p.intervalSeconds)} &middot;{' '}
-                  {p.metrics.length} series &rarr; {compact(p.messagesTogether)} messages/machine/month
-                  {p.metrics.length > 1 && <> instead of {compact(p.messagesApart)}</>}
+                  {t('series.proposalLine', {
+
+                    series: t.plural('series.count', p.metrics.length),
+
+                    messages: compact(p.messagesTogether),
+
+                  })}
+                  {p.metrics.length > 1 && (
+                    <> {t('series.insteadOf', { count: compact(p.messagesApart) })}</>
+                  )}
                 </div>
               ))}
             </div>
@@ -388,12 +378,12 @@ function MachineBlock({
             {saving > 0 && (
               <div class="delta saves" style="margin-bottom:6px">
                 &minus;{compact(saving)}
-                <div class="hint" style="margin:0">messages / month</div>
+                <div class="hint" style="margin:0">{t('series.messagesPerMonthShort')}</div>
               </div>
             )}
             {!applied && (
               <button class="primary" onClick={() => onChange(applyBundleProposal(scenario, mt.id))}>
-                Apply
+                {t('series.apply')}
               </button>
             )}
           </div>

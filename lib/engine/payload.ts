@@ -6,6 +6,7 @@
  * who can copy the payload does not have to trust the arithmetic.
  */
 
+import type { Key, Params } from '../i18n/index.js';
 import { type Bundle, type Metric, type MachineType } from './types.js';
 import { resolveBundles } from './compute.js';
 import { fragmentNameFor } from './bundling.js';
@@ -23,7 +24,11 @@ export type PayloadNamespace =
   | 'inventory fragment';
 
 export interface PayloadExample {
-  title: string;
+  /** A name from the scenario -- data, so it is not translated. */
+  title?: string;
+  /** Or a phrase about the shape, which is. */
+  titleKey?: Key;
+  titleParams?: Params;
   namespace: PayloadNamespace;
   /** The fragment or type name itself, for grouping and for the L7 check. */
   name: string;
@@ -33,7 +38,12 @@ export interface PayloadExample {
   restBody: string;
   mqttTopic: string;
   mqttBody: string;
-  note: string;
+  /**
+   * The sentences under the example, in order. Two keys where two paragraphs of
+   * advice apply -- the bundle note plus the SmartREST caveat -- rather than one
+   * key holding a joined string, so a translator sees each argument whole.
+   */
+  noteKeys: Key[];
 }
 
 /** A plausible series name from a human metric name: "Supply air temp" -> "supplyAirTemp". */
@@ -116,26 +126,13 @@ function measurementBody(fragment: string, metrics: Metric[]): string {
   );
 }
 
-const BUNDLE_NOTE =
-  'One POST, one timestamp, one message -- regardless of how many series it carries. Send exactly ' +
-  'this series set every time: a fragment whose shape varies from message to message is what ' +
-  'degrades write and query performance.';
-
-const STATE_NOTE =
-  'Sent only when the value actually changes, so the timestamp is the transition. Do not fold this ' +
-  'into an interval bundle: the bundle would have to send a different series set whenever this one ' +
-  'moved, and the moment it flipped would be lost between two ticks.';
-
-const SMARTREST_NOTE =
-  'Over MQTT, the JSON above goes to the topic shown. The SmartREST static measurement template ' +
-  'carries one series per row, so bundling several series into one measurement needs a custom ' +
-  'SmartREST 2.0 template that renders this whole fragment in a single request.';
 
 function bundleExample(bundle: Bundle, members: Metric[], prefix: string): PayloadExample {
   const fragment =
     bundle.fragmentName.trim() || fragmentNameFor(prefix, 'readings', bundle.intervalSeconds);
   return {
-    title: `${members.length} series every ${bundle.intervalSeconds} s`,
+    titleKey: 'payload.title.bundle',
+    titleParams: { count: members.length, seconds: bundle.intervalSeconds },
     namespace: 'measurement fragment',
     name: fragment,
     seriesCount: members.length,
@@ -143,14 +140,14 @@ function bundleExample(bundle: Bundle, members: Metric[], prefix: string): Paylo
     restBody: measurementBody(fragment, members),
     mqttTopic: 'measurement/measurements/create',
     mqttBody: measurementBody(fragment, members),
-    note: `${BUNDLE_NOTE} ${SMARTREST_NOTE}`,
+    noteKeys: ['payload.note.bundle', 'payload.note.smartrest'],
   };
 }
 
 function stateExample(metric: Metric, prefix: string): PayloadExample {
   const name = ownFragmentName(prefix, metric);
   return {
-    title: 'on change only',
+    titleKey: 'payload.title.onChange',
     namespace: 'measurement fragment',
     name,
     seriesCount: 1,
@@ -158,7 +155,7 @@ function stateExample(metric: Metric, prefix: string): PayloadExample {
     restBody: measurementBody(name, [metric]),
     mqttTopic: 'measurement/measurements/create',
     mqttBody: measurementBody(name, [metric]),
-    note: STATE_NOTE,
+    noteKeys: ['payload.note.state'],
   };
 }
 
@@ -178,7 +175,7 @@ function eventExample(metric: Metric, prefix: string): PayloadExample {
     restBody: body,
     mqttTopic: 'event/events/create',
     mqttBody: body,
-    note: 'Events hold non-numeric data. A number buried in an event body cannot be aggregated or plotted the way a series can.',
+    noteKeys: ['payload.note.event'],
   };
 }
 
@@ -197,7 +194,8 @@ function alarmExample(metric: Metric, prefix: string): PayloadExample {
     2,
   );
   return {
-    title: `${metric.name} - raise and clear`,
+    titleKey: 'payload.title.raiseAndClear',
+    titleParams: { name: metric.name },
     namespace: 'alarm type',
     name,
     seriesCount: 1,
@@ -205,10 +203,7 @@ function alarmExample(metric: Metric, prefix: string): PayloadExample {
     restBody: body,
     mqttTopic: 'alarm/alarms/create',
     mqttBody: body,
-    note:
-      'Two messages per incident: the raise creates and the clear updates, and both count. Raising an ' +
-      'alarm type that is already active updates the existing alarm rather than creating a duplicate -- ' +
-      'which still counts.',
+    noteKeys: ['payload.note.alarm'],
   };
 }
 
@@ -224,9 +219,7 @@ function inventoryExample(metric: Metric, prefix: string): PayloadExample {
     restBody: body,
     mqttTopic: 'inventory/managedObjects/update',
     mqttBody: body,
-    note:
-      'Send this when it changes, not on a timer. The platform does not diff the payload, so a ' +
-      'successful PUT that changes nothing still counts.',
+    noteKeys: ['payload.note.inventory'],
   };
 }
 
@@ -240,12 +233,11 @@ export function payloadsFor(machineType: MachineType, prefix = 'acme'): PayloadE
   for (const metric of loneContinuous) {
     out.push({
       ...stateExample(metric, prefix),
-      title: `its own measurement, every ${
-        metric.cadence.mode === 'interval' ? metric.cadence.seconds : '?'
-      } s`,
-      note:
-        'This reading travels alone, so it costs one message per sample on its own. If anything else is ' +
-        'sampled on the same tick, they belong in one measurement.',
+      titleKey: 'payload.title.alone',
+      titleParams: {
+        seconds: metric.cadence.mode === 'interval' ? metric.cadence.seconds : '?',
+      },
+      noteKeys: ['payload.note.alone'],
     });
   }
   for (const metric of machineType.metrics) {

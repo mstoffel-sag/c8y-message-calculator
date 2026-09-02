@@ -6,6 +6,8 @@
  * has to survive being ported into an Angular app, so it stays portable.
  */
 
+import type { Key, Params } from '../i18n/index.js';
+
 /** The six kinds a customer picks from. CONCEPT.md section 5, the kind selector. */
 export type MetricKind =
   | 'continuous'
@@ -358,8 +360,17 @@ export interface Finding {
   /** L1 .. L10, matching CONCEPT.md section 7. */
   rule: string;
   severity: Severity;
-  title: string;
-  detail: string;
+  /**
+   * The sentence and the paragraph, as catalogue keys and their parameters.
+   *
+   * The engine decides which rule fires and what the numbers are; it does not
+   * decide what language they are read in. Strings here would have made the
+   * guidance panel the one English island in a German session.
+   */
+  titleKey: Key;
+  titleParams?: Params;
+  detailKey: Key;
+  detailParams?: Params;
   machineTypeId?: string;
   metricIds?: string[];
   bundleId?: string;
