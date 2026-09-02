@@ -11,9 +11,11 @@ import { render } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 
 import { computeScenario, type Scenario } from '../../lib/engine/index.js';
+import type { Locale } from '../../lib/i18n/index.js';
 import { blankScenario, conceptSection9Scenario } from '../../lib/presets/index.js';
 import { load, normalise, save } from './store.js';
 import { useExpert } from './expert.js';
+import { LocaleContext, LocaleSwitch, useLocale, useT } from './i18n.js';
 import { STEPS } from './wizard/steps.js';
 import { StepFleet } from './wizard/StepFleet.js';
 import { StepTimeSeries } from './wizard/StepTimeSeries.js';
@@ -24,6 +26,17 @@ import { Findings } from './Results.js';
 import { compact, nf1 } from './format.js';
 
 function App() {
+  const [locale, setLocale] = useLocale();
+
+  return (
+    <LocaleContext.Provider value={locale}>
+      <Wizard locale={locale} onLocale={setLocale} />
+    </LocaleContext.Provider>
+  );
+}
+
+function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale) => void }) {
+  const t = useT();
   const [scenario, setScenario] = useState<Scenario>(() => load() ?? blankScenario());
   const [step, setStep] = useState(0);
   const [expert, setExpert] = useExpert();
@@ -51,15 +64,15 @@ function App() {
             <input
               type="text"
               value={scenario.name}
-              aria-label="Scenario name"
+              aria-label={t('app.scenarioName')}
               onInput={(e) => setScenario({ ...scenario, name: (e.target as HTMLInputElement).value })}
             />
-            <small>Message calculator &mdash; a volume estimate, never a quote</small>
+            <small>{t('app.tagline')}</small>
           </div>
           <div class="runner">
             <div class="fig">
               <b>{compact(result.peakMonth.total)}</b>
-              <span>messages / peak month</span>
+              <span>{t('app.stat.peakMonth')}</span>
             </div>
             <div class="fig alt">
               <b>
@@ -67,25 +80,27 @@ function App() {
                   ? `${nf1.format(result.peakMonth.naiveTotal / result.peakMonth.total)}×`
                   : '—'}
               </b>
-              <span>vs unbundled</span>
+              <span>{t('app.stat.vsUnbundled')}</span>
             </div>
             <div class="fig alt">
               <b style={errors > 0 ? 'color:var(--error)' : ''}>{result.findings.length}</b>
-              <span>{errors > 0 ? `${errors} to fix` : 'findings'}</span>
+              <span>{errors > 0 ? t('app.stat.toFix', { count: errors }) : t('app.stat.findings')}</span>
             </div>
           </div>
 
           <label
             class={`expert ${expert ? 'on' : ''}`}
-            title="Shows the raw JSON payloads for whoever writes the device code."
+            title={t('app.expert.title')}
           >
             <input
               type="checkbox"
               checked={expert}
               onChange={(e) => setExpert((e.target as HTMLInputElement).checked)}
             />
-            Expert mode
+            {t('app.expert')}
           </label>
+
+          <LocaleSwitch locale={locale} onChange={onLocale} />
         </div>
 
         <div class="rail">
@@ -96,7 +111,7 @@ function App() {
               onClick={() => setStep(i)}
             >
               <i>{i + 1}</i>
-              {s.title}
+              {t(s.titleKey)}
             </button>
           ))}
         </div>
@@ -104,8 +119,8 @@ function App() {
 
       <div class="shell">
         <div class="step-head">
-          <h1>{def.title}</h1>
-          <p>{def.lead}</p>
+          <h1>{t(def.titleKey)}</h1>
+          <p>{t(def.leadKey)}</p>
         </div>
 
         {def.key === 'fleet' && <StepFleet {...props} />}
@@ -124,21 +139,23 @@ function App() {
 
         <div class="nav">
           <button disabled={step === 0} onClick={() => setStep(step - 1)}>
-            &larr; Back
+            &larr; {t('nav.back')}
           </button>
           <span class="hint" style="margin:0">
-            Step {step + 1} of {STEPS.length}
+            {t('nav.progress', { step: step + 1, total: STEPS.length })}
           </span>
           <span class="spacer" />
           {step === 0 && (
             <>
-              <button onClick={() => setScenario(conceptSection9Scenario())}>Load example</button>
-              <button onClick={() => setScenario(blankScenario())}>Reset</button>
+              <button onClick={() => setScenario(conceptSection9Scenario())}>
+                {t('nav.loadExample')}
+              </button>
+              <button onClick={() => setScenario(blankScenario())}>{t('nav.reset')}</button>
             </>
           )}
           {!last && (
             <button class="primary" onClick={() => setStep(step + 1)}>
-              {STEPS[step + 1]!.title} &rarr;
+              {t(STEPS[step + 1]!.titleKey)} &rarr;
             </button>
           )}
           {last && <ScenarioIO scenario={scenario} onChange={setScenario} />}
@@ -155,6 +172,7 @@ function ScenarioIO({
   scenario: Scenario;
   onChange: (next: Scenario) => void;
 }) {
+  const t = useT();
   const download = () => {
     const blob = new Blob([JSON.stringify(scenario, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -168,7 +186,7 @@ function ScenarioIO({
   return (
     <>
       <label class="import">
-        Import
+        {t('io.import')}
         <input
           type="file"
           accept="application/json"
@@ -181,14 +199,14 @@ function ScenarioIO({
               try {
                 onChange(normalise(JSON.parse(text)));
               } catch {
-                alert('That file is not a scenario this tool can read.');
+                alert(t('io.unreadable'));
               }
             });
           }}
         />
       </label>
       <button class="primary" onClick={download}>
-        Export scenario
+        {t('io.export')}
       </button>
     </>
   );

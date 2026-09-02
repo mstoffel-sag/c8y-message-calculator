@@ -1,7 +1,46 @@
-import { formatDuration } from '../../lib/engine/duration.js';
+import { splitDuration, type DurationUnit } from '../../lib/engine/duration.js';
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  translate,
+  translatePlural,
+  type Locale,
+} from '../../lib/i18n/index.js';
 
-export const nf = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 });
-export const nf1 = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 });
+/**
+ * Numbers follow the locale, and the locale is module state.
+ *
+ * 1,000.5 and 1.000,5 are the same number and different strings, so a German
+ * session cannot keep English formatters. Threading a locale through `n()`,
+ * `compact()` and the fifty call sites that use them would put a parameter on
+ * every figure in the app to say something that is true of the whole session, so
+ * the app sets it once (see `useLocale`) and the formatters are rebuilt. The
+ * cost is a module global; the alternative was a worse API everywhere.
+ */
+let locale: Locale = DEFAULT_LOCALE;
+let formats = makeFormats(DEFAULT_LOCALE);
+
+function makeFormats(next: Locale) {
+  const tag = LOCALES.find((l) => l.code === next)?.numbers ?? 'en-GB';
+  return {
+    whole: new Intl.NumberFormat(tag, { maximumFractionDigits: 0 }),
+    tenth: new Intl.NumberFormat(tag, { maximumFractionDigits: 1 }),
+  };
+}
+
+export function setFormatLocale(next: Locale): void {
+  locale = next;
+  formats = makeFormats(next);
+}
+
+export function formatLocale(): Locale {
+  return locale;
+}
+
+// Kept as objects with `.format` so every existing call site reads the same and
+// picks up a locale change without being touched.
+export const nf = { format: (value: number): string => formats.whole.format(value) };
+export const nf1 = { format: (value: number): string => formats.tenth.format(value) };
 
 export function n(value: number): string {
   return nf.format(Math.round(value));
@@ -10,9 +49,9 @@ export function n(value: number): string {
 /** Short form for headline figures: 45,977,000 -> "46.0 M". */
 export function compact(value: number): string {
   const abs = Math.abs(value);
-  if (abs >= 1e9) return `${nf1.format(value / 1e9)} bn`;
-  if (abs >= 1e6) return `${nf1.format(value / 1e6)} M`;
-  if (abs >= 10e3) return `${nf1.format(value / 1e3)} k`;
+  if (abs >= 1e9) return `${nf1.format(value / 1e9)} ${translate(locale, 'format.billion')}`;
+  if (abs >= 1e6) return `${nf1.format(value / 1e6)} ${translate(locale, 'format.million')}`;
+  if (abs >= 10e3) return `${nf1.format(value / 1e3)} ${translate(locale, 'format.thousand')}`;
   return nf.format(value);
 }
 
@@ -42,6 +81,23 @@ export function gibRange(low: number, high: number): string {
   return `${a.replace(/\s*[A-Za-z]+$/, '')} – ${b}`;
 }
 
+/**
+ * "March 2027", in the session's language.
+ *
+ * `lib/engine/calendar.ts` has its own English month names and keeps them: they
+ * go into the workbook, which mirrors an English Configurator. On screen the
+ * browser's own month names are better than a list this repo maintains.
+ */
+export function monthLabel(month: number): string {
+  const tag = LOCALES.find((l) => l.code === locale)?.numbers ?? 'en-GB';
+  // Any non-leap year does; only the month is read out.
+  return new Intl.DateTimeFormat(tag, { month: 'long' }).format(new Date(2027, month - 1, 1));
+}
+
+export function monthYear(year: number, month: number): string {
+  return `${monthLabel(month)} ${year}`;
+}
+
 export function signed(value: number): string {
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${compact(Math.abs(value))}`;
 }
@@ -51,13 +107,25 @@ export function pct(value: number): string {
 }
 
 /**
- * "every 1 min" / "every 15 min" / "every 100 ms".
+ * "every 1 min" / "alle 15 min" / "every 100 ms".
  *
  * Shares splitDuration with the sampling control, so a bundle chip and the
- * dropdown that set it never disagree about what 60 seconds is called.
+ * dropdown that set it never disagree about what 60 seconds is called. The unit
+ * comes from the catalogue rather than from `formatDuration`, which stays
+ * English for the workbook.
  */
+export function duration(seconds: number): string {
+  const split = splitDuration(seconds);
+  return `${split.value} ${unitLabel(split.unit, split.value)}`;
+}
+
 export function interval(seconds: number): string {
-  return `every ${formatDuration(seconds)}`;
+  return translate(locale, 'format.interval', { duration: duration(seconds) });
+}
+
+/** A duration or rate unit, singular or plural, in the session's language. */
+export function unitLabel(unit: DurationUnit | 'month' | 'year', count: number): string {
+  return translatePlural(locale, `unit.${unit}`, count);
 }
 
 /**

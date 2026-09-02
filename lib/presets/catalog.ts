@@ -12,11 +12,64 @@
  * because a catalogue that cannot be escaped is worse than no catalogue.
  */
 
+import type { Key } from '../i18n/index.js';
+
 export interface Choice<T> {
   value: T;
-  label: string;
-  /** Optional group heading, rendered as an optgroup. */
+  /**
+   * What the dropdown shows. A protocol or a reading names itself, and the name
+   * is what gets stored, so most labels are the same in every language; the ones
+   * that are prose carry a `labelKey` instead.
+   */
+  label?: string;
+  labelKey?: Key;
+  /**
+   * Optional group heading, rendered as an optgroup. A heading is never stored,
+   * so it is always translated -- `groupKeyFor` maps it to a catalogue key.
+   */
   group?: string;
+}
+
+
+/**
+ * Every optgroup heading in the tool, and the string that says it.
+ *
+ * The group is stored in the seed as its English name because that is the
+ * readable thing to write in a seed; this is the one place that has to grow when
+ * a new group appears, and a group with no entry here shows its English name
+ * rather than blanking.
+ */
+export const GROUP_KEYS: Record<string, Key> = {
+  'Access': 'group.access',
+  'Building and metering': 'group.buildingAndMetering',
+  'Climate': 'group.climate',
+  'Configuration': 'group.configuration',
+  'Connectivity': 'group.connectivity',
+  'Control': 'group.control',
+  'Device health': 'group.deviceHealth',
+  'Diagnostics': 'group.diagnostics',
+  'Electrical': 'group.electrical',
+  'Fault': 'group.fault',
+  'General': 'group.general',
+  'Identity': 'group.identity',
+  'Lifecycle': 'group.lifecycle',
+  'Low-power WAN': 'group.lowPowerWan',
+  'Maintenance': 'group.maintenance',
+  'Mechanical': 'group.mechanical',
+  'Movement': 'group.movement',
+  'Physical': 'group.physical',
+  'Position': 'group.position',
+  'Process': 'group.process',
+  'Production': 'group.production',
+  'Security': 'group.security',
+  'Shop floor': 'group.shopFloor',
+  'Something else': 'group.somethingElse',
+  'Status': 'group.status',
+  'Straight to Cumulocity': 'group.straightToCumulocity',
+};
+
+export function groupKeyFor(group: string | undefined): Key | undefined {
+  return group === undefined ? undefined : GROUP_KEYS[group];
 }
 
 /* -------------------------------------------------------------- protocols */
@@ -36,7 +89,7 @@ export interface Choice<T> {
  * shop-floor protocol, through building services, or over a low-power network.
  */
 export const PROTOCOLS: Array<Choice<string>> = [
-  { value: '', label: 'Not decided yet' },
+  { value: '', labelKey: 'protocol.undecided' },
 
   { value: 'MQTT (Cumulocity SmartREST 2.0)', label: 'MQTT — Cumulocity SmartREST 2.0', group: 'Straight to Cumulocity' },
   { value: 'HTTP / REST (Cumulocity API)', label: 'HTTP / REST — Cumulocity API', group: 'Straight to Cumulocity' },
@@ -240,11 +293,11 @@ export const UNITS: Array<Choice<string>> = [
  * the label states the total rather than leaving the customer to add one.
  */
 export const TRANSITIONS: Array<Choice<number>> = [
-  { value: 0, label: 'none reported — 1 message per command' },
-  { value: 1, label: '1 — SUCCESSFUL only — 2 messages' },
-  { value: 2, label: '2 — EXECUTING, SUCCESSFUL — 3 messages' },
-  { value: 3, label: '3 — PENDING, EXECUTING, SUCCESSFUL — 4 messages' },
-  { value: 4, label: '4 — with a retry or a failure — 5 messages' },
-  { value: 6, label: '6 — progress reported through status — 7 messages' },
-  { value: 10, label: '10 — fine-grained progress — 11 messages' },
+  { value: 0, labelKey: 'transitions.0' },
+  { value: 1, labelKey: 'transitions.1' },
+  { value: 2, labelKey: 'transitions.2' },
+  { value: 3, labelKey: 'transitions.3' },
+  { value: 4, labelKey: 'transitions.4' },
+  { value: 6, labelKey: 'transitions.6' },
+  { value: 10, labelKey: 'transitions.10' },
 ];

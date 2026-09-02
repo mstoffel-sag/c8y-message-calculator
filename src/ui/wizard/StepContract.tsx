@@ -12,13 +12,14 @@
 import {
   BYTES_PER_VALUE_HIGH,
   DEFAULT_RETENTION_DAYS,
-  monthName,
   periodMonthsCell,
   type Scenario,
   type ScenarioResult,
 } from '../../../lib/engine/index.js';
 import { addPeriod, patchPeriod, removePeriod, setPeriodCount } from '../store.js';
 import { Num, Teach, Empty } from '../parts.js';
+import { Prose, useT } from '../i18n.js';
+import { monthLabel } from '../format.js';
 import { Deployment } from './Deployment.js';
 
 interface Props {
@@ -27,32 +28,22 @@ interface Props {
 }
 
 export function StepContract({ scenario, onChange, result }: Props & { result: ScenarioResult }) {
+  const t = useT();
   return (
     <>
       <section class="panel sub">
         <header>
-          <h3>Periods and the ramp</h3>
-          <span class="sub">Months &rarr; D21 &middot; machines per period</span>
+          <h3>{t('contract.ramp.heading')}</h3>
+          <span class="sub">{t('contract.ramp.sub')}</span>
         </header>
         <div class="body">
-          <Teach title="Billing runs on real calendar months">
-            <p>
-              February is 28 days and January is 31 &mdash; an <b>11 % swing</b> in messages for a fleet
-              doing exactly the same thing. The tool works in real month lengths rather than averaging
-              them away, and reports a range with the peak month named. A single number would be wrong
-              eleven months out of twelve.
-            </p>
-            <p>
-              <b>Registration is derived from the ramp.</b> Each period contributes{' '}
-              <em>Inventories Created</em> only for the machines it <em>adds</em>, once, in its first
-              month. A period that adds nobody registers nobody &mdash; putting onboarding into the
-              monthly rate overstates every later period.
-            </p>
+          <Teach title={t('contract.teach.title')}>
+            <Prose k="contract.teach.body" />
           </Teach>
 
           <div class="row" style="margin-bottom:18px">
             <label class="field" style="width:150px">
-              <span>Ramp starts</span>
+              <span>{t('contract.rampStarts')}</span>
               <select
                 value={scenario.settings.startMonth}
                 onChange={(e) =>
@@ -63,12 +54,12 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
                 }
               >
                 {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i} value={i + 1}>{monthName(i + 1)}</option>
+                  <option key={i} value={i + 1}>{monthLabel(i + 1)}</option>
                 ))}
               </select>
             </label>
             <Num
-              label="Year"
+              label={t('contract.year')}
               width="110px"
               min={2000}
               value={scenario.settings.startYear}
@@ -79,11 +70,11 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
                 results screen because it is a fact about the tenant, like the
                 calendar start, not an output. */}
             <Num
-              label="Data kept"
+              label={t('contract.retention')}
               width="150px"
               min={1}
-              suffix="days"
-              title="Days of data the tenant's retention rules keep. Decides the operational storage estimate on the Results step; it does not change the message count."
+              suffix={t('contract.retention.suffix')}
+              title={t('contract.retention.title')}
               value={scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS}
               onChange={(retentionDays) =>
                 onChange({ ...scenario, settings: { ...scenario.settings, retentionDays } })
@@ -93,11 +84,11 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
                 at the top of it, because under-stating usage on a commit-to-consume
                 contract depletes the commitment early rather than saving anything. */}
             <Num
-              label="Bytes / value"
+              label={t('contract.bytesPerValue')}
               width="160px"
               min={1}
               suffix="B"
-              title="Bytes per stored value, for the storage figure that goes in the Configurator's ODS cell. The evidence is 100-400 B and unverified, so the Results step and the workbook always show the whole range beside whatever this is set to."
+              title={t('contract.bytesPerValue.title')}
               value={scenario.settings.bytesPerValue ?? BYTES_PER_VALUE_HIGH}
               onChange={(bytesPerValue) =>
                 onChange({ ...scenario, settings: { ...scenario.settings, bytesPerValue } })
@@ -106,16 +97,16 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
           </div>
 
           {scenario.machineTypes.length === 0 ? (
-            <Empty>Add a machine type first.</Empty>
+            <Empty>{t('wizard.addMachineFirst')}</Empty>
           ) : (
             <div class="scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>Period</th>
-                    <th class="num" style="width:120px">Months</th>
+                    <th>{t('contract.col.period')}</th>
+                    <th class="num" style="width:120px">{t('contract.col.months')}</th>
                     {scenario.machineTypes.map((mt) => (
-                      <th class="num" key={mt.id}>{mt.name || 'Unnamed'}</th>
+                      <th class="num" key={mt.id}>{mt.name || t('machine.unnamedShort')}</th>
                     ))}
                     <th style="width:80px" />
                   </tr>
@@ -124,7 +115,7 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
                   {scenario.periods.map((period) => (
                     <tr key={period.index}>
                       <td>
-                        Period {period.index}
+                        {t('contract.periodN', { index: period.index })}
                         <div class="cell">{periodMonthsCell(period.index)}</div>
                       </td>
                       <td class="num">
@@ -146,7 +137,7 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
                       <td>
                         {scenario.periods.length > 1 && (
                           <button class="ghost" onClick={() => onChange(removePeriod(scenario, period.index))}>
-                            Remove
+                            {t('contract.remove')}
                           </button>
                         )}
                       </td>
@@ -159,12 +150,9 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
 
           <div class="row" style="margin-top:12px">
             <button disabled={scenario.periods.length >= 5} onClick={() => onChange(addPeriod(scenario))}>
-              Add period
+              {t('contract.addPeriod')}
             </button>
-            <span class="hint" style="margin:0">
-              The Configurator allows five. A contract auto-renews on a 12-month term if it ends without
-              a new agreement, and unused commitment is forfeited rather than carried forward.
-            </span>
+            <span class="hint" style="margin:0">{t('contract.addPeriod.hint')}</span>
           </div>
         </div>
       </section>

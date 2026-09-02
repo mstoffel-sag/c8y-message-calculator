@@ -652,6 +652,29 @@ label.expert:hover { color: var(--ink); border-color: var(--brand); }
 label.expert.on { color: var(--accent); border-color: var(--brand); background: var(--accent-soft); }
 label.expert input { width: auto; min-height: 0; margin: 0; accent-color: var(--brand); }
 
+/* The language switch, beside expert mode: same chip, but a select rather than a
+   checkbox. Its label is for assistive technology only -- each language names
+   itself in the list, which is the only labelling a reader who needs the switch
+   can actually use. */
+label.locale {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--line); border-radius: calc(var(--u) * 2);
+  padding: 2px 4px 2px calc(var(--u) * 1.25);
+  white-space: nowrap;
+}
+label.locale:hover { border-color: var(--brand); }
+label.locale select {
+  border: 0; background: transparent; min-height: 0; padding: 3px 2px;
+  font-size: var(--c8y-font-size-small); font-weight: 600; color: var(--ink-faint);
+  cursor: pointer;
+}
+label.locale select:hover { color: var(--ink); }
+
+.sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
 /* The volume diagram: four readings, one or four envelopes. */
 .diagram {
   background: var(--panel); border: 1px solid var(--line-soft);

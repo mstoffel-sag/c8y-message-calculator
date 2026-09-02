@@ -14,6 +14,7 @@ import { addDatapoint, patchCadence, removeMetric, setCadence, setDatapointName 
 import { Choice, Every, Teach } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { type Collapse } from '../collapse.js';
+import { Prose, useT } from '../i18n.js';
 import { nf1 } from '../format.js';
 
 interface Props {
@@ -22,7 +23,7 @@ interface Props {
 }
 
 const COMMAND_OPTIONS = [
-  { value: '', label: 'Choose a command…' },
+  { value: '', labelKey: 'commands.chooseOne' as const },
   ...COMMANDS.map((seed) => ({ value: seed.name, label: seed.name, group: seed.group })),
 ];
 
@@ -31,29 +32,18 @@ const COMMAND_OPTIONS = [
  * folded away in one section of the step is folded away in all four.
  */
 export function Commands({ scenario, onChange, collapse }: Props & { collapse: Collapse }) {
+  const t = useT();
   return (
     <section class="panel sub">
       <header>
-        <h3>Commands</h3>
-        <span class="sub">Operation &rarr; Operations Created + Operations Updated</span>
+        <h3>{t('commands.heading')}</h3>
+        <span class="sub">
+          {t('commands.element')} &rarr; Operations Created + Operations Updated
+        </span>
       </header>
       <div class="body">
-        <Teach title="This one runs outbound, and it costs more than it looks">
-          <p>
-            Everything above is the machine talking to Cumulocity. An <b>operation</b> goes the other
-            way: a firmware update, a configuration push, a reboot, a setpoint change.
-          </p>
-          <p>
-            <b>One command is not one message.</b> Creating the operation counts, and then every
-            status the device reports back counts as well &mdash; <code>PENDING</code>,{' '}
-            <code>EXECUTING</code>, <code>SUCCESSFUL</code> is three more. A single command is
-            realistically <b>three or four messages</b>, which is why an estimate that models a
-            firmware campaign as one message per machine is out by a factor of four.
-          </p>
-          <p>
-            If your device reports fine-grained progress through the operation status, count those
-            too. That pattern gets expensive quickly, and progress usually belongs in an event.
-          </p>
+        <Teach title={t('commands.teach.title')}>
+          <Prose k="commands.teach.body" />
         </Teach>
 
         {scenario.machineTypes.map((mt) => (
@@ -73,6 +63,7 @@ export function Commands({ scenario, onChange, collapse }: Props & { collapse: C
 function CommandTable({
   machineType: mt, scenario, onChange, collapse,
 }: Props & { machineType: MachineType; collapse: Collapse }) {
+  const t = useT();
   const rows = mt.metrics.filter((m) => m.kind === 'command');
 
   return (
@@ -84,24 +75,21 @@ function CommandTable({
     >
       <div class="row" style="margin-bottom:6px">
         <button onClick={() => onChange(addDatapoint(scenario, mt.id, 'command'))}>
-          + Command
+          {t('commands.add')}
         </button>
       </div>
 
       {rows.length === 0 ? (
-        <p class="hint" style="margin:0">
-          None. If Cumulocity never sends anything to these machines, that is a legitimate answer
-          &mdash; but firmware updates count, and almost every fleet has those.
-        </p>
+        <p class="hint" style="margin:0">{t('commands.none')}</p>
       ) : (
         <div class="scroll">
           <table class="dp">
             <thead>
               <tr>
-                <th style="min-width:200px">Command</th>
-                <th style="min-width:230px">How often</th>
-                <th style="min-width:280px">Status transitions reported back</th>
-                <th class="num" style="width:130px">Messages each</th>
+                <th style="min-width:200px">{t('commands.col.command')}</th>
+                <th style="min-width:230px">{t('commands.col.howOften')}</th>
+                <th style="min-width:280px">{t('commands.col.transitions')}</th>
+                <th class="num" style="width:130px">{t('commands.col.each')}</th>
                 <th style="width:34px" />
               </tr>
             </thead>
@@ -115,7 +103,7 @@ function CommandTable({
                       <Choice
                         value={metric.name}
                         options={COMMAND_OPTIONS}
-                        placeholder="Name it yourself"
+                        placeholder={t('commands.namePlaceholder')}
                         onChange={(name) => onChange(setDatapointName(scenario, mt.id, metric.id, name))}
                       />
                     </td>
@@ -123,7 +111,7 @@ function CommandTable({
                       <Every
                         cadence={metric.cadence}
                         kind="command"
-                        hint={`${nf1.format(perMonth)} per machine / month`}
+                        hint={t('commands.perMachineMonth', { count: nf1.format(perMonth) })}
                         onChange={(cadence) => onChange(setCadence(scenario, mt.id, metric.id, cadence))}
                       />
                     </td>
@@ -132,13 +120,15 @@ function CommandTable({
                         value={transitions}
                         kind="number"
                         options={TRANSITIONS}
-                        suffix="transitions"
+                        suffix={t('commands.transitionsSuffix')}
                         onChange={(v) => onChange(patchCadence(scenario, mt.id, metric.id, { transitions: v }))}
                       />
                     </td>
                     <td class="num">
                       <b>{1 + transitions}</b>
-                      <div class="hint" style="margin:0">1 create + {transitions} updates</div>
+                      <div class="hint" style="margin:0">
+                        {t('commands.breakdown', { count: transitions })}
+                      </div>
                     </td>
                     <td>
                       <button class="ghost" onClick={() => onChange(removeMetric(scenario, mt.id, metric.id))}>

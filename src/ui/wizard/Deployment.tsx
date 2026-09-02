@@ -22,6 +22,7 @@ import {
 } from '../../../lib/engine/index.js';
 import { commercialBool, commercialNumber, copyCommercialAcross, setCommercial } from '../store.js';
 import { Teach } from '../parts.js';
+import { Prose, Rich, useT } from '../i18n.js';
 
 interface Props {
   scenario: Scenario;
@@ -34,39 +35,27 @@ type RowProps = Props & { item: LineItem; result: ScenarioResult };
 const GROUPS = ['Deployment', 'Core Metrics', 'Add-Ons', 'Support'] as const;
 
 export function Deployment({ scenario, onChange, result }: Props & { result: ScenarioResult }) {
+  const t = useT();
   return (
     <section class="panel sub">
       <header>
-        <h3>Deployment &amp; add-ons</h3>
-        <span class="sub">One column per period &rarr; Configurator rows 23&ndash;26</span>
+        <h3>{t('deployment.heading')}</h3>
+        <span class="sub">{t('deployment.sub')}</span>
       </header>
       <div class="body">
-        <Teach title="The parts of the quote the fleet cannot tell you">
-          <p>
-            Message volume comes out of the machines. Everything in this section does not: how many
-            deployments, which add-ons, how many tenants. Somebody has to state them, so the wizard
-            asks rather than guessing.
-          </p>
-          <p>
-            Cumulocity is <b>commit-to-consume</b>. A customer commits to a spend amount, not to
-            quantities &mdash; there is no bill of materials, usage is metered daily and drawn down
-            against the commitment. So nothing here is an order; it is the shape of the estimate.
-          </p>
-          <p>
-            <b>This tool shows no prices.</b> It collects the quantities and tells you which cell each
-            one belongs in. What they cost is the Sales Configurator&rsquo;s job.
-          </p>
+        <Teach title={t('deployment.teach.title')}>
+          <Prose k="deployment.teach.body" />
         </Teach>
 
         <div class="scroll">
           <table>
             <thead>
               <tr>
-                <th style="min-width:280px">Line item</th>
-                <th>Unit</th>
+                <th style="min-width:280px">{t('deployment.col.item')}</th>
+                <th>{t('deployment.col.unit')}</th>
                 {scenario.periods.map((p) => (
                   <th class="num" key={p.index} style="min-width:110px">
-                    Period {p.index}
+                    {t('contract.periodN', { index: p.index })}
                   </th>
                 ))}
               </tr>
@@ -101,18 +90,14 @@ export function Deployment({ scenario, onChange, result }: Props & { result: Sce
         {scenario.periods.length > 1 && (
           <div class="row" style="margin-top:14px">
             <button onClick={() => onChange(copyCommercialAcross(scenario, 1))}>
-              Copy period 1 across all periods
+              {t('deployment.copyAcross')}
             </button>
-            <span class="hint" style="margin:0">
-              Most quotes repeat the same deployment every period; the fleet is what ramps.
-            </span>
+            <span class="hint" style="margin:0">{t('deployment.copyAcross.hint')}</span>
           </div>
         )}
 
         <p class="hint" style="margin-top:16px">
-          <b>Not asked for, deliberately:</b> discounts, currency, minimum commitments and approval
-          thresholds. Those live in the Configurator and are nobody&rsquo;s business inside a tool that
-          may be shown to a customer.
+          <Rich k="deployment.notAsked" />
         </p>
       </div>
     </section>
@@ -120,6 +105,7 @@ export function Deployment({ scenario, onChange, result }: Props & { result: Sce
 }
 
 function Row({ item, scenario, onChange, result }: RowProps) {
+  const t = useT();
   return (
     <tr>
       <td>
@@ -138,7 +124,7 @@ function Row({ item, scenario, onChange, result }: RowProps) {
                   onChange(setCommercial(scenario, p.index, item.key, (e.target as HTMLInputElement).checked))
                 }
               />
-              {commercialBool(p, item.key) ? 'Yes' : 'No'}
+              {commercialBool(p, item.key) ? t('deployment.yes') : t('deployment.no')}
             </label>
           ) : (
             <Quantity item={item} scenario={scenario} onChange={onChange} result={result} period={p.index} />
@@ -162,6 +148,7 @@ function Row({ item, scenario, onChange, result }: RowProps) {
 function Quantity({
   item, scenario, onChange, result, period,
 }: RowProps & { period: number }) {
+  const t = useT();
   const stated = commercialNumber(scenario.periods.find((p) => p.index === period)!, item.key);
   const storage = item.source === 'estimated' ? peakStorageForPeriod(result.storage, period) : undefined;
   const estimate = storage === undefined ? undefined : Number(storage.quotedGiB.toFixed(2));
@@ -187,14 +174,13 @@ function Quantity({
       />
       {estimate !== undefined && storage !== undefined && (
         <div class="hint" style="margin:3px 0 0;text-align:right">
-          {stated > 0 ? (
-            <>estimate {estimate} GiB</>
-          ) : (
-            <>
-              estimated at {storage.bytesPerValue} B / value &middot;{' '}
-              {storage.lowGiB.toFixed(1)}&ndash;{storage.highGiB.toFixed(1)} GiB across the range
-            </>
-          )}
+          {stated > 0
+            ? t('deployment.estimate', { value: estimate })
+            : t('deployment.estimatedAt', {
+                bytes: storage.bytesPerValue,
+                low: storage.lowGiB.toFixed(1),
+                high: storage.highGiB.toFixed(1),
+              })}
         </div>
       )}
     </>

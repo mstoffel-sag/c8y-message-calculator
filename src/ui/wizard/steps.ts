@@ -19,6 +19,8 @@
  * where it is used.
  */
 
+import type { Key } from '../../../lib/i18n/index.js';
+
 /**
  * The `key` is the handle for a step, and its position in this array is the only
  * statement of order anywhere. Nothing outside this file names a step by number:
@@ -26,25 +28,19 @@
  * key, and CONCEPT.md numbers the rows of one table. Reordering the wizard is
  * then a change to this array, not a rename across twenty files.
  */
+
 export interface StepDef {
   key: string;
-  title: string;
+  /** Catalogue keys, not strings: the wizard's own words are translated too. */
+  titleKey: Key;
   /** One line, shown under the title. */
-  lead: string;
+  leadKey: Key;
 }
 
 export const STEPS: StepDef[] = [
-  { key: 'fleet', title: 'Machines', lead: 'What kinds of machine are there, and how many of each?' },
-  { key: 'series', title: 'Measurements', lead: 'What does each machine measure, and how often?' },
-  {
-    key: 'discrete',
-    title: 'Events, alarms, inventory & commands',
-    lead: 'What else does a machine report, what is simply true about it, and what gets sent back to it?',
-  },
-  {
-    key: 'contract',
-    title: 'Contract & deployment',
-    lead: 'How long each period is, how the fleet ramps across them, and what is deployed in each.',
-  },
-  { key: 'results', title: 'Results', lead: 'Messages per calendar month, and where each number goes.' },
+  { key: 'fleet', titleKey: 'steps.fleet.title', leadKey: 'steps.fleet.lead' },
+  { key: 'series', titleKey: 'steps.series.title', leadKey: 'steps.series.lead' },
+  { key: 'discrete', titleKey: 'steps.discrete.title', leadKey: 'steps.discrete.lead' },
+  { key: 'contract', titleKey: 'steps.contract.title', leadKey: 'steps.contract.lead' },
+  { key: 'results', titleKey: 'steps.results.title', leadKey: 'steps.results.lead' },
 ];

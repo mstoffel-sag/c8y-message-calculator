@@ -21,17 +21,29 @@ import {
   type SummaryElement,
 } from '../../lib/engine/index.js';
 import { compact, interval as fmtInterval, n } from './format.js';
+import { useT } from './i18n.js';
+import type { Key, PluralBase, T } from '../../lib/i18n/index.js';
 
-/** Singular and plural, in the words the step that owns each kind uses. */
-const KIND_WORDS: Record<MetricKind, [string, string]> = {
-  continuous: ['time series', 'time series'],
-  // A flag is a series too -- one sent when the value moves rather than on a
-  // tick. Calling it a "state" here said it was a different kind of thing.
-  state: ['on-change series', 'on-change series'],
-  occurrence: ['event', 'events'],
-  condition: ['alarm', 'alarms'],
-  inventory: ['inventory entry', 'inventory entries'],
-  command: ['command', 'commands'],
+/**
+ * The catalogue key for each kind's noun. A flag is a series too -- one sent
+ * when the value moves rather than on a tick -- so it is named as one; calling
+ * it a "state" here said it was a different kind of thing.
+ */
+const KIND_KEY: Record<MetricKind, PluralBase> = {
+  continuous: 'kind.continuous',
+  state: 'kind.state',
+  occurrence: 'kind.occurrence',
+  condition: 'kind.condition',
+  inventory: 'kind.inventory',
+  command: 'kind.command',
+};
+
+const ELEMENT_KEY: Record<SummaryElement['element'], Key> = {
+  Measurements: 'element.measurements',
+  Events: 'element.events',
+  Alarms: 'element.alarms',
+  Inventory: 'element.inventory',
+  Operations: 'element.operations',
 };
 
 /** Which platform element a kind's messages land in. */
@@ -44,8 +56,8 @@ const ELEMENT_FOR_KIND: Record<MetricKind, SummaryElement['element']> = {
   command: 'Operations',
 };
 
-function plural(count: number, [one, many]: [string, string]): string {
-  return `${n(count)} ${count === 1 ? one : many}`;
+function plural(t: T, kind: MetricKind, count: number): string {
+  return `${n(count)} ${t.plural(KIND_KEY[kind], count)}`;
 }
 
 /**
@@ -55,9 +67,9 @@ function plural(count: number, [one, many]: [string, string]): string {
  * less: the count is the thing that matters, because each interval is a
  * separate measurement that cannot be merged with the others.
  */
-function intervalPhrase(intervals: number[]): string | null {
+function intervalPhrase(t: T, intervals: number[]): string | null {
   if (intervals.length === 0) return null;
-  if (intervals.length > 3) return `${intervals.length} intervals`;
+  if (intervals.length > 3) return t('machine.intervals', { count: intervals.length });
   return intervals.map(fmtInterval).join(', ');
 }
 
@@ -69,30 +81,35 @@ function intervalPhrase(intervals: number[]): string | null {
  * entry and command are not in a measurement at all. Listing the parts first and the
  * measurement count last claims nothing about what contains what.
  */
-export function machineStructure(s: MachineTypeSummary): string {
-  const bits = [s.parts.map((p) => plural(p.count, KIND_WORDS[p.kind])).join(', ')];
-  const rhythm = intervalPhrase(s.intervals);
+export function machineStructure(t: T, s: MachineTypeSummary): string {
+  const bits = [s.parts.map((p) => plural(t, p.kind, p.count)).join(', ')];
+  const rhythm = intervalPhrase(t, s.intervals);
   if (rhythm) bits.push(rhythm);
   if (s.measurementTypes > 0) {
-    bits.push(plural(s.measurementTypes, ['measurement type', 'measurement types']));
+    bits.push(`${n(s.measurementTypes)} ${t.plural('measurementType', s.measurementTypes)}`);
   }
   return bits.filter(Boolean).join(' · ');
 }
 
 /** The message mix, by platform element rather than by counter. */
-function mix(s: MachineTypeSummary): string {
-  return s.elements.map((e) => `${e.element} ${compact(e.messages)}`).join(' · ');
+function mix(t: T, s: MachineTypeSummary): string {
+  return s.elements
+    .map((e) => `${t(ELEMENT_KEY[e.element])} ${compact(e.messages)}`)
+    .join(' · ');
 }
 
 function Figure({ messages, perMachine }: { messages: number; perMachine?: number }) {
+  const t = useT();
   return (
     <span class="mt-sum-fig">
       <b>{compact(messages)}</b>
       <span>
-        messages / month
+        {t('machine.messagesPerMonth')}
         {/* Per machine is a small number by construction, so it is worth in
             full: "45,977 per machine" says something "46 k" does not. */}
-        {perMachine !== undefined && <> &middot; {n(perMachine)} per machine</>}
+        {perMachine !== undefined && (
+          <> &middot; {t('machine.perMachine', { count: n(perMachine) })}</>
+        )}
       </span>
     </span>
   );
@@ -113,27 +130,28 @@ export function MachineSummary({
   metrics: number;
   only?: MetricKind;
 }) {
+  const t = useT();
   if (only !== undefined) {
-    if (metrics === 0) return <span class="mt-sum-empty">none</span>;
+    if (metrics === 0) return <span class="mt-sum-empty">{t('machine.none')}</span>;
     const element = ELEMENT_FOR_KIND[only];
     const messages = s.elements.find((e) => e.element === element)?.messages ?? 0;
     return (
       <>
         <span class="mt-sum-text">
-          <span>{plural(metrics, KIND_WORDS[only])}</span>
+          <span>{plural(t, only, metrics)}</span>
         </span>
         <Figure messages={messages} />
       </>
     );
   }
 
-  if (!s.hasContent) return <span class="mt-sum-empty">nothing modelled yet</span>;
+  if (!s.hasContent) return <span class="mt-sum-empty">{t('machine.nothingModelled')}</span>;
 
   return (
     <>
       <span class="mt-sum-text">
-        <span>{machineStructure(s)}</span>
-        <span class="mt-sum-mix">{mix(s)}</span>
+        <span>{machineStructure(t, s)}</span>
+        <span class="mt-sum-mix">{mix(t, s)}</span>
       </span>
       <Figure messages={s.total} perMachine={s.perMachine} />
     </>
@@ -153,6 +171,7 @@ export function Machine({
   only?: MetricKind;
   children: ComponentChildren;
 }) {
+  const t = useT();
   const summary = machineTypeSummary(mt);
   const metrics = only === undefined ? mt.metrics.length : mt.metrics.filter((m) => m.kind === only).length;
 
@@ -164,9 +183,11 @@ export function Machine({
     >
       <summary>
         <span class="mt-head">
-          <span class="mt-name">{mt.name || 'Unnamed machine type'}</span>
-          <span class="mt-tag">{n(mt.machineCount)} machines</span>
-          {mt.onlinePct < 100 && <span class="mt-tag">{n(mt.onlinePct)} % online</span>}
+          <span class="mt-name">{mt.name || t('machine.unnamed')}</span>
+          <span class="mt-tag">{t('machine.machines', { count: n(mt.machineCount) })}</span>
+          {mt.onlinePct < 100 && (
+            <span class="mt-tag">{t('machine.onlinePct', { pct: n(mt.onlinePct) })}</span>
+          )}
           {mt.protocol?.trim() && <span class="mt-tag">{mt.protocol}</span>}
         </span>
         <MachineSummary summary={summary} metrics={metrics} only={only} />

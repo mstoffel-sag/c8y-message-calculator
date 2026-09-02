@@ -2,8 +2,9 @@
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { copy } from './format.js';
-import type { Choice as ChoiceOption } from '../../lib/presets/catalog.js';
+import { copy, unitLabel } from './format.js';
+import { useT } from './i18n.js';
+import { groupKeyFor, type Choice as ChoiceOption } from '../../lib/presets/catalog.js';
 import {
   DURATION_UNITS,
   splitDuration,
@@ -92,6 +93,7 @@ export function CopyButton({
   title?: string;
   class?: string;
 }) {
+  const t = useT();
   const [state, setState] = useState<'idle' | 'done' | 'failed'>('idle');
 
   useEffect(() => {
@@ -103,10 +105,14 @@ export function CopyButton({
   return (
     <button
       class={className}
-      title={state === 'failed' ? 'The browser refused the clipboard' : title}
+      title={state === 'failed' ? t('copy.refused') : title}
       onClick={async () => setState((await copy(text())) ? 'done' : 'failed')}
     >
-      {state === 'done' ? '\u2713 Copied' : state === 'failed' ? 'Blocked' : label}
+      {state === 'done'
+        ? `\u2713 ${t('copy.done')}`
+        : state === 'failed'
+          ? t('copy.blocked')
+          : label}
     </button>
   );
 }
@@ -146,7 +152,7 @@ export function Choice<T extends string | number>({
   title,
   placeholder,
   suffix,
-  otherLabel = 'Other…',
+  otherLabel,
   allowOther = true,
 }: {
   label?: string;
@@ -163,6 +169,7 @@ export function Choice<T extends string | number>({
   /** Off for closed sets -- "Other" makes no sense for "which measurement". */
   allowOther?: boolean;
 }) {
+  const t = useT();
   const known = useMemo(() => options.some((o) => o.value === value), [options, value]);
   // Sticky: choosing "Other" keeps the field open even before anything is typed.
   const [forceCustom, setForceCustom] = useState(false);
@@ -179,6 +186,9 @@ export function Choice<T extends string | number>({
   }, [options]);
 
   const read = (raw: string): T => (kind === 'number' ? (Number(raw) as T) : (raw as T));
+  // An option names itself unless it is prose, in which case it carries a key.
+  const labelOf = (option: ChoiceOption<T>) =>
+    option.labelKey ? t(option.labelKey) : (option.label ?? String(option.value));
 
   return (
     <label class="field" style={`width:${width}`} title={title}>
@@ -198,22 +208,25 @@ export function Choice<T extends string | number>({
       >
         {groups.map((group, gi) =>
           group.group ? (
-            <optgroup key={`${group.group}-${gi}`} label={group.group}>
+            <optgroup
+              key={`${group.group}-${gi}`}
+              label={groupKeyFor(group.group) ? t(groupKeyFor(group.group)!) : group.group}
+            >
               {group.items.map((option) => (
                 <option key={String(option.value)} value={String(option.value)}>
-                  {option.label}
+                  {labelOf(option)}
                 </option>
               ))}
             </optgroup>
           ) : (
             group.items.map((option) => (
               <option key={String(option.value)} value={String(option.value)}>
-                {option.label}
+                {labelOf(option)}
               </option>
             ))
           ),
         )}
-        {allowOther && <option value={OTHER}>{otherLabel}</option>}
+        {allowOther && <option value={OTHER}>{otherLabel ?? t('choice.other')}</option>}
       </select>
 
       {custom && (
@@ -310,7 +323,7 @@ export function ValueUnit<U extends string>({
         >
           {units.map((u) => (
             <option key={u} value={u}>
-              {u}
+              {unitLabel(u as DurationUnit | 'month' | 'year', 1)}
             </option>
           ))}
         </select>
@@ -367,12 +380,13 @@ export function Every({
   title?: string;
   hint?: string;
 }) {
+  const t = useT();
   const period = cadenceToPeriod(cadence);
   const units = unitsForKind(kind);
   return (
     <ValueUnit
       {...rest}
-      prefix="every"
+      prefix={t('every.prefix')}
       value={period.value}
       unit={period.unit}
       units={units}

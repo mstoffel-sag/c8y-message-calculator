@@ -7,6 +7,7 @@
  * from a good model.
  */
 
+import type { Key } from '../i18n/index.js';
 import type { MachineType, Metric, Period, Scenario } from '../engine/types.js';
 
 let seq = 0;
@@ -30,8 +31,15 @@ interface MetricSeed {
 
 interface Seed {
   key: string;
+  /**
+   * Doubles as the machine type's name, which is why it is not translated: the
+   * name travels into fragment names, payload examples and the workbook, and a
+   * scenario should not mean different things depending on the language it was
+   * built in (lib/i18n NOT_TRANSLATED).
+   */
   label: string;
-  blurb: string;
+  /** The sentence under the button. Prose, so it lives in the catalogue. */
+  blurbKey: Key;
   machineCount: number;
   onlinePct: number;
   /** What this kind of machine usually talks, so a preset arrives complete. */
@@ -100,7 +108,7 @@ export const SEEDS: Seed[] = [
   {
     key: 'hvac',
     label: 'Rooftop HVAC unit',
-    blurb: 'Four climate readings on one tick, two states that sit still for hours.',
+    blurbKey: 'preset.hvac.blurb',
     machineCount: 1000,
     onlinePct: 100,
     protocol: 'BACnet/IP',
@@ -121,7 +129,7 @@ export const SEEDS: Seed[] = [
   {
     key: 'meter',
     label: 'Electricity meter',
-    blurb: 'Register reads on a 15-minute interval; almost nothing else.',
+    blurbKey: 'preset.meter.blurb',
     machineCount: 50_000,
     onlinePct: 98,
     protocol: 'DLMS/COSEM',
@@ -137,7 +145,7 @@ export const SEEDS: Seed[] = [
   {
     key: 'tracker',
     label: 'Asset tracker',
-    blurb: 'Position and battery together; movement start and stop as events.',
+    blurbKey: 'preset.tracker.blurb',
     machineCount: 5000,
     onlinePct: 85,
     protocol: 'NB-IoT / LTE-M',
@@ -154,7 +162,7 @@ export const SEEDS: Seed[] = [
   {
     key: 'gateway',
     label: 'Edge gateway',
-    blurb: 'Aggregates a line and forwards a summary -- the biggest volume lever there is.',
+    blurbKey: 'preset.gateway.blurb',
     machineCount: 200,
     onlinePct: 99,
     protocol: 'OPC UA',
@@ -176,7 +184,7 @@ export const SEEDS: Seed[] = [
   {
     key: 'machine',
     label: 'Production machine',
-    blurb: 'Fast process readings, a shift state, and alarms an operator has to act on.',
+    blurbKey: 'preset.machine.blurb',
     machineCount: 400,
     onlinePct: 90,
     protocol: 'OPC UA',
@@ -197,7 +205,7 @@ export const SEEDS: Seed[] = [
 export const PRESETS = SEEDS.map((seed) => ({
   key: seed.key,
   label: seed.label,
-  blurb: seed.blurb,
+  blurbKey: seed.blurbKey,
   create: () => instantiate(seed),
 }));
 

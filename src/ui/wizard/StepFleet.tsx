@@ -7,6 +7,7 @@ import { addMachineType, patchMachineType, removeMachineType } from '../store.js
 import { Choice, Num, Teach, Txt, Empty } from '../parts.js';
 import { machineStructure } from '../Machine.js';
 import { n } from '../format.js';
+import { Prose, useT } from '../i18n.js';
 
 interface Props {
   scenario: Scenario;
@@ -14,33 +15,26 @@ interface Props {
 }
 
 export function StepFleet({ scenario, onChange }: Props) {
+  const t = useT();
   const total = scenario.machineTypes.reduce((sum, mt) => sum + mt.machineCount, 0);
 
   return (
     <>
-      <Teach title="Start with the machines, not the data">
-        <p>
-          A <b>machine type</b> is a group of machines that behave the same way &mdash; same sensors,
-          same firmware, same reporting. Every machine of a type produces identical traffic, so the
-          whole estimate scales from the count.
-        </p>
-        <p>
-          Split into separate types only where the <em>data</em> differs. Two hundred pumps in
-          Hamburg and two hundred in Lisbon are one type; a pump and a gateway are two.
-        </p>
+      <Teach title={t('fleet.teach.title')}>
+        <Prose k="fleet.teach.body" />
       </Teach>
 
       {scenario.machineTypes.length === 0 ? (
-        <Empty>Add a machine type below to begin.</Empty>
+        <Empty>{t('fleet.empty')}</Empty>
       ) : (
         <div class="scroll">
           <table>
             <thead>
               <tr>
-                <th>Machine type</th>
-                <th style="width:230px">Talks</th>
-                <th class="num" style="width:150px">How many</th>
-                <th class="num" style="width:150px">Online %</th>
+                <th>{t('fleet.col.type')}</th>
+                <th style="width:230px">{t('fleet.col.talks')}</th>
+                <th class="num" style="width:150px">{t('fleet.col.count')}</th>
+                <th class="num" style="width:150px">{t('fleet.col.online')}</th>
                 <th style="width:90px" />
               </tr>
             </thead>
@@ -50,7 +44,7 @@ export function StepFleet({ scenario, onChange }: Props) {
                   <td>
                     <Txt
                       value={mt.name}
-                      placeholder="Rooftop HVAC unit"
+                      placeholder={t('fleet.namePlaceholder')}
                       onChange={(name) => onChange(patchMachineType(scenario, mt.id, { name }))}
                     />
                     {/* The same sentence StepTimeSeries' collapsed header shows,
@@ -58,8 +52,8 @@ export function StepFleet({ scenario, onChange }: Props) {
                         how many measurements a machine actually sends. */}
                     <div class="hint" style="margin-top:4px">
                       {mt.metrics.length === 0
-                        ? 'nothing modelled yet'
-                        : machineStructure(machineTypeSummary(mt))}
+                        ? t('fleet.nothingModelled')
+                        : machineStructure(t, machineTypeSummary(mt))}
                     </div>
                   </td>
                   <td>
@@ -69,8 +63,8 @@ export function StepFleet({ scenario, onChange }: Props) {
                     <Choice
                       value={mt.protocol ?? ''}
                       options={PROTOCOLS}
-                      placeholder="Name the protocol"
-                      otherLabel="Something else…"
+                      placeholder={t('fleet.protocolPlaceholder')}
+                      otherLabel={t('fleet.protocolOther')}
                       onChange={(protocol) => onChange(patchMachineType(scenario, mt.id, { protocol }))}
                     />
                   </td>
@@ -85,19 +79,19 @@ export function StepFleet({ scenario, onChange }: Props) {
                       value={mt.onlinePct}
                       max={100}
                       suffix="%"
-                      title="Duty cycle or connectivity availability. A machine that is offline sends nothing."
+                      title={t('fleet.online.title')}
                       onChange={(onlinePct) => onChange(patchMachineType(scenario, mt.id, { onlinePct }))}
                     />
                   </td>
                   <td>
                     <button class="ghost" onClick={() => onChange(removeMachineType(scenario, mt.id))}>
-                      Remove
+                      {t('fleet.remove')}
                     </button>
                   </td>
                 </tr>
               ))}
               <tr class="total">
-                <td>{scenario.machineTypes.length} types</td>
+                <td>{t.plural('fleet.total', scenario.machineTypes.length)}</td>
                 <td />
                 <td class="num">{n(total)}</td>
                 <td colSpan={2} />
@@ -108,24 +102,21 @@ export function StepFleet({ scenario, onChange }: Props) {
       )}
 
       <div class="row" style="margin-top:16px">
-        <span class="lbl">Add</span>
+        <span class="lbl">{t('fleet.add')}</span>
         {PRESETS.map((preset) => (
           <button
             key={preset.key}
-            title={preset.blurb}
+            title={t(preset.blurbKey)}
             onClick={() => onChange(addMachineType(scenario, preset.create()))}
           >
             {preset.label}
           </button>
         ))}
         <button class="primary" onClick={() => onChange(addMachineType(scenario, blankMachineType()))}>
-          Blank machine type
+          {t('fleet.addBlank')}
         </button>
       </div>
-      <p class="hint">
-        Presets arrive fully modelled and are meant to be edited &mdash; each one is built the way the
-        tool recommends, so starting from one starts you from a good design.
-      </p>
+      <p class="hint">{t('fleet.presetNote')}</p>
     </>
   );
 }

@@ -294,7 +294,9 @@ describe('the catalogue behind the dropdowns', () => {
     const { TRANSITIONS } = await import('../lib/presets/catalog.js');
     assert.equal(TRANSITIONS[0]?.value, 0);
     assert.ok(TRANSITIONS.every((t) => t.value >= 0));
-    assert.ok(TRANSITIONS.every((t) => t.label.length > 0));
+    // Every option says something: these are prose, so they say it from the
+    // catalogue rather than from the seed.
+    assert.ok(TRANSITIONS.every((option) => option.labelKey !== undefined));
   });
 
   test('picking a catalogue name fills the unit but never the interval', async () => {
