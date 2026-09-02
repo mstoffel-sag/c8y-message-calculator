@@ -226,6 +226,8 @@ describe('scenario normalisation', () => {
     };
     const fixed = normalise(old);
     assert.equal(fixed.settings.fragmentPrefix, 'acme');
+    // peakFactor is gone from the model; an old save must not carry it back out.
+    assert.equal('peakFactor' in fixed.settings, false);
     assert.deepEqual(fixed.periods[0]?.commercial, {});
     assert.equal(fixed.machineTypes[0]?.metrics[0]?.bundleId, null);
     assert.doesNotThrow(() => computeScenario(fixed));

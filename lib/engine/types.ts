@@ -128,8 +128,6 @@ export interface Period {
 }
 
 export interface ScenarioSettings {
-  /** Multiplier applied to the average rate to report a peak throughput. */
-  peakFactor: number;
   /**
    * Where the ramp starts on the calendar. Billing is per calendar month, so
    * real month lengths matter and the engine needs to know which months these
@@ -268,8 +266,14 @@ export interface MonthResult {
   /** One-off registration volume landing in this month. */
   onboardingCreates: number;
   byMachineType: Array<{ machineTypeId: string; name: string; total: number }>;
+  /**
+   * Messages per second averaged across the month. A sanity check on the
+   * architecture, not a billing figure -- and deliberately not multiplied by a
+   * burst factor: the tool has no way to know a fleet's burstiness, and asking
+   * for a multiplier only to hand it back is an invented number wearing the
+   * clothes of a measurement.
+   */
   avgMessagesPerSec: number;
-  peakMessagesPerSec: number;
   perMachinePerMonth: number;
   machinesOnline: number;
 }

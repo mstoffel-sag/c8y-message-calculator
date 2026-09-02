@@ -217,7 +217,6 @@ export function blankScenario(): Scenario {
     name: 'Untitled scenario',
     notes: '',
     settings: {
-      peakFactor: 3,
       startYear: now.getUTCFullYear(),
       startMonth: now.getUTCMonth() + 1,
       fragmentPrefix: 'acme',
@@ -238,7 +237,7 @@ export function conceptSection9Scenario(): Scenario {
   return {
     name: 'CONCEPT.md section 9 - 1,000 rooftop HVAC units',
     notes: 'The worked example. Steady state, 100 % online, one period.',
-    settings: { peakFactor: 3, startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
+    settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
     periods: [{ index: 1, months: 12, machineCountOverrides: {}, commercial: { sharedCloud: 1 } }],
     machineTypes: [hvac],
   };

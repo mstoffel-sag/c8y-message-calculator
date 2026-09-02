@@ -295,7 +295,6 @@ function computeMonth(
     onboardingCreates: onboardingThisMonth,
     byMachineType,
     avgMessagesPerSec,
-    peakMessagesPerSec: avgMessagesPerSec * scenario.settings.peakFactor,
     perMachinePerMonth: machinesTotal > 0 ? total / machinesTotal : 0,
     machinesOnline,
   };

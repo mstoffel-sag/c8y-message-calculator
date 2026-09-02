@@ -383,7 +383,7 @@ function monthsSheet(result: ScenarioResult, scenario: Scenario): Sheet {
         1,
         `Fleet: ${scenario.machineTypes
           .map((mt) => `${machineCountIn(mt, scenario.periods[0])} x ${mt.name || 'unnamed'}`)
-          .join(', ')}. Peak factor ${scenario.settings.peakFactor}x applies to the throughput check only.`,
+          .join(', ')}.`,
         'note',
       ),
     ]),

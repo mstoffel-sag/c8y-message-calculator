@@ -74,16 +74,6 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
               value={scenario.settings.startYear}
               onChange={(startYear) => onChange({ ...scenario, settings: { ...scenario.settings, startYear } })}
             />
-            <Num
-              label="Peak factor"
-              width="130px"
-              min={1}
-              step="any"
-              suffix="&times;"
-              title="Multiplier on the average rate, for the throughput sanity check only. It does not change the message count."
-              value={scenario.settings.peakFactor}
-              onChange={(peakFactor) => onChange({ ...scenario, settings: { ...scenario.settings, peakFactor } })}
-            />
             {/* Retention changes nothing about how many messages are sent -- only
                 how many of them are still on disk. It is here rather than on the
                 results screen because it is a fact about the tenant, like the

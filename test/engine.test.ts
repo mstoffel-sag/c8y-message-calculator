@@ -141,7 +141,6 @@ describe('CONCEPT.md section 9 - 1,000 rooftop HVAC units', () => {
   test('throughput sanity check', () => {
     const january = monthOf(result, 1);
     assert.equal(Math.round(january.avgMessagesPerSec), 17);
-    assert.equal(Math.round(january.peakMessagesPerSec), 51, 'peakFactor 3');
   });
 
   test('a clean model produces no errors or warnings', () => {
@@ -202,7 +201,7 @@ describe('the counting rules', () => {
   test('online percentage scales traffic but not registration', () => {
     const scenario: Scenario = {
       ...blankScenario(),
-      settings: { peakFactor: 2, startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
+      settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
       machineTypes: [{ ...presetByKey('hvac')!, machineCount: 1000, onlinePct: 50 }],
     };
     const january = monthOf(computeScenario(scenario), 1);
@@ -222,7 +221,7 @@ describe('registration is a one-off, not a rate', () => {
     const hvac = presetByKey('hvac')!;
     const scenario: Scenario = {
       ...blankScenario(),
-      settings: { peakFactor: 2, startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
+      settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
       periods: [
         { index: 1, months: 12, machineCountOverrides: { [hvac.id]: 1_000 }, commercial: {} },
         { index: 2, months: 12, machineCountOverrides: { [hvac.id]: 4_000 }, commercial: {} },

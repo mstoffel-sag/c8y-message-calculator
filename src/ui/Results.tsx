@@ -66,7 +66,7 @@ export function Results({ scenario, result }: { scenario: Scenario; result: Scen
         <div class="stat">
           <span>Messages / second</span>
           <b>{nf1.format(peak.avgMessagesPerSec)}</b>
-          <small>peak {nf1.format(peak.peakMessagesPerSec)} /s at the stated peak factor</small>
+          <small>averaged across the month</small>
         </div>
       </div>
 

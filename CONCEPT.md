@@ -349,7 +349,7 @@ Two things the source does not say, and the model therefore has to get right:
 
 **Retention decides the size, not the traffic.** What is billed is what is on disk on the fullest day,
 so identical traffic held for 90 days occupies three times what it does at 30. Retention lives in the
-scenario settings, next to the peak factor, and changes no counter.
+scenario settings, beside the calendar start, and changes no counter.
 
 **The ramp means the period is not full yet.** A fleet three months into a rollout has three months of
 history, not thirty days of steady state at its final size. The retention period is walked backwards
@@ -423,7 +423,7 @@ fall out directly.
 ```
 Scenario
   name, notes
-  settings:    peakFactor, startYear, startMonth
+  settings:    startYear, startMonth, retentionDays, bytesPerValue, fragmentPrefix
   periods:     Period[]                  // 1-5, mirrors the Configurator
   machineTypes: MachineType[]
 
@@ -472,8 +472,7 @@ onboarding  → machineCount, once, in its period → Inventories Created
 counters[9]        = each counter summed independently, for one calendar month
 messagesInMonth    = Σ counters
 storedValues       = Σ (sends × seriesCount)     // a count, not bytes -- §4.4
-avgMessagesPerSec  = messagesInMonth / SPM
-peakMessagesPerSec = avgMessagesPerSec × peakFactor
+avgMessagesPerSec  = messagesInMonth / SPM     // averaged; no burst multiplier (§7)
 
 // evaluated across every calendar month in every period
 peakMonth          = MAX(messagesInMonth over all months)
@@ -679,7 +678,13 @@ page supports this table.
   peak month. A single averaged number is misleading in both directions (§2).
 - Total messages/month split by counter and by machine type, with the naive baseline alongside.
 - The per-machine-per-month figure — the number architects actually reason with.
-- Average and peak messages/second: a throughput sanity check.
+- Average messages/second: a throughput sanity check, and only that.
+
+  It used to be reported twice, the second time multiplied by a **peak factor** the wizard asked for.
+  That number is gone. Nobody knows their fleet's burstiness at quoting time, so the answer was
+  always the default; a figure that only ever repeats the input is not evidence, and printing it
+  beside a computed one lends it authority it has not earned. Burstiness is a device-design question
+  and it changes no counter — billing is a monthly total.
 - Stored values per month, as a count, and the operational storage they imply as a GiB **range** with
   its assumptions attached (§4.6). Both ends, never a midpoint.
 - A per-period ramp of message volume as the fleet rolls out.

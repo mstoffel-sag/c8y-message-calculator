@@ -1,0 +1,361 @@
+{
+  "name": "Acme",
+  "notes": "",
+  "settings": {
+    "peakFactor": 3,
+    "startYear": 2026,
+    "startMonth": 8,
+    "fragmentPrefix": "acme"
+  },
+  "periods": [
+    {
+      "index": 1,
+      "months": 12,
+      "machineCountOverrides": {},
+      "commercial": {
+        "sharedCloud": 1
+      }
+    },
+    {
+      "index": 2,
+      "months": 12,
+      "machineCountOverrides": {
+        "mt_3_j1rk": 800,
+        "mt_1_29ob": 200
+      },
+      "commercial": {
+        "sharedCloud": 1
+      }
+    },
+    {
+      "index": 3,
+      "months": 12,
+      "machineCountOverrides": {
+        "mt_3_j1rk": 1000,
+        "mt_1_29ob": 400
+      },
+      "commercial": {
+        "sharedCloud": 1
+      }
+    }
+  ],
+  "machineTypes": [
+    {
+      "id": "mt_3_j1rk",
+      "name": "Production machine",
+      "machineCount": 400,
+      "onlinePct": 100,
+      "protocol": "OPC UA",
+      "bundles": [
+        {
+          "id": "b_4_2p6j",
+          "fragmentName": "acme_Process",
+          "intervalSeconds": 10,
+          "metricIds": [
+            "m_6_k0t2",
+            "m_7_l9ou",
+            "m_5_56an"
+          ]
+        },
+        {
+          "id": "b_1_80o3ee",
+          "fragmentName": "acme_ProductionMachine1s",
+          "intervalSeconds": 1,
+          "metricIds": []
+        },
+        {
+          "id": "b_11_0bskeu",
+          "fragmentName": "acme_ProductionMachine11s",
+          "intervalSeconds": 11,
+          "metricIds": [
+            "m_8_56l4"
+          ]
+        },
+        {
+          "id": "b_9_geo06e",
+          "fragmentName": "acme_ProductionMachine9s",
+          "intervalSeconds": 9,
+          "metricIds": []
+        },
+        {
+          "id": "b_12_v50v0l",
+          "fragmentName": "acme_ProductionMachine12s",
+          "intervalSeconds": 12,
+          "metricIds": []
+        },
+        {
+          "id": "b_13_xtz7g3",
+          "fragmentName": "acme_ProductionMachine13s",
+          "intervalSeconds": 13,
+          "metricIds": []
+        },
+        {
+          "id": "b_14_kvniew",
+          "fragmentName": "acme_ProductionMachine14s",
+          "intervalSeconds": 14,
+          "metricIds": []
+        },
+        {
+          "id": "b_15_v98wjv",
+          "fragmentName": "acme_ProductionMachine15s",
+          "intervalSeconds": 15,
+          "metricIds": []
+        }
+      ],
+      "metrics": [
+        {
+          "id": "m_5_56an",
+          "name": "Spindle speed",
+          "unit": "rpm",
+          "kind": "continuous",
+          "cadence": {
+            "mode": "interval",
+            "seconds": 10
+          },
+          "semanticGroup": "process",
+          "bundleId": "b_4_2p6j",
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_6_k0t2",
+          "name": "Motor current",
+          "unit": "A",
+          "kind": "continuous",
+          "cadence": {
+            "mode": "interval",
+            "seconds": 10
+          },
+          "semanticGroup": "process",
+          "bundleId": "b_4_2p6j",
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_7_l9ou",
+          "name": "Coolant temp",
+          "unit": "C",
+          "kind": "continuous",
+          "cadence": {
+            "mode": "interval",
+            "seconds": 10
+          },
+          "semanticGroup": "process",
+          "bundleId": "b_4_2p6j",
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_8_56l4",
+          "name": "Vibration",
+          "unit": "mm/s",
+          "kind": "continuous",
+          "cadence": {
+            "mode": "interval",
+            "seconds": 11
+          },
+          "semanticGroup": "process",
+          "bundleId": "b_11_0bskeu",
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_9_2wrh",
+          "name": "Machine mode",
+          "unit": "",
+          "kind": "state",
+          "cadence": {
+            "mode": "onChange",
+            "perDay": 12
+          },
+          "semanticGroup": "status",
+          "fragmentName": "MachineMode",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_a_hq8l",
+          "name": "Part completed",
+          "unit": "",
+          "kind": "occurrence",
+          "cadence": {
+            "mode": "onChange",
+            "perDay": 480
+          },
+          "semanticGroup": "production",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_b_c8v2",
+          "name": "Tool wear alarm",
+          "unit": "",
+          "kind": "condition",
+          "cadence": {
+            "mode": "onChange",
+            "perDay": 2
+          },
+          "semanticGroup": "fault",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_c_8b83",
+          "name": "Recipe change",
+          "unit": "",
+          "kind": "command",
+          "cadence": {
+            "mode": "command",
+            "perDay": 1,
+            "transitions": 3
+          },
+          "semanticGroup": "control",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_6_5jpk",
+          "name": "Temperature out of range",
+          "unit": "",
+          "kind": "condition",
+          "cadence": {
+            "mode": "onChange",
+            "perDay": 12
+          },
+          "semanticGroup": "process",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_8_hlim",
+          "name": "Firmware version",
+          "unit": "",
+          "kind": "inventory",
+          "cadence": {
+            "mode": "perMonth",
+            "count": 1
+          },
+          "semanticGroup": "identity",
+          "bundleId": null,
+          "resentOnTimer": false
+        }
+      ]
+    },
+    {
+      "id": "mt_1_29ob",
+      "name": "Air recycler",
+      "machineCount": 100,
+      "onlinePct": 100,
+      "protocol": "Modbus TCP",
+      "bundles": [
+        {
+          "id": "b_60_ooy1ue",
+          "fragmentName": "acme_AirRecycler60s",
+          "intervalSeconds": 60,
+          "metricIds": [
+            "m_2_k2h4",
+            "m_3_583d"
+          ]
+        },
+        {
+          "id": "b_86400_4ilydn",
+          "fragmentName": "acme_AirRecycler1d",
+          "intervalSeconds": 86400,
+          "metricIds": [
+            "m_3_583d"
+          ]
+        }
+      ],
+      "metrics": [
+        {
+          "id": "m_2_k2h4",
+          "name": "Supply air temp",
+          "unit": "C",
+          "kind": "continuous",
+          "cadence": {
+            "mode": "interval",
+            "seconds": 60
+          },
+          "semanticGroup": "climate",
+          "bundleId": "b_60_ooy1ue",
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_3_583d",
+          "name": "Runtime hours",
+          "unit": "h",
+          "kind": "continuous",
+          "cadence": {
+            "mode": "interval",
+            "seconds": 86400
+          },
+          "semanticGroup": "mechanical",
+          "bundleId": "b_86400_4ilydn",
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_4_6hyh",
+          "name": "On/off",
+          "unit": "",
+          "kind": "state",
+          "cadence": {
+            "mode": "onChange",
+            "perDay": 1440
+          },
+          "semanticGroup": "status",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_5_6wvw",
+          "name": "Service performed",
+          "unit": "",
+          "kind": "occurrence",
+          "cadence": {
+            "mode": "onChange",
+            "perDay": 0.14285714285714285
+          },
+          "semanticGroup": "maintenance",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_7_impf",
+          "name": "Pressure out of range",
+          "unit": "",
+          "kind": "condition",
+          "cadence": {
+            "mode": "onChange",
+            "perDay": 0.5
+          },
+          "semanticGroup": "process",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_9_791j",
+          "name": "Firmware version",
+          "unit": "",
+          "kind": "inventory",
+          "cadence": {
+            "mode": "perMonth",
+            "count": 1
+          },
+          "semanticGroup": "identity",
+          "bundleId": null,
+          "resentOnTimer": false
+        },
+        {
+          "id": "m_a_l0q4",
+          "name": "Setpoint change",
+          "unit": "",
+          "kind": "command",
+          "cadence": {
+            "mode": "command",
+            "transitions": 3,
+            "perDay": 1
+          },
+          "semanticGroup": "control",
+          "bundleId": null,
+          "resentOnTimer": false
+        }
+      ]
+    }
+  ]
+}

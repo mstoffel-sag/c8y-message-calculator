@@ -432,7 +432,11 @@ function metricKind(raw: unknown): MetricKind {
 export function normalise(input: unknown): Scenario {
   const raw = (input ?? {}) as Partial<Scenario>;
   const fallback = blankScenario();
-  const settings = { ...fallback.settings, ...(raw.settings ?? {}) };
+  // peakFactor was a multiplier the tool asked for and then only handed back;
+  // dropping the key here stops an old save from writing it out again forever.
+  const rawSettings = { ...(raw.settings ?? {}) } as Record<string, unknown>;
+  delete rawSettings.peakFactor;
+  const settings = { ...fallback.settings, ...rawSettings } as Scenario['settings'];
 
   const periods = (Array.isArray(raw.periods) && raw.periods.length > 0 ? raw.periods : fallback.periods)
     .map((period, i) => ({
