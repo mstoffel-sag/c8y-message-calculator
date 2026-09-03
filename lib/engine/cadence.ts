@@ -33,15 +33,14 @@ export function isDayScaled(unit: RateUnit): boolean {
 /**
  * Which periods make sense for a kind.
  *
- * States, events and alarms only have a day-scaled counter, so they stop at
- * weeks -- "once a month" is said as "every 30 days", which is what the engine
- * actually computes. Inventory has both rhythms. Commands are offered from days up,
+ * Events and alarms only have a day-scaled counter, so they stop at weeks --
+ * "once a month" is said as "every 30 days", which is what the engine actually
+ * computes. Inventory has both rhythms. Commands are offered from days up,
  * because sub-daily commands to every machine in a fleet is not a pattern worth
  * making easy to express.
  */
 export function unitsForKind(kind: MetricKind): RateUnit[] {
   switch (kind) {
-    case 'state':
     case 'occurrence':
     case 'condition':
       return ['s', 'min', 'h', 'day', 'week'];

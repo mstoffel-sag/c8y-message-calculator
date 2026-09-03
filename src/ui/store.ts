@@ -29,8 +29,6 @@ export function defaultCadence(kind: MetricKind): Cadence {
   switch (kind) {
     case 'continuous':
       return { mode: 'interval', seconds: 60 };
-    case 'state':
-      return { mode: 'onChange', perDay: 10 };
     case 'occurrence':
       return { mode: 'onChange', perDay: 1 };
     case 'condition':
@@ -137,52 +135,6 @@ export function setMetricKind(
     cadence: defaultCadence(kind),
   });
   return kind === 'continuous' ? next : assignBundle(next, machineTypeId, metricId, null);
-}
-
-/**
- * Switches a measurement series between its two rhythms: sampled on a timer, or
- * sent when the value moves.
- *
- * Both are measurements -- one timestamp, one series or several -- and the wizard
- * therefore asks this as a rhythm rather than as two kinds of thing. The kind
- * still moves underneath, because the arithmetic genuinely differs: a timed
- * reading can share a measurement with everything else on its tick, and an
- * on-change reading can share one with nothing (CONCEPT.md 4.4).
- *
- * The period carries across, so "every 5 min" on a timer becomes "about every
- * 5 min when it changes" rather than snapping back to a default.
- */
-export function setRhythm(
-  scenario: Scenario,
-  machineTypeId: string,
-  metricId: string,
-  rhythm: 'interval' | 'onChange',
-): Scenario {
-  const metric = scenario.machineTypes
-    .find((mt) => mt.id === machineTypeId)
-    ?.metrics.find((m) => m.id === metricId);
-  if (!metric || (metric.kind !== 'continuous' && metric.kind !== 'state')) return scenario;
-  if (rhythm === (metric.kind === 'continuous' ? 'interval' : 'onChange')) return scenario;
-
-  const period = cadenceToPeriod(metric.cadence);
-  const seconds = toSeconds(period.value, period.unit as DurationUnit);
-
-  if (rhythm === 'onChange') {
-    const next = patchMetric(scenario, machineTypeId, metricId, {
-      kind: 'state',
-      cadence: { mode: 'onChange', perDay: SECONDS_PER_DAY / seconds },
-    });
-    // Its timestamps are its own, so it leaves whatever tick it was sharing.
-    return assignBundle(next, machineTypeId, metricId, null);
-  }
-
-  const next = patchMetric(scenario, machineTypeId, metricId, {
-    kind: 'continuous',
-    cadence: { mode: 'interval', seconds },
-  });
-  return mapMachineType(next, machineTypeId, (mt) =>
-    autoAssign(mt, metricId, scenario.settings.fragmentPrefix),
-  );
 }
 
 /** Inventory may be quoted per month or per day; nothing else has a choice. */
@@ -416,17 +368,43 @@ export function load(): Scenario | null {
  * first render.
  */
 /**
- * The kind, with the one rename this format has had.
+ * The kind, with the two changes this format has had.
  *
  * 'fact' was what the wizard called an inventory write until the step was
- * renamed after the element it actually bills to. Scenarios saved before that
- * are still in browsers and in files on disk, and a scenario that loses its
- * managed-object writes on load loses messages silently -- which is the one
+ * renamed after the element it actually bills to. 'state' was a flag sent at
+ * the moment its value moved, before the measurements table dropped to one
+ * rhythm. Scenarios saved before either are still in browsers and in files on
+ * disk, and a scenario that quietly loses or gains messages on load is the one
  * failure mode this tool cannot have.
  */
 function metricKind(raw: unknown): MetricKind {
   if (raw === 'fact') return 'inventory';
+  if (raw === 'state') return 'continuous';
   return (raw ?? 'continuous') as MetricKind;
+}
+
+/**
+ * A saved flag's cadence, as the interval that sends the same messages.
+ *
+ * A state was quoted as a change rate -- 20 a day -- and billed one message per
+ * change: 620 in a 31-day month. As a series it is quoted as an interval, and
+ * 86,400 / 20 = every 4,320 s bills exactly the same 620. So the conversion is
+ * arithmetic, not a judgement, and a scenario reloaded after this change costs
+ * what it costed before.
+ *
+ * Getting this wrong is expensive in one direction in particular: leaving a
+ * flag's cadence alone and letting it fall through to the 60 s default would
+ * quote a fleet at seventy times the volume it had yesterday, in a tool whose
+ * output goes into a contract.
+ */
+function migratedCadence(raw: unknown, kind: MetricKind): Cadence | undefined {
+  const cadence = raw as Cadence | undefined;
+  if (kind !== 'continuous' || cadence?.mode !== 'onChange') return cadence;
+  const perDay = Number(cadence.perDay);
+  return {
+    mode: 'interval',
+    seconds: Number.isFinite(perDay) && perDay > 0 ? SECONDS_PER_DAY / perDay : 60,
+  };
 }
 
 /**
@@ -482,7 +460,7 @@ export function normalise(input: unknown): Scenario {
         name: m?.name ?? '',
         unit: m?.unit ?? '',
         kind,
-        cadence: m?.cadence ?? defaultCadence(kind),
+        cadence: migratedCadence(m?.cadence, kind) ?? defaultCadence(kind),
         semanticGroup: m?.semanticGroup ?? '',
         fragmentName: typeof m?.fragmentName === 'string' ? m.fragmentName : undefined,
         retentionDays: retentionDays(m?.retentionDays),
@@ -624,20 +602,15 @@ export function setDatapointName(
     ?.metrics.find((m) => m.id === metricId);
   if (!metric) return scenario;
 
-  const own = seedByName(metric.kind, name);
-  const other: MetricKind | null =
-    metric.kind === 'continuous' ? 'state' : metric.kind === 'state' ? 'continuous' : null;
-  const crossed = own || !other ? undefined : seedByName(other, name);
-  const seed = own ?? crossed;
+  // One catalogue per kind now, and one rhythm: picking a name used to be able
+  // to move a row from the timed table to the on-change one and back, which is
+  // what the cross-catalogue lookup was for.
+  const seed = seedByName(metric.kind, name);
 
   const patch: Partial<Metric> = { name };
   if (seed && !metric.unit.trim() && seed.unit) patch.unit = seed.unit;
   if (seed?.group && !metric.semanticGroup.trim()) patch.semanticGroup = seed.group.toLowerCase();
-  const named = patchMetric(scenario, machineTypeId, metricId, patch);
-
-  return crossed
-    ? setRhythm(named, machineTypeId, metricId, other === 'state' ? 'onChange' : 'interval')
-    : named;
+  return patchMetric(scenario, machineTypeId, metricId, patch);
 }
 
 /**

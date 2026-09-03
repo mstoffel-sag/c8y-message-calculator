@@ -32,10 +32,6 @@ import {
 } from './storage.js';
 import { commandsInMonth } from './cadence.js';
 
-/** Interval assumed for a state metric in the naive baseline when the machine
- *  type has no continuous metric to borrow a cadence from. */
-export const NAIVE_FALLBACK_INTERVAL_SECONDS = 60;
-
 /** A bundle plus the metrics that actually belong to it. */
 export interface ResolvedBundle {
   bundle: Bundle;
@@ -88,20 +84,6 @@ export function machineCountIn(machineType: MachineType, period: Period | undefi
   if (!period) return machineType.machineCount;
   const override = period.machineCountOverrides[machineType.id];
   return override === undefined || override === null ? machineType.machineCount : override;
-}
-
-/** The fastest continuous cadence in a machine type, used by the naive baseline. */
-function fastestContinuousInterval(machineType: MachineType): number {
-  let fastest = Number.POSITIVE_INFINITY;
-  for (const { bundle, members } of resolveBundles(machineType).bundles) {
-    if (members.length > 0) fastest = Math.min(fastest, bundle.intervalSeconds);
-  }
-  for (const metric of machineType.metrics) {
-    if (metric.kind === 'continuous' && metric.cadence.mode === 'interval') {
-      fastest = Math.min(fastest, metric.cadence.seconds);
-    }
-  }
-  return Number.isFinite(fastest) ? fastest : NAIVE_FALLBACK_INTERVAL_SECONDS;
 }
 
 export interface MachineTypeMonth {
@@ -192,27 +174,12 @@ export function computeMachineTypeMonth(
     naive.measurementsCreated += sends;
   }
 
-  const naiveStateInterval = fastestContinuousInterval(machineType);
-
   for (const metric of machineType.metrics) {
     const cadence = metric.cadence;
     switch (metric.kind) {
       case 'continuous':
         // Already counted above.
         break;
-
-      case 'state': {
-        // On change, in its own measurement -- the timestamp of the transition
-        // is the information (section 4.4).
-        if (cadence.mode !== 'onChange') break;
-        const sends = n * cadence.perDay * days;
-        counters.measurementsCreated += sends;
-        storedValues += sends;
-        bucketInto(retention, retentionFor(metric.retentionDays, defaultRetentionDays), sends);
-        // Naive: sampled on the fleet's fastest interval like everything else.
-        naive.measurementsCreated += (n * spm) / naiveStateInterval;
-        break;
-      }
 
       case 'occurrence': {
         if (cadence.mode !== 'onChange') break;

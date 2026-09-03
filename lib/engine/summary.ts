@@ -42,10 +42,9 @@ export interface MachineTypeSummary {
   datapoints: number;
   /**
    * Distinct measurements a machine sends: shared bundles, plus every series
-   * travelling alone, plus every state -- a state cannot join an interval
-   * bundle without making the bundle's series set vary, so it is always its own
-   * fragment. Events, alarms, inventory and commands are not measurements and are
-   * not counted here.
+   * travelling alone. A series is alone when no other shares its interval,
+   * since only a shared tick can share a message. Events, alarms, inventory and
+   * commands are not measurements and are not counted here.
    */
   measurementTypes: number;
   /** Distinct sampling intervals, in seconds, fastest first. */
@@ -65,7 +64,7 @@ export interface MachineTypeSummary {
 }
 
 /** The order the wizard asks for them in, so the summary reads in step order. */
-const KIND_ORDER: MetricKind[] = ['continuous', 'state', 'occurrence', 'condition', 'inventory', 'command'];
+const KIND_ORDER: MetricKind[] = ['continuous', 'occurrence', 'condition', 'inventory', 'command'];
 
 const ELEMENT_OF: Array<{ element: SummaryElement['element']; keys: Array<keyof Counters> }> = [
   { element: 'Measurements', keys: ['measurementsCreated'] },
@@ -100,10 +99,9 @@ export function machineTypeSummary(
     machines: machineType.machineCount,
     online,
     datapoints: machineType.metrics.length,
-    measurementTypes:
-      bundles.filter((b) => b.members.length > 0).length +
-      loneContinuous.length +
-      machineType.metrics.filter((m) => m.kind === 'state').length,
+    // Every measurement type is now either a bundle with members or a series
+    // travelling alone; there is no third case since flags stopped being one.
+    measurementTypes: bundles.filter((b) => b.members.length > 0).length + loneContinuous.length,
     intervals: intervalsOf(machineType),
     parts,
     elements,

@@ -75,11 +75,15 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 
 - A **series** is one named value over time (the industry says "datapoint"). A **measurement type**
   is the fragment carrying a set of series under one timestamp.
-- A state/flag is a measurement with one series; only what decides the timestamp differs. The engine
-  still separates `continuous` from `state` because a state cannot join an interval bundle
-  (CONCEPT.md §4.4), but the UI presents one table with a rhythm column.
-- The metric kinds are `continuous | state | occurrence | condition | inventory | command`. `'fact'`
-  was the old name for `inventory` and is still accepted on load.
+- **There is one rhythm.** A status or flag is a series read on an interval like any other; the
+  `state` kind and its on-change cadence are gone (CONCEPT.md §4.4). `normalise` converts a saved
+  one, `perDay` becoming `86400 / perDay` seconds, so the message count is untouched — get that
+  conversion wrong and a reloaded scenario is quoted at seventy times its volume.
+- What replaced the structural guarantee is **L2**: a warning when a series whose name reads as a
+  status is sampled faster than every 15 minutes. `looksLikeFlag` in `lib/engine/types.ts` is the
+  predicate, and it reads the name, so it is advice — no figure depends on it.
+- The metric kinds are `continuous | occurrence | condition | inventory | command`. `'fact'` was the
+  old name for `inventory`, `'state'` the old flag kind; both are still accepted on load.
 
 ## Strings, and the two languages
 

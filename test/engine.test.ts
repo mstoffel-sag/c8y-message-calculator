@@ -105,18 +105,26 @@ describe('CONCEPT.md section 9 - 1,000 rooftop HVAC units', () => {
     assert.equal(february.total, 41_528_000);
   });
 
-  test('the naive baseline is 267,937,000 in the 31-day month', () => {
+  test('the naive baseline is 179,897,000 in the 31-day month', () => {
+    // It was 267,937,000 while the baseline had two clauses: every series in
+    // its own measurement, AND every flag interval-sampled at the fleet's
+    // fastest tick. The second went with the on-change rhythm -- there are no
+    // flags to re-sample, only series read at the rate they were given -- so
+    // the counterfactual is smaller and the argument is the bundling alone.
     const january = monthOf(result, 1);
-    assert.equal(january.naiveTotal - january.onboardingCreates, 267_937_000);
+    assert.equal(january.naiveTotal - january.onboardingCreates, 179_897_000);
   });
 
-  test('the delta is 221,960,000 -- 5.8x, 83 %', () => {
+  test('the delta is 133,920,000 -- 3.9x, 74 %', () => {
     const january = monthOf(result, 1);
     const designed = january.total - january.onboardingCreates;
     const naive = january.naiveTotal - january.onboardingCreates;
-    assert.equal(naive - designed, 221_960_000);
-    assert.equal(Number((naive / designed).toFixed(1)), 5.8);
-    assert.equal(Math.round((1 - designed / naive) * 100), 83);
+    // Exactly the four climate readings: 3 x 44,640 x 1,000 saved by putting
+    // them in one measurement instead of four.
+    assert.equal(naive - designed, 133_920_000);
+    assert.equal(naive - designed, 3 * 44_640 * 1000);
+    assert.equal(Number((naive / designed).toFixed(1)), 3.9);
+    assert.equal(Math.round((1 - designed / naive) * 100), 74);
   });
 
   test('the same fleet spans an 11 % range on month length alone', () => {
@@ -287,25 +295,57 @@ describe('lint rules', () => {
     assert.equal(findings.filter((f) => f.rule === 'L1').length, 0);
   });
 
-  test('L3 is an error, and L2 quantifies the same mistake', () => {
+  test('L3 is an error: only a measurement belongs in a measurement type', () => {
+    // Unreachable through the UI, which offers bundling for series only --
+    // an imported scenario is the way in.
     const findings = lintScenario(
       withMetrics(
         [
           { id: 'a', name: 'Temp', unit: 'C', kind: 'continuous', cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'climate', bundleId: 'bun' },
-          { id: 'f', name: 'Compressor on/off', unit: '', kind: 'state', cadence: { mode: 'onChange', perDay: 20 }, semanticGroup: 'status', bundleId: 'bun' },
+          { id: 'e', name: 'Door opened', unit: '', kind: 'occurrence', cadence: { mode: 'onChange', perDay: 20 }, semanticGroup: 'access', bundleId: 'bun' },
         ],
-        [{ id: 'bun', fragmentName: 'acme_Climate', intervalSeconds: 60, metricIds: ['a', 'f'] }],
+        [{ id: 'bun', fragmentName: 'acme_Climate', intervalSeconds: 60, metricIds: ['a', 'e'] }],
       ),
     );
     const l3 = must(findings.find((f) => f.rule === 'L3'), 'expected L3');
     assert.equal(l3.severity, 'error');
     assert.equal(findings[0]!.rule, 'L3', 'errors sort first');
+  });
 
-    const l2 = must(
-      findings.find((f) => f.rule === 'L2'),
-      'a flag changing 20x a day sampled every 60 s is 72x too fast',
+  test('L2 catches a status being polled, which is the mistake one rhythm invites', () => {
+    // With the on-change rhythm gone, a flag can only be expressed as an
+    // interval -- so the way to get it wrong is to leave it on the fleet's
+    // tick, and this is the only place left that says so.
+    const findings = lintScenario(
+      withMetrics(
+        [
+          { id: 'a', name: 'Temp', unit: 'C', kind: 'continuous', cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'climate', bundleId: 'bun' },
+          { id: 'f', name: 'Compressor on/off', unit: '', kind: 'continuous', cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'status', bundleId: 'bun' },
+        ],
+        [{ id: 'bun', fragmentName: 'acme_Climate', intervalSeconds: 60, metricIds: ['a', 'f'] }],
+      ),
     );
-    assert.ok(l2.messageDelta! < 0);
+    const l2 = must(findings.find((f) => f.rule === 'L2'), 'expected L2');
+    assert.equal(l2.severity, 'warning');
+    assert.deepEqual(l2.metricIds, ['f'], 'the status, not the temperature beside it');
+
+    // It reads the name and the missing unit, so a real reading on the same
+    // tick is left alone however fast it is.
+    const quiet = lintScenario(
+      withMetrics(
+        [{ id: 'a', name: 'Temp', unit: 'C', kind: 'continuous', cadence: { mode: 'interval', seconds: 1 }, semanticGroup: 'climate', bundleId: 'bun' }],
+        [{ id: 'bun', fragmentName: 'acme_Fast', intervalSeconds: 1, metricIds: ['a'] }],
+      ),
+    );
+    assert.equal(quiet.filter((f) => f.rule === 'L2').length, 0);
+
+    // And a status on a believable interval is not nagged about: the preset's
+    // flags sit at 72 minutes, which is what the rule is asking for.
+    assert.equal(
+      lintScenario(conceptSection9Scenario()).filter((f) => f.rule === 'L2').length,
+      0,
+      'the §9 fleet models its flags properly and should stay clean',
+    );
   });
 
   test('L4 fires below one second', () => {
@@ -1192,8 +1232,9 @@ describe('retention is a rule per measurement type', () => {
           metrics: [
             ...s.machineTypes[0]!.metrics,
             {
-              id: 'flag', name: 'Running', unit: '', kind: 'state',
-              cadence: { mode: 'onChange', perDay: 1 },
+              id: 'flag', name: 'Running', unit: '', kind: 'continuous',
+              // One reading a day, in a measurement type of its own.
+              cadence: { mode: 'interval', seconds: 86_400 },
               semanticGroup: '', retentionDays: 365,
             },
           ],

@@ -120,22 +120,6 @@ export function measurementView(
     });
   }
 
-  for (const metric of machineType.metrics) {
-    if (metric.kind !== 'state') continue;
-    const perDay = metric.cadence.mode === 'onChange' ? metric.cadence.perDay : 0;
-    groups.push({
-      id: metric.id,
-      fragmentName: ownFragmentName(prefix, metric),
-      intervalSeconds: undefined,
-      shared: false,
-      timed: false,
-      members: [member(metric)],
-      hiddenMembers: 0,
-      seriesCount: 1,
-      messagesPerMonth: perDay * REFERENCE_DAYS,
-    });
-  }
-
   const capped = capRows(groups, maxMembers, maxRows);
 
   return {

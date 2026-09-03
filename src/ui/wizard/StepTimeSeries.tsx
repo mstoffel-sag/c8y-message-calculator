@@ -30,7 +30,7 @@ import {
   fragmentNameFor,
   measurementView,
   perMonthEquivalent,
-  proposalIsApplied,
+  proposalApplied,
   proposeBundles,
   type MachineType,
   type Metric,
@@ -48,7 +48,6 @@ import {
   setCadence,
   patchUnit,
   setDatapointName,
-  setRhythm,
   setSeriesFragmentName,
   setMetricRetentionDays,
   setInterval as setMetricInterval,
@@ -86,12 +85,6 @@ const nameOptions = (seeds: typeof DATAPOINTS, prompt: string) => [
  * prevent.
  */
 const SERIES_SEEDS = [...DATAPOINTS, ...STATES];
-
-/** What decides the timestamp. The whole difference, asked once per row. */
-const RHYTHMS = [
-  { value: 'interval' as const, labelKey: 'series.rhythm.interval' as const },
-  { value: 'onChange' as const, labelKey: 'series.rhythm.onChange' as const },
-];
 
 export function StepTimeSeries({ scenario, onChange }: Props) {
   const t = useT();
@@ -155,16 +148,21 @@ function MachineBlock({
   machineType: mt, scenario, onChange, collapse,
 }: Props & { machineType: MachineType; collapse: Collapse }) {
   const t = useT();
-  // Both rhythms, one list: everything this machine measures.
-  const series = mt.metrics.filter((m) => m.kind === 'continuous' || m.kind === 'state');
+  // Everything this machine measures. One kind now, so one filter.
+  const series = mt.metrics.filter((m) => m.kind === 'continuous');
   const proposals = proposeBundles(mt, scenario.settings.fragmentPrefix);
-  const applied = proposalIsApplied(mt);
+  // Only the groupings still on offer: a fleet can be half-grouped, and
+  // counting a saving already banked into the "apply this" figure overstates
+  // it by whatever is already bundled.
+  const pending = proposals.filter((p) => !proposalApplied(mt, p));
+  const applied = pending.length === 0;
+  const shown = applied ? proposals : pending;
 
   const prefix = scenario.settings.fragmentPrefix;
   const defaultRetention = scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
   const view = measurementView(mt, prefix);
-  const apart = proposals.reduce((s, p) => s + p.messagesApart, 0);
-  const together = proposals.reduce((s, p) => s + p.messagesTogether, 0);
+  const apart = shown.reduce((s, p) => s + p.messagesApart, 0);
+  const together = shown.reduce((s, p) => s + p.messagesTogether, 0);
   const saving = (apart - together) * mt.machineCount * (mt.onlinePct / 100);
 
   return (
@@ -192,7 +190,6 @@ function MachineBlock({
             </thead>
             <tbody>
               {series.map((metric) => {
-                const timed = metric.kind === 'continuous';
                 const seconds = metric.cadence.mode === 'interval' ? metric.cadence.seconds : 60;
                 const bundle = mt.bundles.find((b) => b.id === metric.bundleId);
                 const siblings = mt.bundles.filter((b) => b.intervalSeconds === seconds);
@@ -223,47 +220,19 @@ function MachineBlock({
                       />
                     </td>
                     <td>
-                      <Choice
-                        value={timed ? 'interval' : 'onChange'}
-                        allowOther={false}
-                        options={RHYTHMS}
-                        onChange={(rhythm) => onChange(setRhythm(scenario, mt.id, metric.id, rhythm))}
+                      <Duration
+                        seconds={seconds}
+                        prefix={t('every.prefix')}
+                        hint={t('series.samplesPerMonth', { count: compact(2_678_400 / seconds) })}
+                        onChange={(s) => onChange(setMetricInterval(scenario, mt.id, metric.id, s))}
                       />
-                      <div style="margin-top:5px">
-                        {timed ? (
-                          <Duration
-                            seconds={seconds}
-                            prefix={t('every.prefix')}
-                            hint={t('series.samplesPerMonth', { count: compact(2_678_400 / seconds) })}
-                            onChange={(s) => onChange(setMetricInterval(scenario, mt.id, metric.id, s))}
-                          />
-                        ) : (
-                          <Every
-                            cadence={metric.cadence}
-                            kind="state"
-                            hint={t('series.messagesPerMonth', {
-                              count: nf1.format(perMonthEquivalent(metric.cadence)),
-                            })}
-                            onChange={(cadence) => onChange(setCadence(scenario, mt.id, metric.id, cadence))}
-                          />
-                        )}
-                      </div>
                     </td>
                     <td>
-                      {/* An on-change series has nothing to choose between: its
-                          timestamp is the moment the value moved, so no tick can
-                          carry it and no other series can share the message. It
-                          still has a measurement type, though, and the customer
-                          still gets to name it. */}
-                      {!timed ? (
-                        <Solo
-                          metric={metric}
-                          prefix={prefix}
-                          hint={t('series.solo.onChange')}
-                          onChange={(name) => onChange(setSeriesFragmentName(scenario, mt.id, metric.id, name))}
-                        />
-                      ) : (
-                        <>
+                      {/* Every row has a measurement type to choose now: with
+                          one rhythm, anything sharing a tick can share a
+                          message, so nothing is excluded from a bundle on
+                          principle. */}
+                      <>
                           <Choice
                             value={metric.bundleId ?? ''}
                             allowOther={false}
@@ -319,15 +288,14 @@ function MachineBlock({
                           ) : (
                             <div class="hint" style="margin:3px 0 0">{t('series.sameMessage')}</div>
                           )}
-                        </>
-                      )}
+                      </>
                     </td>
                     <td>
                       {/* The rule belongs to the type, so the row that names
                           the type is the row that sets it -- a bundled series
                           is kept for as long as its bundle, whatever any
                           earlier scenario put on the metric. */}
-                      {timed && bundle ? (
+                      {bundle ? (
                         names ? (
                           <Retention
                             days={bundle.retentionDays}
@@ -388,11 +356,11 @@ function MachineBlock({
           <div>
             <b>
               {applied
-                ? t.plural('series.bundled', proposals.length)
-                : t.plural('series.suggestion', proposals.length)}
+                ? t.plural('series.bundled', shown.length)
+                : t.plural('series.suggestion', shown.length)}
             </b>
             <div class="hint" style="margin-top:4px">
-              {proposals.map((p) => (
+              {shown.map((p) => (
                 <div key={p.intervalSeconds}>
                   <code>{p.fragmentName}</code> &middot; {fmtInterval(p.intervalSeconds)} &middot;{' '}
                   {t('series.proposalLine', {

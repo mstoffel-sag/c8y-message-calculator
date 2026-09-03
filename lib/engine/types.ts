@@ -8,10 +8,17 @@
 
 import type { Key, Params } from '../i18n/index.js';
 
-/** The six kinds a customer picks from. CONCEPT.md section 5, the kind selector. */
+/**
+ * The five kinds a customer picks from. CONCEPT.md section 5, the kind selector.
+ *
+ * `'state'` was a sixth: a flag or status sent at the moment its value moved,
+ * rather than on a tick. It is gone, and a series is a series -- everything in
+ * the measurements table is sampled on an interval. A saved scenario carrying
+ * one is converted on load (`normalise`), its change rate becoming the interval
+ * that sends the same number of messages, so no figure moves.
+ */
 export type MetricKind =
   | 'continuous'
-  | 'state'
   | 'occurrence'
   | 'condition'
   | 'inventory'
@@ -44,7 +51,6 @@ export type Cadence =
  */
 export const CADENCE_FOR_KIND: Record<MetricKind, Array<Cadence['mode']>> = {
   continuous: ['interval'],
-  state: ['onChange'],
   occurrence: ['onChange'],
   condition: ['onChange'],
   inventory: ['perMonth', 'onChange'],
@@ -254,6 +260,24 @@ export function zeroCounters(): Counters {
     operationsCreated: 0,
     operationsUpdated: 0,
   };
+}
+
+/**
+ * Whether a series reads as a flag or a status rather than a reading.
+ *
+ * There used to be a kind for this and there is not one any more, so the only
+ * evidence left is the name and the absence of a unit. That is enough for the
+ * two things it is used for -- showing 0/1 in a payload example, and warning
+ * when a status is being sampled on a fast tick (L2) -- and both of those are
+ * advice, so a false negative costs a missed hint rather than a wrong figure.
+ *
+ * Deliberately not a catalogue lookup: a customer types their own names, and
+ * "Valve open/closed" should be recognised whether or not it is in the list.
+ */
+const FLAG_NAME = /\bon\s*\/\s*off\b|\bopen\s*\/\s*closed\b|status|\bstate\b|\bmode\b|occupancy|\benabled\b|\bpresent\b/i;
+
+export function looksLikeFlag(metric: Metric): boolean {
+  return metric.unit.trim() === '' && FLAG_NAME.test(metric.name);
 }
 
 export function addCounters(into: Counters, from: Counters): Counters {

@@ -319,7 +319,7 @@ function designSheet(scenario: Scenario): Sheet {
 
     // Everything that is not a measurement: one message each, nothing to group.
     for (const metric of mt.metrics) {
-      if (metric.kind === 'continuous' || metric.kind === 'state') continue;
+      if (metric.kind === 'continuous') continue;
       rows.push(
         row(r++, [
           text(1, ''),

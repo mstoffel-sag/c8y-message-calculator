@@ -81,6 +81,14 @@ export function proposeBundles(machineType: MachineType, prefix: string): Bundle
   const monthSeconds = 31 * SECONDS_PER_DAY;
   return [...byInterval.entries()]
     .sort((a, b) => a[0] - b[0])
+    // Only intervals with more than one series, as the contract above says: a
+    // lone reading costs one message per sample whether or not the tool mints
+    // a type for it, so proposing one is a suggestion that changes nothing.
+    // The filter was missing and did not show, because a series sitting alone
+    // used to be rare -- a flag was its own kind and never came through here.
+    // With one rhythm every ex-flag arrives as a lone series, and the banner
+    // filled up with advice worth nothing.
+    .filter(([, metrics]) => metrics.length > 1)
     .map(([intervalSeconds, metrics]) => {
       const sends = monthSeconds / intervalSeconds;
       return {
@@ -94,21 +102,40 @@ export function proposeBundles(machineType: MachineType, prefix: string): Bundle
 }
 
 /**
- * True when every continuous metric already sits in a bundle whose interval
- * matches its own -- i.e. the proposal has nothing left to offer.
+ * True when this one proposal's series already share a measurement type of
+ * their own -- so it has nothing left to offer.
+ *
+ * Needed per proposal, not just per machine type, because a fleet can be
+ * half-grouped: the §9 HVAC unit has its four climate readings bundled and its
+ * two 72-minute statuses not. Summing the saving across every proposal in that
+ * state offered "apply this and save 134.5 M" when 133.9 M of it was already
+ * banked, which is the kind of number a customer repeats in a meeting.
  */
-export function proposalIsApplied(machineType: MachineType): boolean {
-  const { loneContinuous, bundles } = resolveBundles(machineType);
-  if (loneContinuous.length > 0) return false;
-  const intervals = new Set<number>();
-  for (const { bundle, members } of bundles) {
-    if (members.length === 0) continue;
-    // Two bundles on the same interval means a deliberate split; that is fine,
-    // but it is not the untouched proposal either.
-    if (intervals.has(bundle.intervalSeconds)) return false;
-    intervals.add(bundle.intervalSeconds);
-  }
-  return true;
+export function proposalApplied(machineType: MachineType, proposal: BundleProposal): boolean {
+  const ids = new Set(proposal.metrics.map((m) => m.id));
+  const homes = new Set(proposal.metrics.map((m) => m.bundleId ?? null));
+  if (homes.size !== 1) return false;
+  const [only] = [...homes];
+  if (only === null) return false;
+  const bundle = machineType.bundles.find((b) => b.id === only);
+  // Exactly these series and no others: a bundle carrying a seventh would be a
+  // different design, not this proposal.
+  return bundle !== undefined
+    && bundle.metricIds.length === ids.size
+    && bundle.metricIds.every((id) => ids.has(id));
+}
+
+/**
+ * True when every grouping the tool would propose is already in place.
+ *
+ * Defined in terms of the proposals rather than by walking the bundles, so it
+ * cannot disagree with what the banner offers. It used to answer false whenever
+ * any series sat alone, which stopped being the same question once a lone
+ * series became ordinary rather than a flag that could not be bundled.
+ */
+export function proposalIsApplied(machineType: MachineType, prefix = 'acme'): boolean {
+  const proposals = proposeBundles(machineType, prefix);
+  return proposals.every((p) => proposalApplied(machineType, p));
 }
 
 /**

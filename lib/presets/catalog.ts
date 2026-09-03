@@ -178,6 +178,12 @@ export const DATAPOINTS: DatapointSeed[] = [
 ];
 
 /** Values that hold steady and then move. */
+/**
+ * Flags and statuses. Still their own group so the dropdown keeps them
+ * together, but no longer a kind of their own: each is a series sampled on an
+ * interval like every other, and the interval a customer gives it is how often
+ * they intend to read it.
+ */
 export const STATES: DatapointSeed[] = [
   { name: 'On/off', unit: '', group: 'Status' },
   { name: 'Compressor on/off', unit: '', group: 'Status' },
@@ -243,7 +249,6 @@ export const COMMANDS: DatapointSeed[] = [
 export function catalogFor(kind: string): DatapointSeed[] {
   switch (kind) {
     case 'continuous': return DATAPOINTS;
-    case 'state': return STATES;
     case 'occurrence': return EVENTS;
     case 'condition': return ALARMS;
     case 'inventory': return INVENTORY;

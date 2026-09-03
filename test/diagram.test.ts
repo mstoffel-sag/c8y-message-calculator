@@ -14,7 +14,7 @@ import { blankMachineType, presetByKey } from '../lib/presets/index.js';
 import { DG, boxFor, canvasHeight, rowCentre, rowSpans } from '../src/ui/MeasurementDiagram.js';
 
 describe('the view model', () => {
-  test('the HVAC unit is one shared bundle and two flags travelling alone', () => {
+  test('the HVAC unit is one shared bundle and two statuses on a slower tick', () => {
     const view = measurementView(presetByKey('hvac')!, 'acme');
     assert.equal(view.groups.length, 3);
 
@@ -28,21 +28,25 @@ describe('the view model', () => {
 
     for (const group of solo) {
       assert.equal(group.shared, false, `${group.fragmentName} should be alone`);
-      assert.equal(group.timed, false, 'flags are sent on change');
-      assert.equal(group.intervalSeconds, undefined, 'no interval to state');
-      assert.equal(group.messagesPerMonth, 620);
+      // Every group is timed now: a status is a series read on an interval,
+      // and 72 minutes is the interval this preset reads its two at.
+      assert.equal(group.timed, true);
+      assert.equal(group.intervalSeconds, 4320);
+      assert.equal(group.messagesPerMonth, 620, '2,678,400 / 4,320 -- what they cost as flags');
     }
   });
 
   test('shared bundles come first, fastest to slowest, then the loners', () => {
     const view = measurementView(presetByKey('gateway')!, 'acme');
-    const timed = view.groups.filter((g) => g.timed);
+    const shared = view.groups.filter((g) => g.shared);
     assert.deepEqual(
-      timed.map((g) => g.intervalSeconds),
+      shared.map((g) => g.intervalSeconds),
       [60, 300],
     );
-    // On-change groups sort last, so connectors never cross.
-    assert.equal(view.groups[view.groups.length - 1]?.timed, false);
+    // Series travelling alone sort last, so connectors never cross. They used
+    // to be identifiable by not being timed; everything is timed now, so what
+    // separates them is that nothing shares their measurement type.
+    assert.equal(view.groups[view.groups.length - 1]?.shared, false);
   });
 
   test('totals agree with the counters, and readings do not depend on grouping', () => {
@@ -65,10 +69,14 @@ describe('the view model', () => {
     );
   });
 
-  test('the naive baseline samples flags on the fastest tick in use', () => {
+  test('the naive baseline is every series in its own measurement, at its own rate', () => {
     const view = measurementView(presetByKey('hvac')!, 'acme');
-    // Four readings and two flags, all at 60 s: 6 x 44,640.
-    assert.equal(view.naiveMessagesPerMonth, 44_640 * 6);
+    // Four climate readings at 60 s, unbundled, plus the two statuses that were
+    // already alone: 4 x 44,640 + 2 x 620. The baseline used to add a second
+    // clause -- every flag interval-sampled at the fleet's fastest tick -- and
+    // that clause went with the on-change rhythm, so it is 4x the bundle rather
+    // than 6x. The saving the tool argues for is the bundling, which is intact.
+    assert.equal(view.naiveMessagesPerMonth, 44_640 * 4 + 620 * 2);
     assert.ok(view.naiveMessagesPerMonth > view.messagesPerMonth);
   });
 
@@ -100,7 +108,7 @@ describe('the view model', () => {
     const view = measurementView(hvac, 'acme');
     const drawn = view.groups.flatMap((g) => g.members.map((m) => m.metricId));
     for (const metric of hvac.metrics) {
-      const isMeasurement = metric.kind === 'continuous' || metric.kind === 'state';
+      const isMeasurement = metric.kind === 'continuous';
       assert.equal(
         drawn.includes(metric.id),
         isMeasurement,
@@ -144,8 +152,9 @@ describe('a very wide bundle still draws', () => {
 
   test('many separate measurements each keep a row', () => {
     const metrics = Array.from({ length: 20 }, (_, i) => ({
-      id: `m${i}`, name: `Solo ${i}`, unit: '', kind: 'state' as const,
-      cadence: { mode: 'onChange' as const, perDay: 1 }, semanticGroup: '', bundleId: null,
+      id: `m${i}`, name: `Solo ${i}`, unit: '', kind: 'continuous' as const,
+      // One a day, as an interval: 86,400 s.
+      cadence: { mode: 'interval' as const, seconds: 86_400 }, semanticGroup: '', bundleId: null,
     }));
     const view = measurementView({ ...blankMachineType('Flags'), metrics }, 'acme');
     assert.equal(view.groups.length, 20, 'every measurement stays visible');

@@ -52,7 +52,6 @@ function cadenceFor(seed: MetricSeed): Metric['cadence'] {
   switch (seed.kind) {
     case 'continuous':
       return { mode: 'interval', seconds: seed.interval ?? 60 };
-    case 'state':
     case 'occurrence':
     case 'condition':
       return { mode: 'onChange', perDay: seed.perDay ?? 1 };
@@ -118,8 +117,8 @@ export const SEEDS: Seed[] = [
       { name: 'Humidity', unit: '%', kind: 'continuous', semanticGroup: 'climate', interval: 60, bundle: 'acme_Climate' },
       { name: 'CO2', unit: 'ppm', kind: 'continuous', semanticGroup: 'climate', interval: 60, bundle: 'acme_Climate' },
       { name: 'Pressure', unit: 'Pa', kind: 'continuous', semanticGroup: 'climate', interval: 60, bundle: 'acme_Climate' },
-      { name: 'Compressor on/off', unit: '', kind: 'state', semanticGroup: 'status', perDay: 20 },
-      { name: 'Filter status', unit: '', kind: 'state', semanticGroup: 'status', perDay: 20 },
+      { name: 'Compressor on/off', unit: '', kind: 'continuous', semanticGroup: 'status', interval: 4320 },
+      { name: 'Filter status', unit: '', kind: 'continuous', semanticGroup: 'status', interval: 4320 },
       { name: 'Service event', unit: '', kind: 'occurrence', semanticGroup: 'service', perDay: 1 },
       { name: 'Fault condition', unit: '', kind: 'condition', semanticGroup: 'fault', perDay: 0.5 },
       { name: 'Firmware and config', unit: '', kind: 'inventory', semanticGroup: 'identity', perDay: 1 },
@@ -176,7 +175,7 @@ export const SEEDS: Seed[] = [
       { name: 'Cycle time', unit: 's', kind: 'continuous', semanticGroup: 'production', interval: 60, bundle: 'acme_LineSummary' },
       { name: 'CPU load', unit: '%', kind: 'continuous', semanticGroup: 'gateway health', interval: 300, bundle: 'acme_GatewayHealth' },
       { name: 'Memory used', unit: '%', kind: 'continuous', semanticGroup: 'gateway health', interval: 300, bundle: 'acme_GatewayHealth' },
-      { name: 'Uplink state', unit: '', kind: 'state', semanticGroup: 'status', perDay: 4 },
+      { name: 'Uplink state', unit: '', kind: 'continuous', semanticGroup: 'status', interval: 21600 },
       { name: 'Firmware update', unit: '', kind: 'command', semanticGroup: 'control', perMonth: 0.5, transitions: 3 },
       { name: 'Inventory sync', unit: '', kind: 'inventory', semanticGroup: 'identity', perMonth: 1 },
     ],
@@ -194,7 +193,7 @@ export const SEEDS: Seed[] = [
       { name: 'Motor current', unit: 'A', kind: 'continuous', semanticGroup: 'process', interval: 10, bundle: 'acme_Process' },
       { name: 'Coolant temp', unit: 'C', kind: 'continuous', semanticGroup: 'process', interval: 10, bundle: 'acme_Process' },
       { name: 'Vibration', unit: 'mm/s', kind: 'continuous', semanticGroup: 'process', interval: 10, bundle: 'acme_Process' },
-      { name: 'Machine mode', unit: '', kind: 'state', semanticGroup: 'status', perDay: 12 },
+      { name: 'Machine mode', unit: '', kind: 'continuous', semanticGroup: 'status', interval: 7200 },
       { name: 'Part completed', unit: '', kind: 'occurrence', semanticGroup: 'production', perDay: 480 },
       { name: 'Tool wear alarm', unit: '', kind: 'condition', semanticGroup: 'fault', perDay: 2 },
       { name: 'Recipe change', unit: '', kind: 'command', semanticGroup: 'control', perDay: 1, transitions: 3 },

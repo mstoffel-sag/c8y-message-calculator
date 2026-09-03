@@ -66,23 +66,24 @@ describe('the wizard renders', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /one timestamp/i);
     assert.match(html, /acme_Climate/);
-    assert.match(html, /When it changes/, 'both rhythms live in the one table');
+    assert.doesNotMatch(html, /When it changes|On a timer/, 'there is one rhythm, so it is not asked');
     assert.match(html, /Readings per measurement/, 'the interactive explainer is on this step');
   });
 
-  test('series: asks the rhythm, and asks it once per series', () => {
+  test('series: asks how often once per row, and nothing about rhythm', () => {
     const html = render(<StepTimeSeries {...props} />);
-    // One table, six rows: the four timed readings and the two flags, which are
-    // measurements with one series each and not a different kind of thing.
+    // One table, six rows: four climate readings and two statuses, which are
+    // series like the rest and not a different kind of thing.
     const rows = html.match(/<tr><td>/g) ?? [];
     assert.equal(rows.length, 6, `${rows.length} rows`);
-    assert.equal((html.match(/On a timer/g) ?? []).length, 6, 'every row is asked');
     assert.doesNotMatch(html, /States and flags/, 'and none of them has a section of its own');
-    // The flags still travel alone -- the row says so instead of offering a
-    // measurement type to join -- but the type they send in is still named, and
-    // the name is still theirs to change.
-    assert.match(html, /nothing can share an on-change timestamp/);
+    // Every row gets the interval control, and there is no second dropdown
+    // above it deciding what the number means.
+    assert.equal((html.match(/>every</g) ?? []).length, 6, 'every row is asked how often');
+    // The statuses still travel alone, and the type they send in is still
+    // theirs to name -- they are simply read on a slower tick now.
     assert.match(html, /placeholder="acme_CompressorOnOff"/);
+    assert.match(html, /72 min/, 'the interval the preset gives them');
   });
 
   test('series: makes every column a dropdown', () => {
@@ -151,8 +152,9 @@ describe('the wizard renders', () => {
     assert.match(html, /acme_Pressure · 1 series/);
     assert.match(html, /<input type="text" value="acme_Pressure"/);
     // The offer is gone from the row that took it, and still open to the three
-    // still sharing acme_Climate.
-    assert.equal((html.match(/A measurement type of its own/g) ?? []).length, 3);
+    // still sharing acme_Climate plus the two statuses, which are ordinary
+    // series now and so are offered the choice like everything else.
+    assert.equal((html.match(/A measurement type of its own/g) ?? []).length, 5);
   });
 
   test('series: lets the measurement type be renamed in the table', () => {
@@ -663,9 +665,9 @@ describe('machine types fold away', () => {
 
   test('the folded header carries the summary, not just the name', () => {
     const html = render(<StepTimeSeries scenario={two} onChange={noop} />);
-    assert.match(html, /4 time series, 2 on-change series, 1 event, 1 alarm, 1 inventory entry, 1 command/);
-    assert.match(html, /3 measurement types/, 'the two flags are measurements of their own');
-    assert.match(html, /every 1 min/, 'the sampling rhythm');
+    assert.match(html, /6 time series, 1 event, 1 alarm, 1 inventory entry, 1 command/);
+    assert.match(html, /3 measurement types/, 'the two statuses are types of their own');
+    assert.match(html, /every 1 min, every 72 min/, 'both ticks the machine uses');
     assert.match(html, /Measurements 45\.9 M/, 'the message mix by element');
     // compact() trims a trailing zero, so 45,977,000 is "46 M".
     assert.match(html, /<b>46 M<\/b>/, 'the number the summary exists for');

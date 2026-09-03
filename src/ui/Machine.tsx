@@ -25,13 +25,12 @@ import { useT } from './i18n.js';
 import type { Key, PluralBase, T } from '../../lib/i18n/index.js';
 
 /**
- * The catalogue key for each kind's noun. A flag is a series too -- one sent
- * when the value moves rather than on a tick -- so it is named as one; calling
- * it a "state" here said it was a different kind of thing.
+ * The catalogue key for each kind's noun. A flag is a series like any other,
+ * which is why there is no entry for one: it is named as a series, because that
+ * is now all it is.
  */
 const KIND_KEY: Record<MetricKind, PluralBase> = {
   continuous: 'kind.continuous',
-  state: 'kind.state',
   occurrence: 'kind.occurrence',
   condition: 'kind.condition',
   inventory: 'kind.inventory',
@@ -49,7 +48,6 @@ const ELEMENT_KEY: Record<SummaryElement['element'], Key> = {
 /** Which platform element a kind's messages land in. */
 const ELEMENT_FOR_KIND: Record<MetricKind, SummaryElement['element']> = {
   continuous: 'Measurements',
-  state: 'Measurements',
   occurrence: 'Events',
   condition: 'Alarms',
   inventory: 'Inventory',

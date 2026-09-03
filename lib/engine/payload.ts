@@ -7,7 +7,7 @@
  */
 
 import type { Key, Params } from '../i18n/index.js';
-import { type Bundle, type Metric, type MachineType } from './types.js';
+import { looksLikeFlag, type Bundle, type Metric, type MachineType } from './types.js';
 import { resolveBundles } from './compute.js';
 import { fragmentNameFor } from './bundling.js';
 
@@ -97,7 +97,9 @@ export function ownFragmentName(prefix: string, metric: Metric): string {
 }
 
 function exampleValue(metric: Metric, index: number): number {
-  if (metric.kind === 'state') return index % 2;
+  // A flag or status reads as 0/1 in a payload, which is worth showing even
+  // though the tool no longer has a kind for it.
+  if (looksLikeFlag(metric)) return index % 2;
   const unit = metric.unit.toLowerCase();
   if (unit.includes('c') || unit.includes('°')) return 21.4;
   if (unit === '%') return 63;
@@ -144,10 +146,19 @@ function bundleExample(bundle: Bundle, members: Metric[], prefix: string): Paylo
   };
 }
 
-function stateExample(metric: Metric, prefix: string): PayloadExample {
+/**
+ * One series travelling in a measurement type of its own.
+ *
+ * The title and note used to be overridden at the one call site, back when this
+ * also served on-change flags and needed a second pair for them.
+ */
+function soloExample(metric: Metric, prefix: string): PayloadExample {
   const name = ownFragmentName(prefix, metric);
   return {
-    titleKey: 'payload.title.onChange',
+    titleKey: 'payload.title.alone',
+    titleParams: {
+      seconds: metric.cadence.mode === 'interval' ? metric.cadence.seconds : '?',
+    },
     namespace: 'measurement fragment',
     name,
     seriesCount: 1,
@@ -155,7 +166,7 @@ function stateExample(metric: Metric, prefix: string): PayloadExample {
     restBody: measurementBody(name, [metric]),
     mqttTopic: 'measurement/measurements/create',
     mqttBody: measurementBody(name, [metric]),
-    noteKeys: ['payload.note.state'],
+    noteKeys: ['payload.note.alone'],
   };
 }
 
@@ -232,16 +243,10 @@ export function payloadsFor(machineType: MachineType, prefix = 'acme'): PayloadE
   }
   for (const metric of loneContinuous) {
     out.push({
-      ...stateExample(metric, prefix),
-      titleKey: 'payload.title.alone',
-      titleParams: {
-        seconds: metric.cadence.mode === 'interval' ? metric.cadence.seconds : '?',
-      },
-      noteKeys: ['payload.note.alone'],
+      ...soloExample(metric, prefix),
     });
   }
   for (const metric of machineType.metrics) {
-    if (metric.kind === 'state') out.push(stateExample(metric, prefix));
     if (metric.kind === 'occurrence') out.push(eventExample(metric, prefix));
     if (metric.kind === 'condition') out.push(alarmExample(metric, prefix));
     if (metric.kind === 'inventory') out.push(inventoryExample(metric, prefix));

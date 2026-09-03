@@ -24,6 +24,7 @@ import {
   measurementView,
   payloadsFor,
   periodMonthsCell,
+  proposalApplied,
   proposalIsApplied,
   proposeBundles,
   resolveBundles,
@@ -66,7 +67,12 @@ describe('bundle proposal', () => {
     const before = computeMachineTypeMonth(loose, 1, 31);
     const after = computeMachineTypeMonth(tight, 1, 31);
 
-    assert.equal(before.counters.measurementsCreated - after.counters.measurementsCreated, 3 * 44_640);
+    // Three of the four climate readings stop being their own message, and one
+    // of the two 72-minute statuses joins the other: 3 x 44,640 + 620.
+    assert.equal(
+      before.counters.measurementsCreated - after.counters.measurementsCreated,
+      3 * 44_640 + 620,
+    );
     assert.equal(before.storedValues, after.storedValues, 'identical information either way');
   });
 
@@ -81,9 +87,56 @@ describe('bundle proposal', () => {
     assert.equal(twice.bundles.length, once.bundles.length);
   });
 
-  test('the untouched preset is already the proposal', () => {
-    assert.equal(proposalIsApplied(presetByKey('hvac')!), true);
+  test('the untouched preset has one grouping left to offer', () => {
+    // It used to be exactly the proposal. It no longer is, and the reason is
+    // worth stating: its two statuses are both read every 72 minutes, and two
+    // series on one tick can share a message -- which was impossible while a
+    // flag was its own kind that could not join a bundle. So the tool now
+    // offers to merge them, worth 620 messages a machine a month.
+    //
+    // The preset is deliberately left alone: §9's figures are the engine's
+    // acceptance baseline and are documented as such, and this suggestion is
+    // the customer's to take.
+    assert.equal(proposalIsApplied(presetByKey('hvac')!), false);
     assert.equal(proposalIsApplied(unbundled()), false);
+
+    const proposals = proposeBundles(presetByKey('hvac')!, 'acme');
+    assert.deepEqual(proposals.map((p) => p.intervalSeconds), [60, 4320]);
+    assert.equal(proposals[1]!.messagesApart - proposals[1]!.messagesTogether, 620);
+  });
+
+  test('a half-grouped fleet is offered only what it has not banked', () => {
+    // The banner used to sum every proposal's saving whether or not it was
+    // already in place, so the preset offered "apply and save 134.5 M" when
+    // 133.9 M of that was the climate bundle it already had.
+    const hvac = presetByKey('hvac')!;
+    const proposals = proposeBundles(hvac, 'acme');
+    const [climate, statuses] = proposals;
+
+    assert.equal(proposalApplied(hvac, climate!), true, 'the 60 s bundle is in place');
+    assert.equal(proposalApplied(hvac, statuses!), false, 'the two statuses are not');
+
+    const pending = proposals.filter((p) => !proposalApplied(hvac, p));
+    const saving = pending.reduce((s, p) => s + (p.messagesApart - p.messagesTogether), 0);
+    assert.equal(saving, 620, 'per machine per month, and not 134,540');
+  });
+
+  test('a bundle carrying a series the proposal does not name is not that proposal', () => {
+    // Exactly these members, or it is a different design.
+    const hvac = presetByKey('hvac')!;
+    const [climate] = proposeBundles(hvac, 'acme');
+    const widened = {
+      ...hvac,
+      metrics: hvac.metrics.map((m) =>
+        m.name === 'Compressor on/off' ? { ...m, bundleId: hvac.bundles[0]!.id } : m,
+      ),
+      bundles: hvac.bundles.map((b) =>
+        b.id === hvac.bundles[0]!.id
+          ? { ...b, metricIds: [...b.metricIds, hvac.metrics.find((m) => m.name === 'Compressor on/off')!.id] }
+          : b,
+      ),
+    };
+    assert.equal(proposalApplied(widened, climate!), false);
   });
 
   test('a renamed fragment survives re-applying', () => {
@@ -159,7 +212,9 @@ describe('bundle proposal', () => {
   });
 
   test('intervalsOf reports what the customer actually chose', () => {
-    assert.deepEqual(intervalsOf(presetByKey('gateway')!), [60, 300]);
+    // The gateway's uplink state is read every 6 h, and that is a tick like
+    // any other now, so it appears here beside the two bundles.
+    assert.deepEqual(intervalsOf(presetByKey('gateway')!), [60, 300, 21_600]);
   });
 });
 
@@ -340,7 +395,7 @@ describe('scenario normalisation', () => {
 describe('the catalogue behind the dropdowns', () => {
   test('every kind offers options, and names are unique within a kind', async () => {
     const { catalogFor } = await import('../lib/presets/catalog.js');
-    for (const kind of ['continuous', 'state', 'occurrence', 'condition', 'inventory', 'command']) {
+    for (const kind of ['continuous', 'occurrence', 'condition', 'inventory', 'command']) {
       const seeds = catalogFor(kind);
       assert.ok(seeds.length >= 8, `${kind} offers only ${seeds.length}`);
       const names = seeds.map((s) => s.name);
@@ -439,11 +494,11 @@ describe('a machine type in one line', () => {
     assert.equal(s.perMachine, 45_977);
   });
 
-  test('a state is its own measurement, so it counts as one', () => {
-    // Four series on one 60 s tick share a bundle; the two flags cannot join it
-    // without making its series set vary, so the machine sends three.
+  test('a series alone in its type still counts as a type', () => {
+    // Four readings on one 60 s tick share a bundle; the two statuses are read
+    // every 72 min, which no bundle here uses, so the machine sends three.
     const s = machineTypeSummary(hvac);
-    assert.deepEqual(s.intervals, [60]);
+    assert.deepEqual(s.intervals, [60, 4320], 'both ticks the customer chose');
     assert.equal(s.measurementTypes, 3);
     assert.equal(s.datapoints, 10);
   });
@@ -452,7 +507,7 @@ describe('a machine type in one line', () => {
     const s = machineTypeSummary(hvac);
     assert.deepEqual(
       s.parts.map((p) => `${p.count} ${p.kind}`),
-      ['4 continuous', '2 state', '1 occurrence', '1 condition', '1 inventory', '1 command'],
+      ['6 continuous', '1 occurrence', '1 condition', '1 inventory', '1 command'],
     );
   });
 
@@ -571,7 +626,9 @@ describe('a measurement type of its own', () => {
       after = assignOwnBundle(after, hvac.id, metric.id);
     }
     const bundles = after.machineTypes[0]!.bundles;
-    assert.equal(bundles.length, 4, 'four series, four types, and no husk of the shared one');
+    // Six series now -- the four climate readings plus the two statuses, which
+    // are ordinary series and so are in this loop too.
+    assert.equal(bundles.length, 6, 'six series, six types, and no husk of the shared one');
     assert.ok(bundles.every((b) => b.metricIds.length === 1));
   });
 
@@ -584,7 +641,7 @@ describe('a measurement type of its own', () => {
   });
 });
 
-describe('the two rhythms are one kind of thing', () => {
+describe('one rhythm, and what happens to a scenario that predates it', () => {
   const store = () => import('../src/ui/store.js');
   const fresh = async () => {
     const { blankScenario } = await import('../lib/presets/index.js');
@@ -592,80 +649,111 @@ describe('the two rhythms are one kind of thing', () => {
     return { scenario, hvac: scenario.machineTypes[0]! };
   };
 
-  test('switching a timed reading to on-change keeps its period and drops its type', async () => {
-    const { setRhythm } = await store();
-    const { scenario, hvac } = await fresh();
-    const temp = hvac.metrics.find((m) => m.name === 'Supply air temp')!;
-
-    const after = setRhythm(scenario, hvac.id, temp.id, 'onChange').machineTypes[0]!;
-    const moved = after.metrics.find((m) => m.id === temp.id)!;
-    assert.equal(moved.kind, 'state');
-    assert.equal(moved.cadence.mode, 'onChange');
-    // Sampled every 60 s, so "about every 60 s when it changes" -- 1,440 a day,
-    // not a default plucked out of the air.
-    assert.equal(moved.cadence.mode === 'onChange' ? moved.cadence.perDay : 0, 1440);
-    assert.equal(moved.bundleId, null, 'an on-change timestamp cannot share a tick');
-    assert.equal(after.bundles[0]?.metricIds.length, 3, 'it left acme_Climate');
+  /**
+   * The conversion that has to be exactly right.
+   *
+   * A saved flag was quoted as a change rate and billed one message per change.
+   * As a series it is quoted as an interval. 86,400 / perDay is the interval
+   * that bills the identical number, so a scenario reloaded after the change
+   * costs what it cost before -- and the failure mode if this is wrong is a
+   * fleet quoted at seventy times its volume, in a tool whose output goes into
+   * a contract.
+   */
+  const savedWithFlag = (perDay: number) => ({
+    name: 'Before one rhythm',
+    settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
+    periods: [{ index: 1, months: 1, machineCountOverrides: {}, commercial: {} }],
+    machineTypes: [
+      {
+        id: 'mt', name: 'Pump', machineCount: 1, onlinePct: 100, bundles: [],
+        metrics: [{
+          id: 'f', name: 'Compressor on/off', unit: '', kind: 'state',
+          cadence: { mode: 'onChange', perDay }, semanticGroup: 'status', bundleId: null,
+        }],
+      },
+    ],
   });
 
-  test('and back again, into the measurement type for its interval', async () => {
-    const { setRhythm } = await store();
-    const { scenario, hvac } = await fresh();
+  test('a saved flag loads as a series on the interval that bills the same', async () => {
+    const { normalise } = await store();
+    const fixed = normalise(savedWithFlag(20));
+    const metric = fixed.machineTypes[0]!.metrics[0]!;
+
+    assert.equal(metric.kind, 'continuous');
+    assert.equal(metric.cadence.mode, 'interval');
+    assert.equal(metric.cadence.mode === 'interval' ? metric.cadence.seconds : 0, 4320);
+    // 20 changes a day for 31 days = 620 messages. Every 4,320 s in a 31-day
+    // month = 2,678,400 / 4,320 = 620. The same number, which is the point.
+    assert.equal(computeScenario(fixed).months[0]!.counters.measurementsCreated, 620);
+  });
+
+  test('and it costs exactly what it cost before the rhythm went', async () => {
+    const { normalise } = await store();
+    for (const perDay of [0.5, 1, 4, 12, 20, 96]) {
+      const fixed = normalise(savedWithFlag(perDay));
+      assert.equal(
+        computeScenario(fixed).months[0]!.counters.measurementsCreated,
+        perDay * 31,
+        `${perDay} a day should still be ${perDay * 31} in a 31-day month`,
+      );
+    }
+  });
+
+  test('a nonsensical change rate falls back rather than dividing by zero', async () => {
+    const { normalise } = await store();
+    for (const perDay of [0, -3, Number.NaN]) {
+      const metric = normalise(savedWithFlag(perDay)).machineTypes[0]!.metrics[0]!;
+      assert.equal(metric.cadence.mode, 'interval');
+      assert.equal(metric.cadence.mode === 'interval' ? metric.cadence.seconds : 0, 60);
+    }
+  });
+
+  test('an on-change cadence on a kind that still has one is left alone', async () => {
+    const { normalise } = await store();
+    // Only measurements lost the rhythm. An event still happens when it
+    // happens, and converting its rate to an interval would be nonsense.
+    const fixed = normalise({
+      ...savedWithFlag(3),
+      machineTypes: [
+        {
+          id: 'mt', name: 'Pump', machineCount: 1, onlinePct: 100, bundles: [],
+          metrics: [{
+            id: 'e', name: 'Door opened', unit: '', kind: 'occurrence',
+            cadence: { mode: 'onChange', perDay: 3 }, semanticGroup: 'access', bundleId: null,
+          }],
+        },
+      ],
+    });
+    const metric = fixed.machineTypes[0]!.metrics[0]!;
+    assert.equal(metric.cadence.mode, 'onChange');
+    assert.equal(metric.cadence.mode === 'onChange' ? metric.cadence.perDay : 0, 3);
+  });
+
+  test('the preset flags are series now, and the fleet still bills what §9 says', async () => {
+    const { hvac } = await fresh();
     const flag = hvac.metrics.find((m) => m.name === 'Compressor on/off')!;
-    const perDay = flag.cadence.mode === 'onChange' ? flag.cadence.perDay : 0;
-
-    const after = setRhythm(scenario, hvac.id, flag.id, 'interval').machineTypes[0]!;
-    const moved = after.metrics.find((m) => m.id === flag.id)!;
-    assert.equal(moved.kind, 'continuous');
-    assert.equal(
-      moved.cadence.mode === 'interval' ? moved.cadence.seconds : 0,
-      86_400 / perDay,
-      'the period it was changing at becomes the period it is sampled at',
-    );
-    // 86400/perDay is not 60 s for the preset's flag, so it gets its own type
-    // rather than joining acme_Climate.
-    assert.equal(after.bundles.length, 2);
-    assert.equal(after.metrics.find((m) => m.id === flag.id)?.bundleId, after.bundles[1]?.id);
+    assert.equal(flag.kind, 'continuous');
+    assert.equal(flag.cadence.mode === 'interval' ? flag.cadence.seconds : 0, 4320);
+    // Its own measurement type, because 4,320 s is not the climate tick.
+    assert.equal(flag.bundleId, null);
   });
 
-  test('asking for the rhythm a series already has changes nothing', async () => {
-    const { setRhythm } = await store();
-    const { scenario, hvac } = await fresh();
-    const temp = hvac.metrics.find((m) => m.name === 'Supply air temp')!;
-    assert.equal(setRhythm(scenario, hvac.id, temp.id, 'interval'), scenario);
-  });
-
-  test('a name from the on-change catalogue brings its rhythm with it', async () => {
+  test('picking a name fills the unit and no longer moves the row anywhere', async () => {
     const { setDatapointName } = await store();
     const { scenario, hvac } = await fresh();
-    const temp = hvac.metrics.find((m) => m.name === 'Supply air temp')!;
-
-    // One list on the page, so this pick is one click away from a flag sampled
-    // 44,640 times a month -- the mistake the step exists to prevent.
-    const after = setDatapointName(scenario, hvac.id, temp.id, 'Door open/closed').machineTypes[0]!;
-    const moved = after.metrics.find((m) => m.id === temp.id)!;
-    assert.equal(moved.name, 'Door open/closed');
-    assert.equal(moved.kind, 'state', 'the catalogue knew the rhythm');
-    assert.equal(moved.bundleId, null);
-  });
-
-  test('a timed name pulls an on-change series back onto a timer', async () => {
-    const { setDatapointName } = await store();
-    const { scenario, hvac } = await fresh();
     const flag = hvac.metrics.find((m) => m.name === 'Compressor on/off')!;
 
+    // This used to pull the row across to the timed catalogue and rewrite its
+    // cadence. There is one catalogue and one rhythm now, so a name is a name.
     const after = setDatapointName(scenario, hvac.id, flag.id, 'Temperature').machineTypes[0]!;
     const moved = after.metrics.find((m) => m.id === flag.id)!;
     assert.equal(moved.kind, 'continuous');
-    assert.equal(moved.unit, 'C', 'and filled the unit on the way, as it always did');
-  });
-
-  test('a name in neither catalogue leaves the rhythm alone', async () => {
-    const { setDatapointName } = await store();
-    const { scenario, hvac } = await fresh();
-    const temp = hvac.metrics.find((m) => m.name === 'Supply air temp')!;
-    const after = setDatapointName(scenario, hvac.id, temp.id, 'Widget count').machineTypes[0]!;
-    assert.equal(after.metrics.find((m) => m.id === temp.id)?.kind, 'continuous');
+    assert.equal(moved.unit, 'C', 'the unit still comes along');
+    assert.equal(
+      moved.cadence.mode === 'interval' ? moved.cadence.seconds : 0,
+      4320,
+      'and the interval the customer chose is left where it was',
+    );
   });
 });
 

@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 23 — storage is month ends added up; retention is a rule per type, on every element that stores one · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-03
+**Status:** draft for review, rev 24 — one rhythm: the on-change state kind is gone, and a status is a series read on its own interval · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-03
 
 ---
 
@@ -168,7 +168,7 @@ kind selection (§5) is the centre of the interface rather than a dropdown in a 
 | The metric | Example | Element | Counter | Send when |
 |---|---|---|---|---|
 | A number that changes every time you read it, and that you want to chart | Temperature, pressure, RPM, kWh | **Measurement** | Created | Fixed interval, **bundled** |
-| A number or code that holds steady for long stretches, then changes | Status flag 0/1, mode, error code | **Measurement** | Created | **On change**, own fragment |
+| A number or code that holds steady for long stretches, then changes | Status flag 0/1, mode, error code | **Measurement** | Created | Fixed interval, at the rate it actually moves (§4.4) |
 | Something happened, worth recording, nobody needs to act | Door opened, GPS fix, config applied, shift started | **Event** | Created | On occurrence |
 | Something is wrong and somebody must act | Sensor failure, threshold breach, offline | **Alarm** | Created, then Updated on clear or re-raise | On raise / clear |
 | Something simply true about the machine, not a reading over time | Firmware version, serial, location, config, capability | **Inventory** | Created once at onboarding, Updated on change | On change only |
@@ -266,41 +266,44 @@ Practical corollaries the tool surfaces:
 - A firmware release that adds a sensor introduces a **new** bundle type. It does not widen the old
   one.
 
-### 4.4 On-change metrics need their own measurement
+### 4.4 A status is a series, and its interval is the whole question
 
-A status flag that flips a handful of times a day is not a time series. It has two possible homes,
-and making that trade-off legible is a core job of the calculator.
+A status flag that flips a handful of times a day is a series like any other. What decides its cost
+is the interval it is read at, and that is the only question the tool asks about it.
 
-**Option A — fold it into the 60 s bundle as a fifth series.**
-Costs **zero extra messages**. But it writes 44,640 identical values per machine per month, and the
-transition timestamp is quantised to the sampling interval — you can no longer tell *when* the
-compressor started, only which minute it was in.
+There used to be a second answer here. A `state` kind existed, sent **on change**: one message per
+transition, carrying the exact moment the value moved. It is gone, and the measurements table asks
+one thing — how often — of every row. What that costs and what it buys is worth recording, because
+the argument for the old design was a good one:
 
-**Option B — its own fragment, sent on change.**
-One message per transition, one stored value per transition, exact transition time.
+**What the tool lost.** An on-change send carried the transition timestamp. Read on a tick instead,
+the moment the compressor started is quantised to the sampling interval — you can tell which
+72-minute window it happened in, not which second. That is a functional loss, not an economic one,
+and no interval recovers it.
 
-For 1,000 machines, two flags, ~20 transitions per flag per day, on a 60 s bundle, in a 31-day month:
+**What the tool gained.** One question instead of two. The rhythm column was a second dropdown above
+the rate, and the two together were the most-explained control in the wizard: a customer had to
+decide what kind of thing their flag *was* before they could say how often it moved. The screen now
+asks how often, once, in the same shape for every row.
 
-| | Extra messages / month | Extra stored values / month | Transition timing |
-|---|---|---|---|
-| A — folded into the bundle | 0 | 89,280,000 | ±60 s |
-| B — own fragment, on change | 1,240,000 | 1,240,000 | exact |
+**What did not change: the arithmetic.** A flag changing 20 times a day billed 20 messages a day. A
+series read every 4,320 s bills 2,678,400 / 4,320 = 620 in a 31-day month, which is the same 20 a
+day. So the conversion is exact, `normalise` performs it on load, and no saved scenario moved
+(§8.1). The interval a status is given **is** its change rate, stated the other way round.
 
-Option B costs **+2.8 %** on top of the 44.6 M messages the climate bundle already generates, and
-removes **a third** of the fleet's stored values — 88.0 M of 267.8 M.
+**Where the mistake now lives.** The old design made the expensive answer hard to express: a flag
+could not join an interval bundle, so it could not be dragged onto the fleet's tick. Now it can, and
+a compressor on/off left at 60 s costs 44,640 readings a machine a month to learn something that
+moves two dozen times a day — a 72× over-estimate on a line a customer signs. Nothing structural
+prevents it, so the tool says it instead: **L2** fires on a series whose name reads as a status and
+whose interval is under 15 minutes, and the teach panel on the step makes the same point with the
+same numbers. That is a warning where there used to be an impossibility, and it is the real cost of
+this simplification.
 
-The bytes those values occupy are only known to a factor of four (§4.6), so the recommendation does
-not rest on a storage saving at all. It rests on two things that are certain:
-
-- **1.24 M extra messages against 44.6 M is +2.8 %.** The cost of doing it properly is negligible.
-- **Losing the transition timestamp is a functional loss.** Option A cannot tell you when the
-  compressor started, only which minute it was in — and no amount of storage economy buys that back.
-
-**Recommendation: Option B.** Stated on those grounds, with the stored-value counts shown as
-supporting context rather than as a costed saving.
-
-**What is not an option** is putting the flag in the interval bundle *and* sending it on change.
-That is a partial send, and it violates §4.3. This is the single hard error in the tool.
+**What is still not an option** is a bundle whose series set varies from send to send — §4.3 stands
+untouched, and L3 still reports a non-measurement sharing a measurement type. But the specific
+violation this section used to name, a flag both bundled and sent on change, cannot be expressed any
+more, so the tool has no hard error left of its own making.
 
 ### 4.5 Sampling faster than you need
 
@@ -431,8 +434,7 @@ A customer builds up a fleet the way they think about it: **machine type → met
 ```
 Add machine type          "Rooftop HVAC unit"     how many · % online · rollout per period
   └─ Add metric           "Supply air temp"       name · unit
-       └─ Choose kind     ▸ Continuous reading    → interval, bundled
-                          ▸ State or flag         → on change, own fragment
+       └─ Choose kind     ▸ Series                → interval, bundled
                           ▸ Occurrence            → Event
                           ▸ Condition             → Alarm
                           ▸ Inventory entry       → Inventory
@@ -444,13 +446,12 @@ production machine — so the first screen is never empty.
 
 ### The kind selector
 
-Six kinds cover the nine counters. Each is chosen by a plain-language question, never by naming an
+Five kinds cover the nine counters. Each is chosen by a plain-language question, never by naming an
 API, because a customer who already knows which API to use does not need this tool.
 
 | Kind | The question the UI asks | Element | Counter(s) | Cadence asked for |
 |---|---|---|---|---|
-| **Continuous reading** | "Does it change every time you read it, and do you want to chart it?" | Measurement | Created | Sampling interval |
-| **State or flag** | "Does it hold steady for long stretches, then change?" | Measurement | Created | Changes per day |
+| **Series** | "Is it a value you read off the machine and want to chart?" — a status flag included, since it is read like anything else | Measurement | Created | Sampling interval |
 | **Occurrence** | "Did something happen that's worth recording, with nobody needing to act?" | Event | Created (+ Updated if amended) | Occurrences per day |
 | **Condition** | "Is something wrong that somebody has to act on?" | Alarm | Created + Updated on clear | Raises per day |
 | **Inventory entry** | "Is it simply true about the machine rather than a reading over time?" | Inventory | Updated (+ one Created at onboarding) | Changes per month |
@@ -458,12 +459,13 @@ API, because a customer who already knows which API to use does not need this to
 
 Two things the selector does that a plain dropdown would not:
 
-- **It asks for the cadence the kind implies**, not a generic rate. A continuous reading is asked for
-  an interval; a state is asked how often it changes. Asking "how many per second" for a status flag
-  is how customers end up sampling flags on a timer.
-- **It only offers bundling where bundling is valid** — continuous readings, and only those. State,
-  occurrence, condition, inventory and command metrics never enter an interval bundle, which makes §4.3's
-  hard error structurally unreachable rather than merely warned about.
+- **It asks for the cadence the kind implies**, not a generic rate. A series is asked for an
+  interval; an event is asked how many happen a day; a command is asked how many go out a month and
+  how many statuses come back. Asking "how many per second" for a firmware campaign is how estimates
+  end up out by a factor of four.
+- **It only offers bundling where bundling is valid** — series, and only those. Occurrence,
+  condition, inventory and command metrics never enter an interval bundle, which is what makes L3
+  reachable only through an imported file.
 
 ### Data model
 
@@ -488,9 +490,10 @@ MachineType
 
 Metric
   name, unit
-  kind:    'continuous' | 'state' | 'occurrence' | 'condition' | 'inventory' | 'command'
+  kind:    'continuous' | 'occurrence' | 'condition' | 'inventory' | 'command'
+           // 'state' was a sixth, sent on change; converted to an interval on load (§4.4)
   cadence: { mode: 'interval',  seconds }        // continuous
-         | { mode: 'onChange',  perDay }         // state, occurrence, condition, inventory
+         | { mode: 'onChange',  perDay }         // occurrence, condition, inventory
          | { mode: 'perMonth',  count }          // inventory
          | { mode: 'command',   perMonth, transitions }   // command
   semanticGroup                          // free text; drives bundle proposal
@@ -516,7 +519,6 @@ online = onlinePct / 100
 N = machineCount × online
 
 bundle      → N × SPM / intervalSeconds        → Measurements Created
-state       → N × perDay × DPM                 → Measurements Created
 occurrence  → N × perDay × DPM                 → Events Created
 condition   → N × perDay × DPM × 2             → Alarms Created + Alarms Updated
 inventory   → N × count                        → Inventories Updated   // quoted per month
@@ -546,9 +548,13 @@ There is no month-basis setting, because billing is per calendar month and the e
 month lengths. What replaces it is more useful: results carry a **range** across the months in each
 period, with the peak month named. There is no headroom or commit setting either — see §2.
 
-**Naive baseline.** Every result is shown against the unbundled counterfactual — every series its own
-measurement, every state metric interval-sampled. That delta is the tool's headline: *"your design
-produces 222 million fewer messages in your peak month — 83 % less volume — than the obvious implementation."*
+**Naive baseline.** Every result is shown against the unbundled counterfactual — **every series in
+its own measurement**, at the interval it was given. That delta is the tool's headline: *"your design
+produces 134 million fewer messages in your peak month — 74 % less volume — than the obvious
+implementation."* It used to carry a second clause, every state metric interval-sampled at the
+fleet's fastest tick, which put the §9 figure at 222 million and 83 %. That clause went with the
+on-change rhythm (§4.4): there are no flags left to re-sample, only series read at the rate they were
+given, so the counterfactual is smaller and the whole delta is now the bundling.
 
 ---
 
@@ -562,7 +568,7 @@ every input visibly moves the number.
 | # | Key | Screen | What it asks, and what it teaches |
 |---|---|---|---|
 | 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
-| 2 | `series` | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). |
+| 2 | `series` | **Measurements** | One table, one row per **series**, and one question about each: how often it is read. The interactive explainer sits here. The tool groups series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). A status flag is a row like any other — the interval a customer gives it is the rate they intend to read it at, and L2 is what catches one left on the fleet's tick (§4.4). |
 | 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. Events, alarms and commands each carry a **retention** column, since each row is a type of its own; inventory carries none, and says why (§4.6). |
 | 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs — the default retention and the bytes per value. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
 | 5 | `results` | **Results** | §7. |
@@ -591,26 +597,25 @@ named value over time — and the fragment that carries a set of series under on
 **measurement type**. **Measurements** says series and measurement type in its column headings, its dropdowns
 and its prose, because a customer who leaves with the wrong words models the wrong thing.
 
-**One table, because a flag is not a different kind of thing.** A state sent on change is a
+**One table, one question, because a flag is not a different kind of thing.** A status is a
 measurement with one series in it; giving it its own section, its own heading and its own noun said
-otherwise. What actually differs is *what decides the timestamp* — a tick, or the moment the value
-moved — so that is a column, `How often`, and its two answers carry their consequences: a timed
-series joins the measurement type for its interval, an on-change series is told in its own row that
-nothing can share its timestamp. §4.4 is therefore stated where the mistake would be made rather
-than in a paragraph above a second table. Naming works the same way in both cases: a bundled series
-takes the name from its bundle, a series travelling alone carries one on the metric
-(`Metric.fragmentName`), and one derivation — `ownFragmentName` — resolves either to a stored name or
-to the suggestion, so the table, the diagram, the payload examples and the workbook cannot disagree
-about what a device sends. An empty box means the suggested name, which is what the placeholder in it
-shows. The catalogue is one list too, and a name from its
-on-change end (`Door open/closed`) moves the row's rhythm with it — the alternative is a flag on a
-one-minute timer, which is the single error this step exists to prevent. The
-measurement type's name is editable in the row that first uses it, once per type rather than once per
-series: the name belongs to the group, and four identical boxes for one value would invite an edit in
-row three that silently rewrites row one. Choosing *a measurement type of its own* creates that type
-on the spot, named after the series and editable immediately — a series never travels in a measurement
-type that does not exist, and a type left with no series in it is dropped, because a measurement type
-is its members.
+otherwise. It briefly had a column instead — `How often` carried a rhythm dropdown above the rate,
+one answer for a tick and one for the moment the value moved — and that column is gone too (§4.4).
+Every row is now asked the same thing in the same shape: the interval it is read at. The catalogue is
+one list, its `Status` and `Connectivity` groups sitting under the reading groups, and picking
+`Door open/closed` no longer moves the row anywhere — it fills the unit and leaves the interval the
+customer chose alone.
+
+Naming works one way for everything: a bundled series takes the name from its bundle, a series
+travelling alone carries one on the metric (`Metric.fragmentName`), and one derivation —
+`ownFragmentName` — resolves either to a stored name or to the suggestion, so the table, the diagram,
+the payload examples and the workbook cannot disagree about what a device sends. An empty box means
+the suggested name, which is what the placeholder in it shows. The measurement type's name is
+editable in the row that first uses it, once per type rather than once per series: the name belongs
+to the group, and four identical boxes for one value would invite an edit in row three that silently
+rewrites row one. Choosing *a measurement type of its own* creates that type on the spot, named after
+the series and editable immediately — a series never travels in a measurement type that does not
+exist, and a type left with no series in it is dropped, because a measurement type is its members.
 
 **Bundling is the default, not a feature.** The grouping happens as the customer types: a new
 series drops straight into the measurement type for its interval, and one is created if there is
@@ -645,8 +650,9 @@ did. Three things this pins down:
 
 - **The parts come before the measurement count.** "10 datapoints in 3 measurement types" would be
   false — the event, alarm, inventory entry and command are not inside a measurement at all.
-- **A state counts as a measurement of its own**, per §4.4. The §9 HVAC unit sends three, not one,
-  and the summary now agrees with the diagram directly beneath it.
+- **A series alone in its measurement type counts as a type**, per §4.2. The §9 HVAC unit sends
+  three, not one — one 60 s bundle plus its two 72-minute statuses — and the summary agrees with the
+  diagram directly beneath it.
 - **Messages are grouped by element, not by counter.** The nine counters split created from updated,
   which matters when pasting into the Configurator and nowhere else; an alarm's raise and clear are
   one line in a summary.
@@ -756,7 +762,8 @@ page supports this table.
 Deliberately absent: billable units, utilisation, headroom, commit recommendations, overage warnings.
 A billing system handles withdrawal (§2).
 
-**Payload design** — for every bundle and on-change metric, a copy-pasteable example: REST JSON plus
+**Payload design** — for every measurement type, event, alarm and inventory fragment, a
+copy-pasteable example: REST JSON plus
 the MQTT equivalents (JSON-over-MQTT and a SmartREST template sketch). This is what turns an estimate
 into an implementation brief.
 
@@ -764,8 +771,8 @@ Grouped by **namespace**, because measurement fragments, event types, alarm type
 fragments are four separate namespaces that never collide. Listed flat they read as one long list of
 fragments, which makes a well-modelled machine look far more complicated than it is: the HVAC example
 needs six names, but only **three** are measurement fragments — one interval bundle plus one per
-state. A state cannot share a fragment with another state, because two flags that change
-independently would mean sending one and omitting the other, which is §4.3 again.
+status, because each status is read on a tick no other series shares. Two series *can* share a
+fragment once they share an interval, and the tool proposes exactly that whenever they do.
 
 Every generated name uses the customer's own prefix. **Never `c8y_`** — that is Cumulocity's reserved
 namespace, and a payload example that writes into it is telling the customer to collide with the
@@ -778,8 +785,8 @@ asserted.
 | # | Rule | Severity |
 |---|---|---|
 | L1 | Two or more continuous metrics share an interval and semantic group but sit in different bundles | Suggestion — shows saving |
-| L2 | A `state` metric sits in an interval bundle sampled ≥10× faster than it changes | Warning — redundant stored values, lost timing |
-| L3 | A non-continuous metric has been forced into an interval bundle | **Error** — violates §4.3 |
+| L2 | A series whose name reads as a status is sampled faster than every 15 min | Warning — paying for identical readings (§4.4) |
+| L3 | A non-measurement metric has been forced into a measurement type | **Error** — violates §4.3; reachable only by import |
 | L4 | Bundle interval below 1 s | Warning — offer edge-aggregation model |
 | L5 | Inventory updates exceed 1 per machine per minute | Warning — wrong element (§3) |
 | L6 | Bundle exceeds **100 series** — the platform recommendation — or mixes semantic groups | Warning — split the bundle |
@@ -953,7 +960,7 @@ for a **31-day peak month** with the February figure alongside.
 | Counter | Metric and kind | 31-day month | 28-day month |
 |---|---|---|---|
 | Measurements Created | `acme_Climate` — T, humidity, CO₂, pressure — 4 continuous, 1 bundle @ 60 s | 44,640,000 | 40,320,000 |
-| Measurements Created | compressor on/off, filter status — 2 states, ~20 changes/day each | 1,240,000 | 1,120,000 |
+| Measurements Created | compressor on/off, filter status — 2 series @ 4,320 s, one type each | 1,240,000 | 1,120,000 |
 | Events Created | service events — occurrence, 1/machine/day | 31,000 | 28,000 |
 | Alarms Created | condition, 0.5/machine/day | 15,500 | 14,000 |
 | Alarms Updated | the matching clears | 15,500 | 14,000 |
@@ -971,19 +978,26 @@ the output is a range with the peak named.
 
 ### Against the naive baseline
 
-Every series its own measurement, both states sampled at 60 s, same 31-day month:
+Every series in its own measurement, at the interval it was given, same 31-day month:
 
 | | Messages |
 |---|---|
 | As designed | 45,977,000 |
-| Naive | 267,937,000 |
-| **Difference** | **221,960,000** |
+| Naive | 179,897,000 |
+| **Difference** | **133,920,000** |
 
-**5.8× less volume** — 83 % — for identical information. That is the product.
+**3.9× less volume** — 74 % — for identical information. That is the product, and the whole of it is
+the climate bundle: three of its four readings stop being messages of their own, 3 × 44,640 × 1,000.
+
+It read 5.8× and 83 % until rev 24. The baseline then had a second clause — both statuses sampled at
+60 s, the fleet's fastest tick — which went with the on-change rhythm (§4.4). Nothing about the
+design changed and the designed figure did not move; the counterfactual it is measured against got
+smaller, because the tool no longer has a rhythm to model that mistake in. **L2** warns about it
+instead.
 
 ### The one caveat the tool should still carry
 
-An 83 % reduction in messages is not automatically an 83 % reduction in what the customer pays. How
+A 74 % reduction in messages is not automatically a 74 % reduction in what the customer pays. How
 volume converts to money depends on commercial terms — commit blocks, floors, whatever the billing
 system withdraws against — and none of that lives here.
 

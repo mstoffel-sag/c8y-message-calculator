@@ -7,6 +7,7 @@
  */
 
 import {
+  looksLikeFlag,
   type Finding,
   type MachineType,
   type Metric,
@@ -20,8 +21,14 @@ import { ownFragmentName } from './payload.js';
 /** The platform recommendation, CONCEPT.md section 11. */
 export const MAX_SERIES_PER_BUNDLE = 100;
 const REFERENCE_SECONDS = REFERENCE_DAYS * SECONDS_PER_DAY;
-/** A state sampled this many times faster than it changes is mostly noise. */
-const REDUNDANCY_FACTOR = 10;
+/**
+ * Faster than this, and a status is being polled rather than reported.
+ *
+ * Fifteen minutes: slow enough that a genuinely fast-moving signal (a valve
+ * that cycles every few minutes) is not nagged about, fast enough to catch the
+ * default of dropping a flag into the fleet's one-minute tick.
+ */
+const STATUS_TICK_SECONDS = 15 * 60;
 /** Above this many raises per machine per day, an alarm is being re-raised. */
 const ALARM_RERAISE_PER_DAY = 24;
 const MAX_SENSIBLE_TRANSITIONS = 4;
@@ -98,7 +105,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
     });
   }
 
-  /* -- L2 / L3: metrics that do not belong in an interval bundle ----------- */
+  /* -- L3: a non-measurement in an interval bundle -------------------------- */
   for (const metric of machineType.metrics) {
     const bundle = bundleOf.get(metric.id);
     if (!bundle) continue;
@@ -122,31 +129,40 @@ function lintMachineType(machineType: MachineType): Finding[] {
         bundleId: bundle.id,
       });
     }
+  }
 
-    if (metric.kind === 'state' && metric.cadence.mode === 'onChange' && metric.cadence.perDay > 0) {
-      const secondsBetweenChanges = SECONDS_PER_DAY / metric.cadence.perDay;
-      const ratio = secondsBetweenChanges / bundle.interval;
-      if (ratio >= REDUNDANCY_FACTOR) {
-        const sends = (n * REFERENCE_SECONDS) / bundle.interval;
-        const onChange = n * metric.cadence.perDay * REFERENCE_DAYS;
-        findings.push({
-          rule: 'L2',
-          severity: 'warning',
-          titleKey: 'lint.L2.title',
-          titleParams: {
-            name: metric.name,
-            minutes: Math.round(secondsBetweenChanges / 60),
-            interval: bundle.interval,
-          },
-          detailKey: 'lint.L2.detail',
-          detailParams: { ratio: Math.round(ratio) },
-          machineTypeId: machineType.id,
-          metricIds: [metric.id],
-          bundleId: bundle.id,
-          messageDelta: onChange - sends,
-        });
-      }
-    }
+  /* -- L2: a status sampled on a fast tick ---------------------------------- */
+  /**
+   * This rule used to catch a flag sitting inside an interval bundle, back when
+   * a flag was its own kind sent on change. With one rhythm there is nothing
+   * structural left to catch -- a status is a series like any other -- so the
+   * mistake it was guarding against is now easier to make rather than harder,
+   * and this is the only place left to say so. A two-state value on a one-minute
+   * tick pays for 44,640 identical readings a month to learn something that
+   * changed twenty times.
+   *
+   * It reads the name, so it is a hint and not an assertion: no figure depends
+   * on it, and a series the pattern misses is simply not flagged.
+   */
+  for (const metric of machineType.metrics) {
+    if (metric.cadence.mode !== 'interval') continue;
+    if (metric.cadence.seconds >= STATUS_TICK_SECONDS) continue;
+    if (!looksLikeFlag(metric)) continue;
+
+    const sends = (n * REFERENCE_SECONDS) / Math.max(metric.cadence.seconds, 1e-9);
+    findings.push({
+      rule: 'L2',
+      severity: 'warning',
+      titleKey: 'lint.L2.title',
+      titleParams: {
+        name: metric.name,
+        interval: Math.round(metric.cadence.seconds),
+      },
+      detailKey: 'lint.L2.detail',
+      detailParams: { sends: Math.round(sends).toLocaleString('en-GB') },
+      machineTypeId: machineType.id,
+      metricIds: [metric.id],
+    });
   }
 
   /* -- L4 / L6: bundle shape ---------------------------------------------- */
@@ -316,8 +332,7 @@ function lintFragmentNames(scenario: Scenario): Finding[] {
         .join('|');
       note(bundle.fragmentName.trim(), { machineType, signature, bundleId: bundle.id });
     }
-    const solo = [...loneContinuous, ...machineType.metrics.filter((m) => m.kind === 'state')];
-    for (const metric of solo) {
+    for (const metric of loneContinuous) {
       note(ownFragmentName(scenario.settings.fragmentPrefix, metric).trim(), {
         machineType,
         signature: metric.name.trim().toLowerCase(),

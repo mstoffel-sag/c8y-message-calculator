@@ -103,7 +103,7 @@ tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurato
 | Step | Asks |
 |---|---|
 | 1 Machines | machine types, counts, online %, and what each machine talks — a protocol list you can always escape. Descriptive: no counter reads it. |
-| 2 Measurements | one row per series; its rhythm — on a timer, or when the value moves — is a column. Timed series are grouped by interval into one measurement type each, as you type, and that type's fragment name is editable in the row. Splitting one out creates its own measurement type there and then; an on-change series always travels alone — the row says why, and still lets you name the type it sends in. |
+| 2 Measurements | one row per series, and one question about each: how often it is read. Series are grouped by interval into one measurement type each, as you type, and that type's fragment name is editable in the row. Splitting one out creates its own measurement type there and then. A status flag is a row like any other — the interval you give it is the rate you intend to read it at, and the tool warns if one is left on the fleet's fastest tick. |
 | 3 Events, alarms, inventory & commands | everything that is not a measurement, one panel each. Commands close the step, with the status-transition count, because the contrast between three inbound elements and one outbound one is the thing being taught |
 | 4 Contract & deployment | periods, the ramp and the calendar, then every Configurator line item the fleet cannot imply — one column per period, right under the table that decides how many periods there are |
 | 5 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
@@ -186,9 +186,10 @@ different angles, so past two types either of them was a page nobody reads. Each
 whose `<summary>` carries what is inside it and what it costs:
 
 ```
-▸ Rooftop HVAC unit  1,000 machines    4 time series, 2 states, 1 event, 1 alarm,               46 M
-                                       1 inventory entry, 1 command · every 1 min ·      MESSAGES / MONTH ·
-                                       3 measurement types                              45,977 PER MACHINE
+▸ Rooftop HVAC unit  1,000 machines    6 time series, 1 event, 1 alarm,                          46 M
+                                       1 inventory entry, 1 command ·                  MESSAGES / MONTH ·
+                                       every 1 min, every 72 min ·                     45,977 PER MACHINE
+                                       3 measurement types
                                        Measurements 45.9 M · Events 31 k · Alarms 31 k
 ```
 
@@ -197,9 +198,10 @@ one-line machine description on the Machines step comes from the same call -- so
 the two cannot drift. Two things it gets right that the old hand-rolled line did
 not:
 
-- **A state is its own measurement.** It cannot join an interval bundle without
-  making that bundle's series set vary, so the section 9 HVAC unit sends three
-  measurements, not one. The count now matches the diagram directly beneath it.
+- **A series alone in its measurement type still counts as a type.** The section
+  9 HVAC unit sends three -- one 60 s bundle plus its two 72-minute statuses,
+  which share no tick with anything else. The count matches the diagram directly
+  beneath it.
 - **The parts come before the measurement count.** "10 datapoints in 3
   measurement types" would be false -- the event, alarm, inventory entry and
   command are not in a measurement at all.
