@@ -43,10 +43,13 @@ npm run dev      # http://127.0.0.1:5173
 There is no browser here. Every UI check is `preact-render-to-string` plus a WebKit snapshot:
 
 ```
-node tools/render_step.mjs contract /tmp/c.html   # any step key; reads dist-test/, so run npm test first
-qlmanage -t -s 1100 -o /tmp /tmp/c.html           # WebKit; renders HTML and .xlsx
-python3 tools/xlsx_dump.py <file.xlsx>            # stdlib-only; pipe through sed to redact prices
+node tools/render_step.mjs <step> <out.html> [scrollPx] [locale]   # reads dist-test/: npm test first
+qlmanage -t -s 1100 -o /tmp /tmp/c.html   # WebKit; renders HTML and .xlsx
+python3 tools/xlsx_dump.py <file.xlsx>    # stdlib-only; pipe through sed to redact prices
 ```
+
+Step keys are `fleet series discrete contract results`; `scrollPx` shifts the page up to reach
+content below the first screenful, and `locale` is `en` or `de`.
 
 Worth the round trip when **layout or wording** changed, or when two figures could disagree with each
 other. Not worth it for a rename or an engine change — the tests cover those. Hover, focus and click
@@ -63,6 +66,10 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 - `normalise()` in the store is the compatibility layer for saved scenarios (localStorage and
   exported JSON). A rename that silently drops metrics would under-count, which is the one failure
   this tool cannot have — migrate the old value there and test it.
+- **A test that reads source files has to find the repo first.** Tests run compiled, from
+  `dist-test/test/`, where `resolve(__dirname, '..')` is `dist-test/` and there is not one `.ts` file
+  to be found — two guards were passing on an empty string that way. Walk up to the `package.json`
+  that has `lib/engine` beside it, as `test/engine.test.ts` does.
 
 ## Vocabulary, and what the code calls things
 
@@ -91,6 +98,9 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
   module state — `setFormatLocale` — so `n()` and `compact()` did not each grow a parameter.
 - `test/i18n.test.tsx` enforces the rest: no empty or copy-pasted German, matching placeholders, no
   dead keys, and no English function words left on a German render of any step.
+- **German runs about a fifth longer than English**, so a new string in a fixed-width row is a layout
+  change: snapshot the German render too. The top bar is the tight one — it is capped at 1240 px and
+  already wrapped once.
 
 ## Docs, and keeping the cost of a change down
 

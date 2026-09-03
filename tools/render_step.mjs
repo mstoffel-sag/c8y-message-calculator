@@ -14,7 +14,6 @@ import { h } from 'preact';
 import { render } from 'preact-render-to-string';
 import { readFileSync, writeFileSync } from 'node:fs';
 
-import { h as _h } from 'preact';
 import { LocaleContext } from '../dist-test/src/ui/i18n.js';
 import { setFormatLocale } from '../dist-test/src/ui/format.js';
 import { STEPS } from '../dist-test/src/ui/wizard/steps.js';
@@ -38,7 +37,9 @@ const COMPONENTS = {
 const [key, out, scroll = '0', locale = 'en'] = process.argv.slice(2);
 const Step = COMPONENTS[key];
 if (!Step || !out) {
-  console.error(`usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx]`);
+  console.error(
+    `usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx] [en|de]`,
+  );
   process.exit(1);
 }
 
@@ -52,7 +53,7 @@ const def = STEPS[index];
 setFormatLocale(locale);
 const t = makeT(locale);
 const body = render(
-  _h(LocaleContext.Provider, { value: locale }, h(Step, { scenario, result, expert: true, onChange: () => {} })),
+  h(LocaleContext.Provider, { value: locale }, h(Step, { scenario, result, expert: true, onChange: () => {} })),
 );
 const rail = STEPS.map(
   (s, i) => `<button class="rail-step ${i === index ? 'on' : ''}"><i>${i + 1}</i>${t(s.titleKey)}</button>`,
