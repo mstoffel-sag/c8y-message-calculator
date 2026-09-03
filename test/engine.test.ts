@@ -27,6 +27,7 @@ import {
   payloadsFor,
   resolveBundles,
   seriesNameOf,
+  storageGiBMonthsForPeriod,
   totalOf,
   type MachineType,
   type Scenario,
@@ -728,5 +729,272 @@ describe('operational storage', () => {
       assert.equal(month.lowGiB, 0);
       assert.equal(month.valuesPerMeasurement, 0);
     }
+  });
+});
+
+/**
+ * What the Configurator's storage line is actually filled in from.
+ *
+ * The platform captures what the database holds at the end of each calendar
+ * month and the period's quantity is those captures added up -- GiB-months. It
+ * is worth a describe of its own because two plausible readings of "storage per
+ * period" are both wrong: the fullest month over-states a period that spent
+ * itself filling up, and the last month under-states one whose fleet shrank.
+ */
+describe('storage is the month ends, added up', () => {
+  test('the §9 fleet: 64.8 GiB standing at every month end, twelve times', () => {
+    const result = computeScenario(conceptSection9Scenario());
+    const period = must(result.storageByPeriod[0], 'no period storage');
+
+    // A constant fleet at 30 days' retention holds 30 days of writing whenever
+    // the month happens to close -- 5.8 M values a day, so 174 M, so 64.82 GiB
+    // at 400 B. Every month of the period is that same figure, and the quantity
+    // is the twelve of them added up.
+    assert.equal(period.monthsCounted, 12);
+    for (const month of result.storage) {
+      assert.ok(Math.abs(month.retained - 174_000_000) < 500_000, `${month.retained}`);
+    }
+    assert.ok(Math.abs(period.giBMonths - 777.84) < 0.01, `${period.giBMonths}`);
+    assert.ok(Math.abs(period.averageGiB - 64.82) < 0.01, `${period.averageGiB}`);
+    assert.equal(
+      Number(period.giBMonths.toFixed(6)),
+      Number(result.storage.reduce((sum, m) => sum + m.quotedGiB, 0).toFixed(6)),
+      'the sum of the column, and nothing cleverer',
+    );
+  });
+
+  test('and it is a sum, not the fullest month, wherever the fleet is still filling up', () => {
+    const s = conceptSection9Scenario();
+    const ramp: Scenario = {
+      ...s,
+      // 90 days retained over six months: storage climbs for the first three
+      // and then holds, so the months differ from each other and the difference
+      // between a sum and a peak stops being invisible.
+      settings: { ...s.settings, retentionDays: 90 },
+      periods: [{ ...s.periods[0]!, months: 6 }],
+    };
+    const result = computeScenario(ramp);
+    const period = must(result.storageByPeriod[0], 'no period storage');
+    const peak = must(period.peak, 'no peak month');
+
+    assert.ok(
+      period.giBMonths < peak.quotedGiB * period.monthsCounted * 0.95,
+      `a period that filled up cannot be quoted at its peak: ${period.giBMonths} ` +
+        `vs ${peak.quotedGiB * period.monthsCounted}`,
+    );
+    assert.ok(
+      period.giBMonths > peak.quotedGiB,
+      'and it cannot be quoted at one month either',
+    );
+  });
+
+  test('every column is summed the same way, so the range survives the addition', () => {
+    const result = computeScenario(conceptSection9Scenario());
+    const period = must(result.storageByPeriod[0], 'no period storage');
+    const sum = (pick: (m: (typeof result.storage)[number]) => number) =>
+      result.storage.reduce((total, m) => total + pick(m), 0);
+
+    assert.ok(Math.abs(period.lowGiBMonths - sum((m) => m.lowGiB)) < 1e-9);
+    assert.ok(Math.abs(period.highGiBMonths - sum((m) => m.highGiB)) < 1e-9);
+    assert.ok(Math.abs(period.dataHubLowGiBMonths - sum((m) => m.dataHubLowGiB)) < 1e-9);
+    assert.equal(period.highGiBMonths / period.lowGiBMonths, 4, 'the 4x spread, intact');
+    // Never a midpoint: the quoted sum is one end of the range, not between them.
+    assert.equal(period.giBMonths, period.highGiBMonths);
+  });
+
+  test('each period is added up on its own, because the Configurator asks per period', () => {
+    const s = conceptSection9Scenario();
+    const two: Scenario = {
+      ...s,
+      periods: [
+        { ...s.periods[0]!, months: 3 },
+        {
+          ...s.periods[0]!,
+          index: 2,
+          months: 3,
+          machineCountOverrides: Object.fromEntries(
+            s.machineTypes.map((mt) => [mt.id, mt.machineCount * 2]),
+          ),
+        },
+      ],
+    };
+    const result = computeScenario(two);
+    assert.deepEqual(
+      result.storageByPeriod.map((p) => p.periodIndex),
+      [1, 2],
+    );
+    assert.equal(result.storageByPeriod[0]!.monthsCounted, 3);
+    // Twice the fleet, so twice on disk -- and the period sums say so without
+    // either one borrowing a month from the other.
+    const ratio = result.storageByPeriod[1]!.giBMonths / result.storageByPeriod[0]!.giBMonths;
+    assert.ok(Math.abs(ratio - 2) < 0.05, `${ratio}`);
+    assert.equal(
+      storageGiBMonthsForPeriod(result, 2),
+      result.storageByPeriod[1]!.giBMonths,
+    );
+    assert.equal(storageGiBMonthsForPeriod(result, 9), 0, 'a period that does not exist');
+  });
+});
+
+/**
+ * Retention, per measurement type.
+ *
+ * A retention rule in Cumulocity is attached to a measurement type, so two
+ * types on one machine can age out at different rates -- and the whole point of
+ * bucketing by window is that a scenario-wide number cannot express that. These
+ * are hand-checkable on purpose: one machine, one value a day, round numbers.
+ */
+describe('retention is a rule per measurement type', () => {
+  /**
+   * One machine writing exactly one value a day into each of two measurement
+   * types. A 31-day month then makes the arithmetic trivial: a type kept `d`
+   * days holds `min(d, days elapsed)` values.
+   */
+  const twoTypes = (kept: [number | undefined, number | undefined]): Scenario => {
+    const daily = { mode: 'interval' as const, seconds: 86_400 };
+    return {
+      name: 'two types',
+      notes: '',
+      settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme', retentionDays: 30 },
+      periods: [{ index: 1, months: 3, machineCountOverrides: {}, commercial: {} }],
+      machineTypes: [
+        {
+          id: 'mt',
+          name: 'Machine',
+          machineCount: 1,
+          onlinePct: 100,
+          metrics: [
+            {
+              id: 'a', name: 'A', unit: '', kind: 'continuous', cadence: daily,
+              semanticGroup: '', bundleId: 'ba',
+            },
+            {
+              id: 'b', name: 'B', unit: '', kind: 'continuous', cadence: daily,
+              semanticGroup: '', bundleId: 'bb',
+            },
+          ],
+          bundles: [
+            {
+              id: 'ba', fragmentName: 'acme_A', intervalSeconds: 86_400,
+              metricIds: ['a'], retentionDays: kept[0],
+            },
+            {
+              id: 'bb', fragmentName: 'acme_B', intervalSeconds: 86_400,
+              metricIds: ['b'], retentionDays: kept[1],
+            },
+          ],
+        },
+      ],
+    };
+  };
+
+  test('the engine hands storage one bucket per window, summing to the total', () => {
+    const month = computeScenario(twoTypes([90, 7])).months[0]!;
+    assert.deepEqual(
+      month.storedByRetention.map((b) => b.retentionDays),
+      [7, 90],
+      'shortest first, and one entry per distinct window',
+    );
+    assert.equal(
+      month.storedByRetention.reduce((sum, b) => sum + b.values, 0),
+      month.storedValues,
+      'the buckets are a partition of the month, not an extra',
+    );
+  });
+
+  test('two types kept for the same time share one bucket', () => {
+    const month = computeScenario(twoTypes([45, 45])).months[0]!;
+    assert.equal(month.storedByRetention.length, 1);
+    assert.equal(month.storedByRetention[0]!.retentionDays, 45);
+  });
+
+  test('each window is walked back through its own history', () => {
+    // Month 3 of a 31/28/31 run: 90 days elapsed, so the 90-day type holds
+    // everything it ever wrote (90 values) and the 7-day type holds 7.
+    const result = computeScenario(twoTypes([90, 7]));
+    const third = result.storage[2]!;
+    assert.ok(Math.abs(third.retained - 97) < 0.01, `${third.retained}`);
+    // And the same fleet on one window holds what that window says, so the
+    // mixed figure is genuinely the two of them and not an average.
+    assert.ok(Math.abs(computeScenario(twoTypes([90, 90])).storage[2]!.retained - 180) < 0.01);
+    assert.ok(Math.abs(computeScenario(twoTypes([7, 7])).storage[2]!.retained - 14) < 0.01);
+  });
+
+  test('the shortest and longest windows are both reported, so a mixed tenant reads as mixed', () => {
+    const mixed = computeScenario(twoTypes([90, 7])).storage[2]!;
+    assert.equal(mixed.retentionDays, 90, 'the longest decides how long storage climbs');
+    assert.equal(mixed.retentionDaysShortest, 7);
+    assert.equal(mixed.daysCovered, 90, 'and by month three the long window is full');
+
+    const uniform = computeScenario(twoTypes([45, 45])).storage[2]!;
+    assert.equal(uniform.retentionDays, uniform.retentionDaysShortest, 'one number when they agree');
+  });
+
+  test('a type with no rule of its own falls back to the scenario default', () => {
+    const inherited = computeScenario(twoTypes([undefined, undefined]));
+    assert.deepEqual(
+      inherited.months[0]!.storedByRetention.map((b) => b.retentionDays),
+      [30],
+      'the scenario default, not a per-type value invented here',
+    );
+    // Set one and only that one moves.
+    const one = computeScenario(twoTypes([90, undefined]));
+    assert.deepEqual(
+      one.months[0]!.storedByRetention.map((b) => b.retentionDays),
+      [30, 90],
+    );
+  });
+
+  test('a type kept for nothing stores nothing, and does not silently inherit 30 days', () => {
+    // Zero is an answer, and the one place a fallback would be a real bug: a
+    // customer who says "we do not keep this" must not be quoted for a month
+    // of it. So zero has to survive all the way through.
+    const result = computeScenario(twoTypes([0, 90]));
+    assert.deepEqual(
+      result.months[0]!.storedByRetention.map((b) => b.retentionDays),
+      [0, 90],
+    );
+    // Month three: the 90-day type has 90 values, the other has none.
+    assert.ok(Math.abs(result.storage[2]!.retained - 90) < 0.01, `${result.storage[2]!.retained}`);
+  });
+
+  test('retention moves no counter, whichever type carries it', () => {
+    const short = computeScenario(twoTypes([1, 1]));
+    const long = computeScenario(twoTypes([900, 900]));
+    assert.equal(long.peakMonth.total, short.peakMonth.total);
+    assert.equal(long.months[0]!.storedValues, short.months[0]!.storedValues);
+    assert.ok(long.storage[2]!.retained > short.storage[2]!.retained * 50);
+  });
+
+  test('a lone series carries its own rule, because it is its own measurement type', () => {
+    const s = twoTypes([30, 30]);
+    // A flag sent on change travels alone: no bundle can hold it, so the rule
+    // lives on the metric (CONCEPT.md section 4.4).
+    const withFlag: Scenario = {
+      ...s,
+      machineTypes: [
+        {
+          ...s.machineTypes[0]!,
+          metrics: [
+            ...s.machineTypes[0]!.metrics,
+            {
+              id: 'flag', name: 'Running', unit: '', kind: 'state',
+              cadence: { mode: 'onChange', perDay: 1 },
+              semanticGroup: '', retentionDays: 365,
+            },
+          ],
+        },
+      ],
+    };
+    const month = computeScenario(withFlag).months[0]!;
+    assert.deepEqual(
+      month.storedByRetention.map((b) => b.retentionDays),
+      [30, 365],
+    );
+    assert.equal(
+      month.storedByRetention.find((b) => b.retentionDays === 365)!.values,
+      31,
+      'one transition a day for 31 days, kept for a year',
+    );
   });
 });

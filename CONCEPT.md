@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 21 — English and German, from one catalogue; no burst multiplier · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-08-27
+**Status:** draft for review, rev 22 — storage is month ends added up, and retention is a rule per measurement type · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-03
 
 ---
 
@@ -316,26 +316,38 @@ alternative side by side.
 
 ### 4.6 Operational storage — a range, and why it stays one
 
-The Operational Data Store is billed per GiB of **daily maximum** storage, so it is a real line in the
-Configurator (row 37) that somebody has to fill in. The tool now offers a figure for it, from
-`StorageCalculation.txt`:
+The Operational Data Store is a real line in the Configurator (row 37) that somebody has to fill in.
+Two questions decide what goes in it: **what is measured**, and **how big a stored value is**. The
+first is a billing rule; the second comes from `StorageCalculation.txt` and is a range.
+
+**What is measured: the end of each month, added up.** The platform captures what the database holds
+when a calendar month closes. That capture happens every month, and a contract period's quantity is
+those captures **added up** — so the unit is **GiB-months**, and the figure for a twelve-month period
+is roughly twelve times what the database holds at any one time.
+
+Two plausible readings of "storage for the period" are both wrong, and worth naming because each is
+wrong in an expensive direction. The **fullest month** over-states a period that spent most of itself
+filling up: quoting a year at the level it reached in month twelve charges for eleven months the
+customer did not have. The **last month** does the reverse, and under-states a fleet that shrank. The
+sum is neither, and it is what is billed.
 
 | Assumption | Value | Provenance |
 |---|---|---|
 | Bytes per stored value in MongoDB | **100–400 B** | 100 B from independent tests on Edge and a rule of thumb; 400 B from one proof of concept. Marked *"needs to be verified"* at source. |
 | DataHub extract, relative to MongoDB | **20–25 %** | Rule of thumb, tested on Edge. Also *"to be verified"*. |
-| Retention | **asked** (30 days to start) | Not in the source at all. It is a tenant setting, and the tool cannot read it. |
+| Retention | **asked**, per measurement type, over a scenario default (30 days to start) | Not in the source at all. Retention rules are a tenant setting, and the tool cannot read them. |
 
 **Both ends are always reported, and no midpoint is ever computed.** Averaging two unverified figures
 produces something that looks like a measurement. A fourfold spread *is* the finding, and the tool
-hands it over intact.
+hands it over intact — summed the same way as the quoted figure, so the range arrives at the period
+as a range rather than being re-derived from a total that has already lost it.
 
-**But a cell needs one number, so the tool writes one.** `D37` is filled in from the values on disk at
-the assumed **bytes per value**, which defaults to **400 B — the top of the range**. Not a midpoint,
+**But a cell needs one number, so the tool writes one.** `D37` is filled in from the month-end values
+at the assumed **bytes per value**, which defaults to **400 B — the top of the range**. Not a midpoint,
 and not the bottom: on a commit-to-consume contract, under-stating usage saves the customer nothing,
 it depletes the commitment early and triggers an automatic top-up. The assumption is a scenario
-setting beside retention, the whole range travels in the note column next to the cell, and a customer
-who has measured their own tenant overrides it in the deployment panel — their figure wins.
+setting beside the default retention, the whole range travels in the note column next to the cell, and
+a customer who has measured their own tenant overrides it in the deployment panel — their figure wins.
 
 That makes storage the tool's only `estimated` line item, a third kind alongside `calculated` and
 `asked`: derived, but on assumptions worth overriding. `calculated` would claim the fleet implies it;
@@ -345,17 +357,30 @@ A well-bundled fleet has room *below* the quoted figure and none above it: the 1
 on values stored one per measurement, and a measurement carrying four values pays for its envelope
 once rather than four times. That is another reason the top of the range is the safe end to write.
 
-Two things the source does not say, and the model therefore has to get right:
+#### Retention is a rule per measurement type
 
-**Retention decides the size, not the traffic.** What is billed is what is on disk on the fullest day,
-so identical traffic held for 90 days occupies three times what it does at 30. Retention lives in the
-scenario settings, beside the calendar start, and changes no counter.
+**Retention decides the size, not the traffic.** What survives to the end of the month is what is
+still inside its retention window, so identical traffic held for 90 days occupies three times what it
+does at 30. It moves no counter.
+
+**And a retention rule is attached to a measurement type**, which is where the tool asks for it: a
+column in the measurements table, on the row that names the type. A tenant keeping `acme_Climate` for
+90 days and `acme_Vibration` for 7 is the ordinary case, and a single scenario-wide number cannot
+express it — a fleet with one long-lived type and one short-lived one would be quoted at whichever of
+the two somebody typed. The scenario setting survives as the **tenant default**, for every type with
+no rule of its own, and an empty field means exactly that.
+
+So the engine hands the storage model one bucket of values per window rather than a single total, and
+walks each bucket back through its own window. Types kept for the same time share a bucket, because
+they age out together and nothing downstream needs their names. Zero is a real answer — "we do not
+keep this" — and has to survive every layer that might read it as absent and refill it with 30.
 
 **The ramp means the period is not full yet.** A fleet three months into a rollout has three months of
-history, not thirty days of steady state at its final size. The retention period is walked backwards
-day by day through the months the ramp actually produced, so period 1 reads truthfully — and storage
-keeps climbing for months after the message count has levelled off, which is a property no
-single-month calculation can show. That behaviour is enforced by test.
+history, not thirty days of steady state at its final size. Each window is walked backwards day by
+day through the months the ramp actually produced, so period 1 reads truthfully — and storage keeps
+climbing for months after the message count has levelled off, which is a property no single-month
+calculation can show. That behaviour is enforced by test, and it is also why the period is a sum:
+the months genuinely differ from one another.
 
 **What it covers: measurements.** Events, alarms, inventory writes and operations are stored too, but
 the source measured datapoints. Rather than assert that the difference is small, the tool reports the
@@ -424,6 +449,7 @@ fall out directly.
 Scenario
   name, notes
   settings:    startYear, startMonth, retentionDays, bytesPerValue, fragmentPrefix
+               // retentionDays here is the tenant default; a measurement type overrides it
   periods:     Period[]                  // 1-5, mirrors the Configurator
   machineTypes: MachineType[]
 
@@ -444,9 +470,12 @@ Metric
          | { mode: 'command',   perMonth, transitions }   // command
   semanticGroup                          // free text; drives bundle proposal
   bundleId?                              // continuous only; null = own measurement
+  fragmentName?                          // the type it sends in when it travels alone
+  retentionDays?                         // likewise; absent = the scenario default
 
 Bundle
   fragmentName, intervalSeconds, metricIds[]
+  retentionDays?                         // the type's rule; absent = the scenario default
   // invariant: every member is kind 'continuous' with identical intervalSeconds
   // invariant: metricIds.length <= 100   -- platform recommendation, §11
 ```
@@ -468,6 +497,11 @@ inventory   → N × count                        → Inventories Updated   // q
             → N × perDay × DPM                 → Inventories Updated   // quoted per day
 command     → N × perMonth × (1 + transitions) → Operations Created + Updated
 onboarding  → machineCount, once, in its period → Inventories Created
+
+// storage, separately: not a counter, and the only figure retention touches
+stored[w]   = values written this month into types kept w days
+retained    = Σ over w of (that window walked back day by day through prior months)
+period ODS  = Σ over the period's months of retained, at bytesPerValue   // GiB-months
 
 counters[9]        = each counter summed independently, for one calendar month
 messagesInMonth    = Σ counters
@@ -499,9 +533,9 @@ every input visibly moves the number.
 | # | Key | Screen | What it asks, and what it teaches |
 |---|---|---|---|
 | 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
-| 2 | `series` | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. |
+| 2 | `series` | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). |
 | 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. |
-| 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
+| 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs — the default retention and the bytes per value. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
 | 5 | `results` | **Results** | §7. |
 
 **An input is asked once, in the place it is used.** Deployment & add-ons and Rollout were two
@@ -685,8 +719,9 @@ page supports this table.
   always the default; a figure that only ever repeats the input is not evidence, and printing it
   beside a computed one lends it authority it has not earned. Burstiness is a device-design question
   and it changes no counter — billing is a monthly total.
-- Stored values per month, as a count, and the operational storage they imply as a GiB **range** with
-  its assumptions attached (§4.6). Both ends, never a midpoint.
+- Stored values per month, as a count, and the operational storage they imply as a **range** with its
+  assumptions attached (§4.6): what the database holds at each month's end, added up over the period,
+  in GiB-months. Both ends, never a midpoint.
 - A per-period ramp of message volume as the fleet rolls out.
 
 Deliberately absent: billable units, utilisation, headroom, commit recommendations, overage warnings.
@@ -742,7 +777,7 @@ in the wizard and sends the file to their account team, who price it up.** So it
 |---|---|---|
 | **Configurator** | transfer | every quantity on the row the Configurator keeps for it, **one column per period**, so column D pastes at the same cell and each later column pastes at the cell its heading names. The Messages row is left blank in every period column on purpose — it is the one formula in that column (`=SUM(D28:D36)`) and a pasted constant would destroy it |
 | **Quote** | the account team | quantities referenced from the Configurator sheet, periods side by side, billable units over the whole term, a shaded unit-price column, and **the CTC commitment** as a formula (§6.6). Messages are rounded into blocks of 100,000 per month before being multiplied by the months |
-| **Storage** | review | the operational-storage range month by month, with its assumptions and their provenance (§4.6) |
+| **Storage** | review | the operational-storage range month by month plus each period's sum, with its assumptions and their provenance (§4.6) |
 | **Design** | the device team | every reading, its cadence, and the measurement it travels in |
 | **Months** | evidence | all nine counters for every calendar month, so the range is demonstrable rather than asserted |
 | **Guidance** | review | every finding with its volume delta |

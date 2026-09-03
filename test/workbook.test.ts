@@ -188,6 +188,44 @@ describe('the workbook content', () => {
     assert.equal(valueAt(27), '', 'D27 must stay empty so the formula survives');
   });
 
+  test('the storage line is the period sum, and the Storage sheet shows the addition', () => {
+    const result = computeScenario(conceptSection9Scenario());
+    const period = result.storageByPeriod[0]!;
+
+    // D37 carries the quantity storage is billed on: the month-end snapshots
+    // added up. The fullest month is a stat, not the cell -- quoting it would
+    // charge twelve full months for a year spent filling up.
+    const d37 = sheet('Configurator')
+      .rows.find((row) => row.row === 37)
+      ?.cells.find((c) => c.col === 4)?.value;
+    assert.equal(d37, Number(period.giBMonths.toFixed(2)));
+    assert.notEqual(d37, Number(period.peak!.quotedGiB.toFixed(2)));
+
+    // And the sheet behind it carries one row per month plus the total, so the
+    // sum can be checked rather than taken on trust.
+    const storage = sheet('Storage');
+    const cells = storage.rows.flatMap((row) => row.cells);
+    const labels = cells.filter((c) => c.col === 1).map((c) => String(c.value));
+    assert.ok(
+      labels.some((l) => l === 'Period 1 total (12 months) - GiB-months'),
+      `no period total row: ${labels.join(' | ')}`,
+    );
+    assert.ok(labels.filter((l) => /^\w+ 2027$/.test(l.replace(' (fullest)', ''))).length >= 12);
+    // The total row's GiB columns are the sums of the month rows above it.
+    const totalRow = storage.rows.find((row) =>
+      row.cells.some((c) => c.col === 1 && String(c.value).startsWith('Period 1 total')),
+    )!;
+    assert.equal(
+      totalRow.cells.find((c) => c.col === 6)?.value,
+      Number(period.highGiBMonths.toFixed(2)),
+    );
+    // GiB-months has to be said somewhere, or a reader divides by twelve.
+    assert.ok(
+      allValues().some((v) => typeof v === 'string' && v.includes('GiB-months')),
+      'the unit is named',
+    );
+  });
+
   test('periods run left to right, one column each', () => {
     const base = conceptSection9Scenario();
     const hvac = base.machineTypes[0]!;

@@ -25,6 +25,7 @@ function makeFormats(next: Locale) {
   return {
     whole: new Intl.NumberFormat(tag, { maximumFractionDigits: 0 }),
     tenth: new Intl.NumberFormat(tag, { maximumFractionDigits: 1 }),
+    hundredth: new Intl.NumberFormat(tag, { maximumFractionDigits: 2 }),
   };
 }
 
@@ -61,10 +62,13 @@ export function compact(value: number): string {
  * once it is past a few GiB.
  */
 export function gib(value: number): string {
+  // Every branch goes through Intl: a summed figure crosses into four digits
+  // easily, and 2130 beside a grouped 2,130 elsewhere on the same panel reads
+  // as two different numbers. `toFixed` was also giving German a decimal point.
   if (value === 0) return '0 GiB';
-  if (value < 1) return `${value.toFixed(2)} GiB`;
+  if (value < 1) return `${formats.hundredth.format(value)} GiB`;
   if (value < 100) return `${nf1.format(value)} GiB`;
-  if (value < 10_240) return `${Math.round(value)} GiB`;
+  if (value < 10_240) return `${nf.format(Math.round(value))} GiB`;
   return `${nf1.format(value / 1024)} TiB`;
 }
 
@@ -74,6 +78,18 @@ export function gib(value: number): string {
  * Unless the two ends land in different units, where dropping the first one
  * would read as "6,000 TiB to 23.4 TiB" -- so both are spelled out.
  */
+/**
+ * The same figure, as the quantity storage is actually billed in.
+ *
+ * Storage is captured at the end of each month and the captures are added up,
+ * so a period's quantity is GiB-months and not GiB -- and a reader who is not
+ * told that will divide by twelve to see whether it looks right. The unit is a
+ * catalogue string because German makes it "GiB-Monate".
+ */
+export function gibMonths(value: number): string {
+  return translate(locale, 'format.gibMonths', { amount: gib(value) });
+}
+
 export function gibRange(low: number, high: number): string {
   const [a, b] = [gib(low), gib(high)];
   const unitOf = (s: string) => s.replace(/^[\d.,\s]+/, '');

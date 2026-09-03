@@ -97,6 +97,42 @@ describe('the wizard renders', () => {
     assert.match(html, /A measurement type of its own/);
   });
 
+  test('series: asks retention once per measurement type, not once per row', () => {
+    const html = render(<StepTimeSeries {...props} />);
+    assert.match(html, /<th[^>]*>Kept for<\/th>/, 'the column exists');
+    // A retention rule is attached to a measurement type, so the row that names
+    // the type is the row that sets it. The four HVAC series share acme_Climate:
+    // one field between them, and the other three say where their rule lives.
+    // The two flags travel alone, so each carries its own.
+    const fields = html.match(/placeholder="30"/g) ?? [];
+    assert.equal(fields.length, 3, `${fields.length} retention fields`);
+    assert.equal((html.match(/as its measurement type/g) ?? []).length, 3);
+    // Empty box, the scenario default as the placeholder: nobody has decided
+    // this, and this is what will be used if nobody does.
+    // An empty string renders as a bare `value`, which is what an empty box is.
+    assert.match(html, /value placeholder="30"/);
+    assert.match(html, /scenario default/);
+    assert.match(html, /retention rule belongs to the measurement type/i);
+  });
+
+  test('series: a rule set on one type shows there and nowhere else', async () => {
+    const { setBundleRetentionDays } = await import('../src/ui/store.js');
+    const hvac = props.scenario.machineTypes[0]!;
+    const climate = hvac.bundles.find((b) => b.fragmentName === 'acme_Climate')!;
+    const kept = setBundleRetentionDays(props.scenario, hvac.id, climate.id, 90);
+    const html = render(<StepTimeSeries scenario={kept} onChange={noop} />);
+    assert.match(html, /value="90" placeholder="30"/, 'the rule reads back in its own row');
+    // And the flags keep inheriting: setting one type must not move the others.
+    // The placeholder stays the default everywhere -- it says what an empty box
+    // would use -- so the inherited rows are the ones with no value at all.
+    assert.equal((html.match(/value placeholder="30"/g) ?? []).length, 2);
+    assert.equal(
+      computeScenario(kept).months[0]!.storedByRetention.map((b) => b.retentionDays).join(),
+      '30,90',
+      'and the engine sees both windows',
+    );
+  });
+
   test('series: names things the way the platform does', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /<th[^>]*>Series<\/th>/, 'a datapoint is a series');
@@ -340,7 +376,9 @@ describe('the hand-off row explains its own buttons', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
     // The workbook fills D37 in from the storage estimate. This screen used to
     // show a dash there, which made the two disagree about the same cell.
-    assert.match(html, /64\.8/);
+    // 64.8 GiB standing at every month end of a 12-month period: 777.8
+    // GiB-months, which is the quantity, not the 64.8 the fullest month holds.
+    assert.match(html, /777\.8/);
     assert.match(html, /estimated, overridable/);
     // The catalogue writes punctuation literally, curly apostrophe included.
     assert.match(html, /title="the tool’s estimate; state a figure/);
@@ -352,8 +390,8 @@ describe('the hand-off row explains its own buttons', () => {
     // it, or the checklist misses the one line the tool filled in itself.
     assert.match(html, /Every cell, value and label/);
     // The value is built on click, so assert the source of truth instead.
-    const { storageGiBForPeriod } = await import('../lib/engine/index.js');
-    assert.ok(storageGiBForPeriod(result, 1) > 0);
+    const { storageGiBMonthsForPeriod } = await import('../lib/engine/index.js');
+    assert.ok(storageGiBMonthsForPeriod(result, 1) > 0);
   });
 
   test('and every copy button can report what happened', () => {
@@ -371,11 +409,12 @@ describe('the storage estimate shows its working', () => {
   test('results: reports a range, both ends of it, and where it came from', () => {
     const html = render(<Results scenario={scenario} result={result} />);
     assert.match(html, /Operational storage/);
-    // The §9 fleet stores 174 M values inside a 30-day retention period: 16.2
-    // GiB at 100 bytes each, 64.8 at 400.
-    assert.match(html, /16\.2 – 64\.8 GiB/);
+    // The §9 fleet holds 174 M values at every month end -- 30 days of writing
+    // at 5.8 M values a day -- which is 16.2 GiB at 100 bytes each and 64.8 at
+    // 400. Twelve month-ends make the period's quantity: 194 to 778 GiB-months.
+    assert.match(html, /194 – 778 GiB/);
     assert.match(html, /to be verified/, 'the provenance travels with the number');
-    assert.match(html, /30 days kept/);
+    assert.match(html, /kept for 30 days/);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
   });
 
@@ -384,11 +423,12 @@ describe('the storage estimate shows its working', () => {
     // 400 B per value is the default: the top of the range, because
     // under-stating usage on a commit-to-consume contract depletes the
     // commitment early rather than saving anybody anything.
-    assert.match(html, /64\.8 GiB<\/b>/, 'the quoted figure');
+    // The figure, with its unit in the stat's label: 778 GiB-months.
+    assert.match(html, /GiB-months<\/span><b>778<\/b>/, 'the quoted figure');
     assert.match(html, /at 400 B \/ value/);
-    assert.match(html, /16\.2 – 64\.8 GiB/, 'with the whole range beside it');
+    assert.match(html, /194 – 778 GiB/, 'with the whole range beside it');
     // Never a midpoint: no averaging of two unverified figures.
-    assert.doesNotMatch(html, /40\.5/, 'the midpoint of 16.2 and 64.8');
+    assert.doesNotMatch(html, /486/, 'the midpoint of 194 and 778');
     assert.match(html, /goes in the ODS cell/);
   });
 
@@ -396,9 +436,9 @@ describe('the storage estimate shows its working', () => {
     const html = render(<StepContract scenario={scenario} result={result} onChange={noop} />);
     // Empty box, estimate as the placeholder: nobody has stated this, and this
     // is what the workbook will use if nobody does.
-    assert.match(html, /placeholder="64\.82"/);
+    assert.match(html, /placeholder="777\.84"/);
     assert.match(html, /estimated at 400 B \/ value/);
-    assert.match(html, /16\.2–64\.8 GiB across the range/);
+    assert.match(html, /194\.5–777\.8 GiB-months across the range/);
   });
 
   test('it says what it leaves out', () => {

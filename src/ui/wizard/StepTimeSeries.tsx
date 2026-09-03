@@ -25,6 +25,7 @@
  */
 
 import {
+  DEFAULT_RETENTION_DAYS,
   derivedTypeName,
   fragmentNameFor,
   measurementView,
@@ -43,11 +44,13 @@ import {
   assignOwnBundle,
   patchBundle,
   removeMetric,
+  setBundleRetentionDays,
   setCadence,
   patchUnit,
   setDatapointName,
   setRhythm,
   setSeriesFragmentName,
+  setSeriesRetentionDays,
   setInterval as setMetricInterval,
 } from '../store.js';
 import { Choice, Duration, Every, Teach, Txt, Empty } from '../parts.js';
@@ -148,6 +151,55 @@ function Solo({
   );
 }
 
+/**
+ * How long the tenant keeps this measurement type.
+ *
+ * A retention rule in Cumulocity is attached to a measurement type, so this
+ * control belongs to the type and not to the row -- the same rule that gives
+ * the name field to the first series in a bundle and nobody else.
+ *
+ * Empty means the tenant's default, which is why this is a bare input with a
+ * placeholder rather than a `Num`: a spinner cannot be empty, and pre-filling
+ * every row with 30 would say the customer had decided something they have not
+ * even seen. Clearing the box hands the type back to the default.
+ */
+function Retention({
+  days, fallback, onChange,
+}: {
+  days: number | undefined;
+  fallback: number;
+  onChange: (days: number | undefined) => void;
+}) {
+  const t = useT();
+  const effective = days ?? fallback;
+  return (
+    <label class="field" title={t('series.retention.title')}>
+      <span style="display:flex;align-items:center;gap:5px">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          style="width:76px"
+          value={days === undefined ? '' : days}
+          placeholder={String(fallback)}
+          onInput={(e) => {
+            const raw = (e.target as HTMLInputElement).value.trim();
+            if (raw === '') return onChange(undefined);
+            const parsed = Number(raw);
+            onChange(Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined);
+          }}
+        />
+        <em style="font-style:normal;color:var(--ink-faint);font-size:12px">
+          {t.plural('unit.day', effective)}
+        </em>
+      </span>
+      {days === undefined && (
+        <span class="hint" style="margin:3px 0 0">{t('series.retention.inherited')}</span>
+      )}
+    </label>
+  );
+}
+
 function MachineBlock({
   machineType: mt, scenario, onChange, collapse,
 }: Props & { machineType: MachineType; collapse: Collapse }) {
@@ -158,6 +210,7 @@ function MachineBlock({
   const applied = proposalIsApplied(mt);
 
   const prefix = scenario.settings.fragmentPrefix;
+  const defaultRetention = scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
   const view = measurementView(mt, prefix);
   const apart = proposals.reduce((s, p) => s + p.messagesApart, 0);
   const together = proposals.reduce((s, p) => s + p.messagesTogether, 0);
@@ -182,6 +235,7 @@ function MachineBlock({
                 <th style="min-width:150px">{t('series.col.unit')}</th>
                 <th style="min-width:230px">{t('series.col.howOften')}</th>
                 <th style="min-width:250px">{t('series.col.type')}</th>
+                <th style="width:130px">{t('series.col.retention')}</th>
                 <th style="width:34px" />
               </tr>
             </thead>
@@ -318,6 +372,33 @@ function MachineBlock({
                       )}
                     </td>
                     <td>
+                      {/* The rule belongs to the type, so the row that names
+                          the type is the row that sets it -- a bundled series
+                          is kept for as long as its bundle, whatever any
+                          earlier scenario put on the metric. */}
+                      {timed && bundle ? (
+                        names ? (
+                          <Retention
+                            days={bundle.retentionDays}
+                            fallback={defaultRetention}
+                            onChange={(days) =>
+                              onChange(setBundleRetentionDays(scenario, mt.id, bundle.id, days))
+                            }
+                          />
+                        ) : (
+                          <span class="hint">{t('series.retention.shared')}</span>
+                        )
+                      ) : (
+                        <Retention
+                          days={metric.retentionDays}
+                          fallback={defaultRetention}
+                          onChange={(days) =>
+                            onChange(setSeriesRetentionDays(scenario, mt.id, metric.id, days))
+                          }
+                        />
+                      )}
+                    </td>
+                    <td>
                       <button class="ghost" onClick={() => onChange(removeMetric(scenario, mt.id, metric.id))}>
                         &times;
                       </button>
@@ -330,6 +411,9 @@ function MachineBlock({
         </div>
         <p class="hint" style="margin:8px 0 0">
           <Rich k="series.namingNote" />
+        </p>
+        <p class="hint" style="margin:6px 0 0">
+          <Rich k="series.retentionNote" p={{ days: String(defaultRetention) }} />
         </p>
         </>
       )}

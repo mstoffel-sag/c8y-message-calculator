@@ -429,6 +429,19 @@ function metricKind(raw: unknown): MetricKind {
   return (raw ?? 'continuous') as MetricKind;
 }
 
+/**
+ * A retention override, or nothing.
+ *
+ * Zero is a real answer -- "this type is not kept" -- so it has to pass, while
+ * a missing or nonsensical value has to stay missing: filling it in with 30
+ * here would turn every measurement type the customer never touched into one
+ * that overrides the tenant default, and the Contract step's field would then
+ * quietly stop doing anything.
+ */
+function retentionDays(raw: unknown): number | undefined {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : undefined;
+}
+
 export function normalise(input: unknown): Scenario {
   const raw = (input ?? {}) as Partial<Scenario>;
   const fallback = blankScenario();
@@ -457,6 +470,10 @@ export function normalise(input: unknown): Scenario {
       fragmentName: b?.fragmentName ?? 'acme_Readings',
       intervalSeconds: typeof b?.intervalSeconds === 'number' ? b.intervalSeconds : 60,
       metricIds: Array.isArray(b?.metricIds) ? b.metricIds : [],
+      // Absent means "the tenant default", which is a different scenario from
+      // one that says zero days -- so undefined has to survive the round trip
+      // rather than being filled in with a number here.
+      retentionDays: retentionDays(b?.retentionDays),
     })),
     metrics: (Array.isArray(mt?.metrics) ? mt.metrics : []).map((m) => {
       const kind = metricKind(m?.kind);
@@ -468,6 +485,7 @@ export function normalise(input: unknown): Scenario {
         cadence: m?.cadence ?? defaultCadence(kind),
         semanticGroup: m?.semanticGroup ?? '',
         fragmentName: typeof m?.fragmentName === 'string' ? m.fragmentName : undefined,
+        retentionDays: retentionDays(m?.retentionDays),
         bundleId: m?.bundleId ?? null,
         resentOnTimer: Boolean(m?.resentOnTimer),
       };
@@ -639,6 +657,38 @@ export function setSeriesFragmentName(
 ): Scenario {
   return patchMetric(scenario, machineTypeId, metricId, {
     fragmentName: fragmentName.trim() ? fragmentName : undefined,
+  });
+}
+
+/**
+ * How long the tenant keeps the measurement type a lone series sends in.
+ *
+ * Same shape as `setSeriesFragmentName`, and for the same reason: a bundled
+ * series takes its type -- and therefore its retention rule -- from the bundle,
+ * so this is for the ones that travel alone. Clearing the box drops the
+ * override rather than storing a number, because an empty field means "the
+ * tenant default", which is what the placeholder in it says.
+ */
+export function setSeriesRetentionDays(
+  scenario: Scenario,
+  machineTypeId: string,
+  metricId: string,
+  days: number | undefined,
+): Scenario {
+  return patchMetric(scenario, machineTypeId, metricId, {
+    retentionDays: typeof days === 'number' && Number.isFinite(days) && days >= 0 ? days : undefined,
+  });
+}
+
+/** The same, for a measurement type that is a bundle. */
+export function setBundleRetentionDays(
+  scenario: Scenario,
+  machineTypeId: string,
+  bundleId: string,
+  days: number | undefined,
+): Scenario {
+  return patchBundle(scenario, machineTypeId, bundleId, {
+    retentionDays: typeof days === 'number' && Number.isFinite(days) && days >= 0 ? days : undefined,
   });
 }
 

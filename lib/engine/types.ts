@@ -81,6 +81,18 @@ export interface Metric {
    * this is ignored while bundleId is set.
    */
   fragmentName?: string;
+  /**
+   * Days the tenant's retention rule keeps this measurement type, when the
+   * series travels alone -- an on-change flag, or a continuous series in no
+   * bundle. Ignored while `bundleId` is set, for the same reason
+   * `fragmentName` is: the type belongs to the bundle then, and so does its
+   * rule.
+   *
+   * Absent means the scenario's default (`ScenarioSettings.retentionDays`).
+   * Retention changes no counter -- only how much of what was written is still
+   * on disk at the end of a month.
+   */
+  retentionDays?: number;
 }
 
 export interface Bundle {
@@ -89,6 +101,16 @@ export interface Bundle {
   fragmentName: string;
   intervalSeconds: number;
   metricIds: string[];
+  /**
+   * Days the tenant's retention rule keeps this measurement type. Absent means
+   * the scenario's default.
+   *
+   * Retention rules in Cumulocity match on the measurement type, so this is
+   * where one belongs -- not on the series inside it. A tenant that keeps
+   * `acme_Climate` for 90 days and `acme_Vibration` for 7 is the normal case,
+   * and a single scenario-wide number cannot express it.
+   */
+  retentionDays?: number;
 }
 
 export interface MachineType {
@@ -247,6 +269,18 @@ export function totalOf(counters: Counters): number {
 
 /* ------------------------------------------------------------------- results */
 
+/**
+ * Values written in one month under one retention rule.
+ *
+ * The engine groups by the number of days rather than by measurement type: two
+ * types kept for the same 30 days age out identically, and carrying their names
+ * this far would only invite a per-type storage table nobody asked for.
+ */
+export interface RetentionBucket {
+  retentionDays: number;
+  values: number;
+}
+
 export interface MonthResult {
   year: number;
   /** 1-12. */
@@ -263,6 +297,15 @@ export interface MonthResult {
    * tool does not invent one.
    */
   storedValues: number;
+  /**
+   * The same values, split by the retention rule that governs them.
+   *
+   * Retention is a property of the measurement type, so a month does not write
+   * one heap of values that all age out together -- it writes one heap per
+   * rule. Storage has to walk each heap back through its own window, which it
+   * cannot do from a single total. Buckets sum to `storedValues`.
+   */
+  storedByRetention: RetentionBucket[];
   /** Every series its own measurement, every state interval-sampled. */
   naiveTotal: number;
   /** One-off registration volume landing in this month. */
@@ -303,12 +346,26 @@ export interface StorageMonth {
   /** Measurement values written during this month. */
   written: number;
   /**
-   * Values still inside the retention window at the end of it -- the fullest
-   * day, and so the daily maximum the platform bills for.
+   * Values still inside their retention windows at the end of the month.
+   *
+   * The end of the month is the measuring point, not the fullest day: the
+   * platform snapshots what the database holds when the month closes, and the
+   * year's quantity is those snapshots added up. So this is a month-end
+   * figure, and `PeriodStorage.giBMonths` is the sum that gets quoted.
    */
   retained: number;
+  /**
+   * The longest retention window in play, in days -- the one that decides how
+   * long storage keeps climbing. Equal to `retentionDaysShortest` when every
+   * measurement type is kept for the same time, which is the common case.
+   */
   retentionDays: number;
-  /** Days of history actually behind this figure; short while the fleet ramps. */
+  /** The shortest window in play. Differs from `retentionDays` on a mixed tenant. */
+  retentionDaysShortest: number;
+  /**
+   * Days of history behind the longest window; short while the fleet ramps.
+   * A fleet two months into a rollout cannot have 90 days of anything.
+   */
   daysCovered: number;
   lowGiB: number;
   highGiB: number;
@@ -336,6 +393,32 @@ export interface StorageMonth {
   nonMeasurementShare: number;
 }
 
+/**
+ * Operational storage for one contract period -- the quantity the Configurator
+ * actually asks for.
+ *
+ * Storage is billed on what the database holds at the end of each month,
+ * captured every month and added up over the period. So the quantity is a sum
+ * of month-end snapshots, in GiB-months, and not the fullest month: a period
+ * that ends full has paid for every month it took to fill up.
+ */
+export interface PeriodStorage {
+  periodIndex: number;
+  /** Calendar months summed -- the period's length, and the divisor for `averageGiB`. */
+  monthsCounted: number;
+  /** The quantity: month-end GiB added up, at the scenario's assumed bytes per value. */
+  giBMonths: number;
+  /** The same sum at each end of the unverified byte range. */
+  lowGiBMonths: number;
+  highGiBMonths: number;
+  dataHubLowGiBMonths: number;
+  dataHubHighGiBMonths: number;
+  /** `giBMonths / monthsCounted` -- what a month of the period holds on average. */
+  averageGiB: number;
+  /** The fullest month in the period. Not the quantity, but worth naming. */
+  peak?: StorageMonth;
+}
+
 export interface ScenarioResult {
   scenarioName: string;
   periods: PeriodResult[];
@@ -350,6 +433,8 @@ export interface ScenarioResult {
    * message month -- it keeps climbing while the fleet grows.
    */
   peakStorage?: StorageMonth;
+  /** One entry per contract period: the month-end snapshots, added up. */
+  storageByPeriod: PeriodStorage[];
 }
 
 /* ------------------------------------------------------------------- linting */

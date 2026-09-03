@@ -260,6 +260,73 @@ describe('scenario normalisation', () => {
     assert.equal(computeScenario(fixed).peakMonth.counters.inventoriesUpdated, 100);
   });
 
+  test('a per-type retention rule survives a save and reload', async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    // normalise rebuilds every bundle and metric field by field, so a new field
+    // that is not listed there is silently dropped -- and a dropped retention
+    // rule reverts to the default, which over-states storage without saying so.
+    const saved = {
+      name: 'Kept differently',
+      settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme', retentionDays: 30 },
+      periods: [{ index: 1, months: 12, machineCountOverrides: {}, commercial: {} }],
+      machineTypes: [
+        {
+          id: 'mt', name: 'Pump', machineCount: 1, onlinePct: 100,
+          bundles: [{
+            id: 'b', fragmentName: 'acme_Flow', intervalSeconds: 60,
+            metricIds: ['m'], retentionDays: 90,
+          }],
+          metrics: [
+            {
+              id: 'm', name: 'Flow', unit: 'l/s', kind: 'continuous',
+              cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'flow', bundleId: 'b',
+            },
+            {
+              id: 'f', name: 'Running', unit: '', kind: 'state',
+              cadence: { mode: 'onChange', perDay: 2 }, semanticGroup: 'status',
+              retentionDays: 0,
+            },
+          ],
+        },
+      ],
+    };
+    const fixed = normalise(saved);
+    assert.equal(fixed.machineTypes[0]?.bundles[0]?.retentionDays, 90);
+    // Zero is an answer -- "we do not keep this" -- so it must not be read as
+    // absent and refilled with the default.
+    assert.equal(fixed.machineTypes[0]?.metrics[1]?.retentionDays, 0);
+    assert.deepEqual(
+      computeScenario(fixed).months[0]?.storedByRetention.map((b) => b.retentionDays),
+      [0, 90],
+    );
+  });
+
+  test('a scenario with no rules anywhere keeps the field absent, not defaulted', async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    // Filling in 30 here would make every untouched measurement type look like
+    // one the customer had decided about, and the Contract step's default would
+    // then quietly stop doing anything.
+    const fixed = normalise({
+      name: 'No rules',
+      settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
+      periods: [{ index: 1, months: 12, machineCountOverrides: {}, commercial: {} }],
+      machineTypes: [
+        {
+          id: 'mt', name: 'Pump', machineCount: 1, onlinePct: 100,
+          bundles: [{ id: 'b', fragmentName: 'acme_Flow', intervalSeconds: 60, metricIds: ['m'] }],
+          metrics: [{
+            id: 'm', name: 'Flow', unit: 'l/s', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'flow', bundleId: 'b',
+            // Nonsense from a hand-edited file: neither of these is a duration.
+            retentionDays: -5,
+          }],
+        },
+      ],
+    });
+    assert.equal(fixed.machineTypes[0]?.bundles[0]?.retentionDays, undefined);
+    assert.equal(fixed.machineTypes[0]?.metrics[0]?.retentionDays, undefined);
+  });
+
   test('garbage in does not take the page down', async () => {
     const { normalise } = await import('../src/ui/store.js');
     for (const junk of [null, undefined, {}, { periods: 'nope' }, { machineTypes: [null] }]) {

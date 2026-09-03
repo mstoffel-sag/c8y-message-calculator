@@ -15,6 +15,7 @@ import {
   type MonthResult,
   type Period,
   type PeriodResult,
+  type RetentionBucket,
   type Scenario,
   type ScenarioResult,
   addCounters,
@@ -23,7 +24,12 @@ import {
 } from './types.js';
 import { type CalendarMonth, SECONDS_PER_DAY, expandMonths, secondsInMonth } from './calendar.js';
 import { lintScenario } from './lint.js';
-import { peakStorageMonth, storageByMonth } from './storage.js';
+import {
+  DEFAULT_RETENTION_DAYS,
+  peakStorageMonth,
+  storageByMonth,
+  storagePerPeriod,
+} from './storage.js';
 import { commandsInMonth } from './cadence.js';
 
 /** Interval assumed for a state metric in the naive baseline when the machine
@@ -101,9 +107,27 @@ function fastestContinuousInterval(machineType: MachineType): number {
 export interface MachineTypeMonth {
   counters: Counters;
   storedValues: number;
+  /** `storedValues`, split by the retention rule governing each measurement type. */
+  storedByRetention: RetentionBucket[];
   /** Total messages under the naive baseline, for the same information. */
   naiveTotal: number;
   total: number;
+}
+
+/**
+ * A retention setting, as a number of days the walk-back can use.
+ *
+ * A measurement type with no rule of its own inherits the tenant's default,
+ * which is the scenario setting. Zero is meaningful -- it says nothing is kept
+ * -- so only a missing, negative or nonsensical value falls back.
+ */
+export function retentionFor(own: number | undefined, fallback: number): number {
+  return typeof own === 'number' && Number.isFinite(own) && own >= 0 ? own : fallback;
+}
+
+/** Accumulates values into the bucket for their window, so equal windows merge. */
+function bucketInto(into: Map<number, number>, retentionDays: number, values: number): void {
+  into.set(retentionDays, (into.get(retentionDays) ?? 0) + values);
 }
 
 /**
@@ -115,12 +139,16 @@ export function computeMachineTypeMonth(
   machineType: MachineType,
   machinesOnline: number,
   days: number,
+  defaultRetentionDays: number = DEFAULT_RETENTION_DAYS,
 ): MachineTypeMonth {
   const counters = zeroCounters();
   const naive = zeroCounters();
   const spm = secondsInMonth(days);
   const n = machinesOnline;
   let storedValues = 0;
+  // Keyed by window rather than by measurement type: two types kept for the
+  // same 30 days age out together, so they can be added up here.
+  const retention = new Map<number, number>();
 
   // --- continuous readings, bundled: one POST carries every series in the
   // --- bundle, so the count is per send, not per series.
@@ -131,6 +159,13 @@ export function computeMachineTypeMonth(
     const sends = (n * spm) / interval;
     counters.measurementsCreated += sends;
     storedValues += sends * members.length;
+    // The rule belongs to the measurement type, so every series in the bundle
+    // ages out on the bundle's window whatever else it has been given.
+    bucketInto(
+      retention,
+      retentionFor(bundle.retentionDays, defaultRetentionDays),
+      sends * members.length,
+    );
 
     // Naive: every series its own measurement at the same cadence.
     naive.measurementsCreated += sends * members.length;
@@ -142,6 +177,7 @@ export function computeMachineTypeMonth(
     const sends = (n * spm) / Math.max(metric.cadence.seconds, 1e-9);
     counters.measurementsCreated += sends;
     storedValues += sends;
+    bucketInto(retention, retentionFor(metric.retentionDays, defaultRetentionDays), sends);
     naive.measurementsCreated += sends;
   }
 
@@ -161,6 +197,7 @@ export function computeMachineTypeMonth(
         const sends = n * cadence.perDay * days;
         counters.measurementsCreated += sends;
         storedValues += sends;
+        bucketInto(retention, retentionFor(metric.retentionDays, defaultRetentionDays), sends);
         // Naive: sampled on the fleet's fastest interval like everything else.
         naive.measurementsCreated += (n * spm) / naiveStateInterval;
         break;
@@ -219,6 +256,9 @@ export function computeMachineTypeMonth(
   return {
     counters,
     storedValues,
+    storedByRetention: [...retention]
+      .map(([retentionDays, values]) => ({ retentionDays, values }))
+      .sort((a, b) => a.retentionDays - b.retentionDays),
     naiveTotal: totalOf(naive),
     total: totalOf(counters),
   };
@@ -254,18 +294,27 @@ function computeMonth(
   const period = scenario.periods.find((p) => p.index === month.periodIndex);
   const counters = zeroCounters();
   const byMachineType: MonthResult['byMachineType'] = [];
+  const retention = new Map<number, number>();
   let storedValues = 0;
   let naiveTotal = 0;
   let machinesOnline = 0;
   let machinesTotal = 0;
 
+  const defaultRetention = retentionFor(scenario.settings.retentionDays, DEFAULT_RETENTION_DAYS);
+
   for (const machineType of scenario.machineTypes) {
     const count = machineCountIn(machineType, period);
     const online = count * (machineType.onlinePct / 100);
-    const result = computeMachineTypeMonth(machineType, online, month.days);
+    const result = computeMachineTypeMonth(machineType, online, month.days, defaultRetention);
 
     addCounters(counters, result.counters);
     storedValues += result.storedValues;
+    for (const bucket of result.storedByRetention) {
+      retention.set(
+        bucket.retentionDays,
+        (retention.get(bucket.retentionDays) ?? 0) + bucket.values,
+      );
+    }
     naiveTotal += result.naiveTotal;
     machinesOnline += online;
     machinesTotal += count;
@@ -292,6 +341,9 @@ function computeMonth(
     counters,
     total,
     storedValues,
+    storedByRetention: [...retention]
+      .map(([retentionDays, values]) => ({ retentionDays, values }))
+      .sort((a, b) => a.retentionDays - b.retentionDays),
     naiveTotal,
     onboardingCreates: onboardingThisMonth,
     byMachineType,
@@ -331,9 +383,10 @@ export function computeScenario(scenario: Scenario): ScenarioResult {
   });
 
   const first = months[0]!;
-  // Storage needs the whole month series, not one month: what is on disk at the
-  // end of a month is what the months before it left inside the retention
-  // window. So it is derived here, once, rather than per consumer.
+  // Storage needs the whole month series, not one month: what is on disk when a
+  // month closes is what the months before it left inside the retention
+  // windows, and the quantity billed is those month-end figures added up. So it
+  // is derived here, once, rather than per consumer.
   const storage = storageByMonth(
     months,
     scenario.settings.retentionDays,
@@ -348,6 +401,10 @@ export function computeScenario(scenario: Scenario): ScenarioResult {
     findings: lintScenario(scenario),
     storage,
     peakStorage: peakStorageMonth(storage),
+    // What the Configurator asks for is the period's sum of month-end
+    // snapshots, so it is derived here beside the months rather than by every
+    // consumer summing the array itself.
+    storageByPeriod: storagePerPeriod(storage),
   };
 }
 

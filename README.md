@@ -125,18 +125,29 @@ workbook** itself. Numbers and month names come from `Intl`.
 ### Operational storage is a range, not a number
 
 The Results step and a `Storage` sheet in the workbook estimate the Operational Data Store from the
-values the fleet writes: **100–400 bytes per stored value** in MongoDB, held for the tenant's
-**retention period**, plus a **DataHub extract at 20–25 %** of that. Both figures come from
-`StorageCalculation.txt` and both are marked "to be verified" at source, so both ends of the range
-are always shown and no midpoint ever is.
+values the fleet writes: **100–400 bytes per stored value** in MongoDB, kept for as long as the
+tenant's **retention rules** keep them, plus a **DataHub extract at 20–25 %** of that. Both figures
+come from `StorageCalculation.txt` and both are marked "to be verified" at source, so both ends of the
+range are always shown and no midpoint ever is.
 
-The Configurator's ODS cell (`D37`) is filled in from it, at the assumed bytes per value — **400 B by
-default, the top of the range**, because under-stating usage on a commit-to-consume contract depletes
-the commitment early rather than saving anything. The note beside the cell carries the whole range,
-and typing a figure in the deployment panel overrides it.
+**Storage is billed on what the database holds at the end of each calendar month, captured every
+month and added up over the contract period** — so the quantity is in **GiB-months**, and a
+twelve-month period reads roughly twelve times what the database holds at any one time. It is
+deliberately neither the fullest month, which would charge a year at the level it only reached in
+month twelve, nor the last, which would under-state a fleet that shrank.
 
-The retention period is walked backwards through the months the ramp produced, so a fleet three
-months into a rollout is not credited with a full period of history, and storage keeps climbing after
+**Retention is a rule per measurement type**, asked in a column of the measurements table on the row
+that names the type — a tenant keeping `acme_Climate` for 90 days and `acme_Vibration` for 7 is the
+ordinary case. The scenario setting on the Contract step is the tenant default, used by every type
+with no rule of its own.
+
+The Configurator's ODS cell (`D37`) is filled in from all of this, at the assumed bytes per value —
+**400 B by default, the top of the range**, because under-stating usage on a commit-to-consume
+contract depletes the commitment early rather than saving anything. The note beside the cell carries
+the whole range, and typing a figure in the deployment panel overrides it.
+
+Each retention window is walked backwards through the months the ramp produced, so a fleet three
+months into a rollout is not credited with a full window of history, and storage keeps climbing after
 the message count has levelled off.
 
 ### Styling follows the Cumulocity design system

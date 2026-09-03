@@ -16,7 +16,7 @@ import {
   type Scenario,
   type ScenarioResult,
 } from '../../lib/engine/index.js';
-import { compact, gib, gibRange, monthYear, n, nf1, pct, signed } from './format.js';
+import { compact, gib, gibMonths, gibRange, monthYear, n, nf1, pct, signed } from './format.js';
 import { Rich, useT } from './i18n.js';
 
 export function Results({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
@@ -295,12 +295,28 @@ export function Findings({ findings }: { findings: Finding[] }) {
  * source, and one of them spans 4x on its own. Reporting a midpoint would make
  * that look like a measurement, so both ends are shown, the retention that
  * scales them is stated, and the ODS line stays somebody's decision.
+ *
+ * The headline figure is a period's sum of month-end snapshots, in GiB-months,
+ * because that is what is billed. The fullest month keeps a stat of its own: it
+ * is not the quantity, but it says when the fleet stopped filling up, and a
+ * period whose peak lands in its last month is a period that will be quoted
+ * higher next time.
  */
 function Storage({ result }: { result: ScenarioResult }) {
   const t = useT();
   const peak = result.peakStorage;
-  if (!peak || peak.retained <= 0) return null;
+  // The quote is anchored on the first period, which is what the Configurator's
+  // own note says; the others are listed under the grid.
+  const first = result.storageByPeriod[0];
+  if (!peak || !first || peak.retained <= 0) return null;
   const partial = peak.daysCovered < peak.retentionDays;
+  const mixed = peak.retentionDaysShortest !== peak.retentionDays;
+  const keptFor = mixed
+    ? t('storage.kept.mixed', {
+        from: n(peak.retentionDaysShortest),
+        to: n(peak.retentionDays),
+      })
+    : t('storage.kept.uniform', { days: n(peak.retentionDays) });
 
   return (
     <section class="panel">
@@ -311,12 +327,17 @@ function Storage({ result }: { result: ScenarioResult }) {
       <div class="body">
         <div class="grid four" style="margin-bottom:18px">
           <div class="stat">
-            <span>{t('storage.stat.ods')}</span>
-            <b>{gib(peak.quotedGiB)}</b>
+            {/* The unit rides in the label rather than the figure: "778
+                GiB-months" breaks across its own hyphen at this size, and a
+                unit in small caps above the number is where a reader looks for
+                one anyway. */}
+            <span>{t('storage.stat.ods', { index: n(first.periodIndex) })}</span>
+            <b>{n(first.giBMonths)}</b>
             <small>
               {t('storage.stat.ods.sub', {
+                months: n(first.monthsCounted),
                 bytes: n(peak.bytesPerValue),
-                range: gibRange(peak.lowGiB, peak.highGiB),
+                range: gibRange(first.lowGiBMonths, first.highGiBMonths),
               })}
             </small>
           </div>
@@ -324,7 +345,7 @@ function Storage({ result }: { result: ScenarioResult }) {
             <span>{t('storage.stat.fullest')}</span>
             <b>{monthYear(peak.year, peak.month)}</b>
             <small>
-              {t('storage.stat.fullest.sub', { days: n(peak.retentionDays) })}
+              {t('storage.stat.fullest.sub', { kept: keptFor })}
               {partial &&
                 t('storage.stat.fullest.partial', { days: n(peak.daysCovered) })}
             </small>
@@ -346,11 +367,26 @@ function Storage({ result }: { result: ScenarioResult }) {
             </small>
           </div>
           <div class="stat">
-            <span>{t('storage.stat.dataHub')}</span>
-            <b>{gibRange(peak.dataHubLowGiB, peak.dataHubHighGiB)}</b>
+            {/* The same period as the ODS stat, summed the same way. Reporting
+                this one at the fullest month while the ODS line was a period
+                sum put two figures on two different bases in one grid, which
+                reads as a contradiction rather than as two facts. */}
+            <span>{t('storage.stat.dataHub', { index: n(first.periodIndex) })}</span>
+            <b>
+              {n(first.dataHubLowGiBMonths)} – {n(first.dataHubHighGiBMonths)}
+            </b>
             <small>{t('storage.stat.dataHub.sub')}</small>
           </div>
         </div>
+
+        {result.storageByPeriod.length > 1 && (
+          <p class="hint" style="margin:-8px 0 16px">
+            {t('storage.perPeriod')}{' '}
+            {result.storageByPeriod
+              .map((p) => `P${p.periodIndex} ${gibMonths(p.giBMonths)}`)
+              .join(' · ')}
+          </p>
+        )}
 
         <div class="grid two">
           <div>
@@ -358,7 +394,10 @@ function Storage({ result }: { result: ScenarioResult }) {
               <Rich
                 k="storage.odsCell"
                 p={{
-                  amount: gib(peak.quotedGiB),
+                  amount: gibMonths(first.giBMonths),
+                  index: n(first.periodIndex),
+                  months: n(first.monthsCounted),
+                  average: gib(first.averageGiB),
                   bytes: n(peak.bytesPerValue),
                   note: t('engine.storageSourceNote'),
                 }}
@@ -373,9 +412,9 @@ function Storage({ result }: { result: ScenarioResult }) {
               <Rich
                 k="storage.retentionDecides"
                 p={{
-                  days: n(peak.retentionDays),
+                  kept: keptFor,
                   note:
-                    peak.retentionDays === DEFAULT_RETENTION_DAYS
+                    !mixed && peak.retentionDays === DEFAULT_RETENTION_DAYS
                       ? t('storage.retentionDefault')
                       : '',
                 }}

@@ -24,15 +24,28 @@ import { formatDuration } from './duration.js';
 import { formatMonth } from './calendar.js';
 import { measurementView } from './diagram.js';
 import { machineCountIn } from './compute.js';
-import { DEFAULT_RETENTION_DAYS, peakStorageForPeriod } from './storage.js';
+import { BYTES_PER_VALUE_HIGH, DEFAULT_RETENTION_DAYS, storageForPeriod } from './storage.js';
 import { en, translate } from '../i18n/index.js';
-import type { MetricKind, Period, Scenario, ScenarioResult } from './types.js';
+import type { MetricKind, Period, PeriodStorage, Scenario, ScenarioResult } from './types.js';
 import { colName } from '../xlsx/writer.js';
 import type { Cell, Row, Sheet } from '../xlsx/writer.js';
 import { MESSAGE_BILLING_UNIT, commitmentFor } from './commitment.js';
-import { storageGiBForPeriod } from './storage.js';
+import { storageGiBMonthsForPeriod } from './storage.js';
 
 const COL = { category: 2, label: 3, value: 4, unit: 6, note: 7 } as const;
+
+/**
+ * The retention windows behind a period's figure, in words.
+ *
+ * A tenant that keeps every measurement type for the same time gets one number;
+ * one that keeps them for different times gets the span, because a single
+ * number would be a claim the scenario does not make.
+ */
+function retentionSpan(storage: PeriodStorage): string {
+  const longest = storage.peak?.retentionDays ?? DEFAULT_RETENTION_DAYS;
+  const shortest = storage.peak?.retentionDaysShortest ?? longest;
+  return shortest === longest ? `${longest} days` : `${shortest} to ${longest} days`;
+}
 
 /** Which Cumulocity element each kind writes to, for the Design sheet. */
 const ELEMENT_OF: Partial<Record<MetricKind, string>> = {
@@ -177,7 +190,7 @@ function configuratorSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         const value = scenarioPeriod?.commercial[item.key];
         const stated = typeof value === 'number' && value > 0;
         const storage =
-          item.key === 'ods' ? peakStorageForPeriod(result.storage, period.index) : undefined;
+          item.key === 'ods' ? storageForPeriod(result.storage, period.index) : undefined;
 
         if (stated) {
           anyStated = true;
@@ -187,21 +200,23 @@ function configuratorSheet(scenario: Scenario, result: ScenarioResult): Sheet {
           cells.push(text(periodCol(period.index), 'Yes'));
         } else if (storage !== undefined) {
           anyEstimated = true;
-          cells.push(num(periodCol(period.index), Number(storage.quotedGiB.toFixed(2))));
+          cells.push(num(periodCol(period.index), Number(storage.giBMonths.toFixed(2))));
         }
       }
 
-      const storage = item.key === 'ods' ? peakStorageForPeriod(result.storage, 1) : undefined;
+      const storage = item.key === 'ods' ? storageForPeriod(result.storage, 1) : undefined;
       cells.push(
         text(
           noteCol,
           storage === undefined
             ? 'stated in the wizard'
             : anyEstimated
-              ? `estimated: values on disk at ${storage.bytesPerValue} B each, ` +
-                `${storage.retentionDays} days retained. Unverified assumption -- the evidence spans ` +
-                `${storage.lowGiB.toFixed(1)} to ${storage.highGiB.toFixed(1)} GiB in period 1. ` +
-                'See the Storage sheet.'
+              ? `estimated: what the database held at the end of each month, added up over the ` +
+                `period, at ${storage.peak?.bytesPerValue ?? BYTES_PER_VALUE_HIGH} B per value. ` +
+                `Retention comes from the measurement types (${retentionSpan(storage)}). ` +
+                'Unverified assumption -- the evidence spans ' +
+                `${storage.lowGiBMonths.toFixed(1)} to ${storage.highGiBMonths.toFixed(1)} ` +
+                'GiB-months in period 1. See the Storage sheet.'
               : anyStated
                 ? 'stated in the wizard, overriding the storage estimate'
                 : 'stated in the wizard',
@@ -407,10 +422,16 @@ function monthsSheet(result: ScenarioResult, scenario: Scenario): Sheet {
  * Two columns for one quantity, because the source figure spans 4x and says
  * "to be verified" twice. Whoever fills in the ODS line picks a number from
  * this; the file will not pick one for them.
+ *
+ * One row per month and a total row per period, because the quantity is a sum:
+ * the platform captures what the database holds at the end of each calendar
+ * month, and the period's figure is those captures added up. A reader who only
+ * sees the total cannot tell a fleet that filled up in month two from one that
+ * filled up in month eleven, and those are different conversations.
  */
 function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
   const peak = result.peakStorage;
-  const retention = scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
+  const fallback = scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
 
   const rows: Row[] = [
     row(1, [text(1, 'Operational storage', 'title')]),
@@ -418,17 +439,19 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
     row(3, [
       text(
         1,
-        `Retention: ${retention} days, from the scenario. The platform bills the daily maximum, so ` +
-          'the quantity is what is still on disk on the fullest day of the month -- not what the ' +
-          'month wrote. Measurements only: events, alarms, inventory writes and operations are ' +
-          'stored too, but the source figure was measured on datapoints.',
+        'Storage is billed on what the database holds at the end of each calendar month, ' +
+          'captured every month and added up over the period -- so the quantity is a sum in ' +
+          'GiB-months, and the period total below is what the ODS line is filled in from. ' +
+          'Retention is a rule per measurement type, and the scenario default for a type ' +
+          `without one is ${fallback} days. Measurements only: events, alarms, inventory writes ` +
+          'and operations are stored too, but the source figure was measured on datapoints.',
         'note',
       ),
     ]),
     row(5, [
       text(1, 'Month', 'heading'),
       text(2, 'Values written', 'heading'),
-      text(3, 'Values on disk', 'heading'),
+      text(3, 'Values at month end', 'heading'),
       text(4, 'Days of history', 'heading'),
       text(5, 'GiB at 100 B', 'heading'),
       text(6, 'GiB at 400 B', 'heading'),
@@ -437,10 +460,36 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
     ]),
   ];
 
-  result.storage.forEach((month, i) => {
+  // Months, with each period's sum immediately under its last month: the sum is
+  // the quantity, so it belongs beside the figures it was added up from.
+  let r = 6;
+  let previous: number | undefined;
+  const closePeriod = (index: number | undefined): void => {
+    if (index === undefined) return;
+    const period = result.storageByPeriod.find((p) => p.periodIndex === index);
+    if (!period) return;
+    rows.push(
+      row(r, [
+        // The month rows are GiB; their sum is GiB-months, and saying so in
+        // the row label is cheaper than a second pair of columns.
+        text(1, `Period ${index} total (${period.monthsCounted} months) - GiB-months`, 'heading'),
+        text(2, ''),
+        text(3, ''),
+        text(4, `${retentionSpan(period)} retained`),
+        { col: 5, value: Number(period.lowGiBMonths.toFixed(2)), style: 'numberBold' },
+        { col: 6, value: Number(period.highGiBMonths.toFixed(2)), style: 'numberBold' },
+        { col: 7, value: Number(period.dataHubLowGiBMonths.toFixed(2)) },
+        { col: 8, value: Number(period.dataHubHighGiBMonths.toFixed(2)) },
+      ]),
+    );
+    r += 2;
+  };
+
+  for (const month of result.storage) {
+    if (previous !== undefined && month.periodIndex !== previous) closePeriod(previous);
     const isPeak = peak !== undefined && month.year === peak.year && month.month === peak.month;
     rows.push(
-      row(6 + i, [
+      row(r, [
         text(1, `${formatMonth(month.year, month.month)}${isPeak ? ' (fullest)' : ''}`),
         num(2, Math.round(month.written)),
         num(3, Math.round(month.retained), isPeak ? 'numberBold' : 'number'),
@@ -451,9 +500,12 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
         { col: 8, value: Number(month.dataHubHighGiB.toFixed(2)) },
       ]),
     );
-  });
+    previous = month.periodIndex;
+    r += 1;
+  }
+  closePeriod(previous);
 
-  const after = 7 + result.storage.length;
+  const after = r;
   if (peak !== undefined) {
     rows.push(
       row(after, [
@@ -692,7 +744,7 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
     } else {
       const quantities = periods.map((period) =>
         item.key === 'ods'
-          ? storageGiBForPeriod(result, period.index)
+          ? storageGiBMonthsForPeriod(result, period.index)
           : commercialQuantity(scenario.periods.find((p) => p.index === period.index), item.key),
       );
 

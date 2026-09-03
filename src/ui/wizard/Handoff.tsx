@@ -14,7 +14,7 @@ import {
   LINE_ITEMS,
   cellFor,
   periodMonthsCell,
-  storageGiBForPeriod,
+  storageGiBMonthsForPeriod,
   type PeriodResult,
   type Scenario,
   type ScenarioResult,
@@ -66,8 +66,10 @@ function valueFor(
   if (value > 0) return { text: n(value), origin: 'stated' };
 
   if (item?.source === 'estimated' && key === 'ods') {
-    const giB = storageGiBForPeriod(result, periodResult.index);
-    if (giB > 0) return { text: nf1.format(giB), origin: 'estimated' };
+    // GiB-months: what the database held at the end of each month of the
+    // period, added up. See storage.ts for why that and not the fullest month.
+    const giBMonths = storageGiBMonthsForPeriod(result, periodResult.index);
+    if (giBMonths > 0) return { text: nf1.format(giBMonths), origin: 'estimated' };
   }
   return { text: '—', origin: 'none' };
 }
