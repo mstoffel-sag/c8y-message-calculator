@@ -376,9 +376,9 @@ describe('the hand-off row explains its own buttons', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
     // The workbook fills D37 in from the storage estimate. This screen used to
     // show a dash there, which made the two disagree about the same cell.
-    // 64.8 GiB standing at every month end of a 12-month period: 777.8
+    // 64.8 GiB standing at every month end of a 12-month period: 778.1
     // GiB-months, which is the quantity, not the 64.8 the fullest month holds.
-    assert.match(html, /777\.8/);
+    assert.match(html, /778\.1/);
     assert.match(html, /estimated, overridable/);
     // The catalogue writes punctuation literally, curly apostrophe included.
     assert.match(html, /title="the tool’s estimate; state a figure/);
@@ -411,8 +411,9 @@ describe('the storage estimate shows its working', () => {
     assert.match(html, /Operational storage/);
     // The §9 fleet holds 174 M values at every month end -- 30 days of writing
     // at 5.8 M values a day -- which is 16.2 GiB at 100 bytes each and 64.8 at
-    // 400. Twelve month-ends make the period's quantity: 194 to 778 GiB-months.
-    assert.match(html, /194 – 778 GiB/);
+    // 400, plus 47.5 k documents a month and 1,000 managed objects. Twelve
+    // month-ends make the period's quantity: 195 to 778 GiB-months.
+    assert.match(html, /195 – 778 GiB/);
     assert.match(html, /to be verified/, 'the provenance travels with the number');
     assert.match(html, /kept for 30 days/);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
@@ -426,9 +427,9 @@ describe('the storage estimate shows its working', () => {
     // The figure, with its unit in the stat's label: 778 GiB-months.
     assert.match(html, /GiB-months<\/span><b>778<\/b>/, 'the quoted figure');
     assert.match(html, /at 400 B \/ value/);
-    assert.match(html, /194 – 778 GiB/, 'with the whole range beside it');
+    assert.match(html, /195 – 778 GiB/, 'with the whole range beside it');
     // Never a midpoint: no averaging of two unverified figures.
-    assert.doesNotMatch(html, /486/, 'the midpoint of 194 and 778');
+    assert.doesNotMatch(html, /486/, 'the midpoint of 195 and 778');
     assert.match(html, /goes in the ODS cell/);
   });
 
@@ -436,14 +437,18 @@ describe('the storage estimate shows its working', () => {
     const html = render(<StepContract scenario={scenario} result={result} onChange={noop} />);
     // Empty box, estimate as the placeholder: nobody has stated this, and this
     // is what the workbook will use if nobody does.
-    assert.match(html, /placeholder="777\.84"/);
+    assert.match(html, /placeholder="778\.05"/);
     assert.match(html, /estimated at 400 B \/ value/);
-    assert.match(html, /194\.5–777\.8 GiB-months across the range/);
+    assert.match(html, /194\.5–778\.1 GiB-months across the range/);
   });
 
-  test('it says what it leaves out', () => {
+  test('it says which half of itself rests on the weaker assumption', () => {
     const html = render(<Results scenario={scenario} result={result} />);
-    assert.match(html, /Measurements only/);
+    // Documents are counted in -- omitting them understates a commit-to-consume
+    // bill -- so what the panel owes the reader is the share they make up, and
+    // the fact that the byte figure was measured on datapoints.
+    assert.match(html, /Events, alarms, operations and every registered device are counted in/);
+    assert.match(html, /measured on datapoints/);
     assert.match(html, /under 1 %/, 'and how far off that can be for this fleet');
   });
 });

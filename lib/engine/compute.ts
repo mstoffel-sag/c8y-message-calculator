@@ -109,6 +109,8 @@ export interface MachineTypeMonth {
   storedValues: number;
   /** `storedValues`, split by the retention rule governing each measurement type. */
   storedByRetention: RetentionBucket[];
+  /** Event, alarm and operation documents, split the same way. */
+  documentsByRetention: RetentionBucket[];
   /** Total messages under the naive baseline, for the same information. */
   naiveTotal: number;
   total: number;
@@ -130,6 +132,13 @@ function bucketInto(into: Map<number, number>, retentionDays: number, values: nu
   into.set(retentionDays, (into.get(retentionDays) ?? 0) + values);
 }
 
+/** Shortest window first, so a mixed tenant reads in a stable order. */
+function bucketsOf(from: Map<number, number>): RetentionBucket[] {
+  return [...from]
+    .map(([retentionDays, values]) => ({ retentionDays, values }))
+    .sort((a, b) => a.retentionDays - b.retentionDays);
+}
+
 /**
  * One machine type, one calendar month.
  *
@@ -146,9 +155,11 @@ export function computeMachineTypeMonth(
   const spm = secondsInMonth(days);
   const n = machinesOnline;
   let storedValues = 0;
-  // Keyed by window rather than by measurement type: two types kept for the
-  // same 30 days age out together, so they can be added up here.
+  // Keyed by window rather than by type: two types kept for the same 30 days
+  // age out together, so they can be added up here. Measurements and documents
+  // stay apart because the byte assumption behind them is not equally strong.
   const retention = new Map<number, number>();
+  const documents = new Map<number, number>();
 
   // --- continuous readings, bundled: one POST carries every series in the
   // --- bundle, so the count is per send, not per series.
@@ -207,6 +218,8 @@ export function computeMachineTypeMonth(
         if (cadence.mode !== 'onChange') break;
         const sends = n * cadence.perDay * days;
         counters.eventsCreated += sends;
+        // One document per event, aged by the event type's own rule.
+        bucketInto(documents, retentionFor(metric.retentionDays, defaultRetentionDays), sends);
         naive.eventsCreated += sends;
         break;
       }
@@ -218,6 +231,9 @@ export function computeMachineTypeMonth(
         const raises = n * cadence.perDay * days;
         counters.alarmsCreated += raises;
         counters.alarmsUpdated += raises;
+        // The raise creates the document and the clear updates it, so the pair
+        // is two messages and one stored alarm.
+        bucketInto(documents, retentionFor(metric.retentionDays, defaultRetentionDays), raises);
         naive.alarmsCreated += raises;
         naive.alarmsUpdated += raises;
         break;
@@ -234,6 +250,9 @@ export function computeMachineTypeMonth(
               ? n * cadence.perDay * days
               : 0;
         counters.inventoriesUpdated += writes;
+        // Nothing to store and nothing to age out: a PUT overwrites the managed
+        // object in place. The object itself was created at registration and is
+        // not retention-governed, so it is counted once, in computeMonth.
         naive.inventoriesUpdated += writes;
         break;
       }
@@ -246,6 +265,8 @@ export function computeMachineTypeMonth(
         const commands = n * commandsInMonth(cadence, days);
         counters.operationsCreated += commands;
         counters.operationsUpdated += commands * cadence.transitions;
+        // One document per command; the transitions update it as it runs.
+        bucketInto(documents, retentionFor(metric.retentionDays, defaultRetentionDays), commands);
         naive.operationsCreated += commands;
         naive.operationsUpdated += commands * cadence.transitions;
         break;
@@ -256,9 +277,8 @@ export function computeMachineTypeMonth(
   return {
     counters,
     storedValues,
-    storedByRetention: [...retention]
-      .map(([retentionDays, values]) => ({ retentionDays, values }))
-      .sort((a, b) => a.retentionDays - b.retentionDays),
+    storedByRetention: bucketsOf(retention),
+    documentsByRetention: bucketsOf(documents),
     naiveTotal: totalOf(naive),
     total: totalOf(counters),
   };
@@ -295,6 +315,7 @@ function computeMonth(
   const counters = zeroCounters();
   const byMachineType: MonthResult['byMachineType'] = [];
   const retention = new Map<number, number>();
+  const documents = new Map<number, number>();
   let storedValues = 0;
   let naiveTotal = 0;
   let machinesOnline = 0;
@@ -313,6 +334,12 @@ function computeMonth(
       retention.set(
         bucket.retentionDays,
         (retention.get(bucket.retentionDays) ?? 0) + bucket.values,
+      );
+    }
+    for (const bucket of result.documentsByRetention) {
+      documents.set(
+        bucket.retentionDays,
+        (documents.get(bucket.retentionDays) ?? 0) + bucket.values,
       );
     }
     naiveTotal += result.naiveTotal;
@@ -341,9 +368,10 @@ function computeMonth(
     counters,
     total,
     storedValues,
-    storedByRetention: [...retention]
-      .map(([retentionDays, values]) => ({ retentionDays, values }))
-      .sort((a, b) => a.retentionDays - b.retentionDays),
+    storedByRetention: bucketsOf(retention),
+    documentsByRetention: bucketsOf(documents),
+    // The registrations, which no retention rule removes.
+    permanentDocuments: onboardingThisMonth,
     naiveTotal,
     onboardingCreates: onboardingThisMonth,
     byMachineType,

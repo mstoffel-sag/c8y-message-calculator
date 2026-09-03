@@ -311,6 +311,9 @@ function Storage({ result }: { result: ScenarioResult }) {
   if (!peak || !first || peak.retained <= 0) return null;
   const partial = peak.daysCovered < peak.retentionDays;
   const mixed = peak.retentionDaysShortest !== peak.retentionDays;
+  // What share of the retained volume is not measurement values: event, alarm
+  // and operation documents plus every managed object registered so far.
+  const otherShare = peak.retained > 0 ? peak.retainedOther / peak.retained : 0;
   const keptFor = mixed
     ? t('storage.kept.mixed', {
         from: n(peak.retentionDaysShortest),
@@ -420,14 +423,17 @@ function Storage({ result }: { result: ScenarioResult }) {
                 }}
               />
             </p>
+            {/* The byte figure was measured on datapoints, so the part of the
+                estimate that is documents rests on the weaker assumption. It
+                is counted anyway -- leaving it out understates the bill, and on
+                a commit-to-consume contract that is the expensive direction --
+                so its share is stated instead of being quietly carried. */}
             <p style="font-size:13px;color:var(--ink-mute)">
               <Rich
-                k="storage.measurementsOnly"
+                k="storage.documentsToo"
                 p={{
                   share:
-                    peak.nonMeasurementShare < 0.01
-                      ? t('storage.under1pct')
-                      : pct(peak.nonMeasurementShare),
+                    otherShare < 0.01 ? t('storage.under1pct') : pct(otherShare),
                 }}
               />
             </p>

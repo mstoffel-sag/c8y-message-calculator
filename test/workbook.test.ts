@@ -216,9 +216,19 @@ describe('the workbook content', () => {
       row.cells.some((c) => c.col === 1 && String(c.value).startsWith('Period 1 total')),
     )!;
     assert.equal(
-      totalRow.cells.find((c) => c.col === 6)?.value,
+      totalRow.cells.find((c) => c.col === 7)?.value,
       Number(period.highGiBMonths.toFixed(2)),
     );
+    // The two streams are shown apart: the byte figure was measured on
+    // datapoints, so a reviewer has to be able to see how much of the estimate
+    // is documents before trusting it.
+    const monthRow = storage.rows.find((row) =>
+      row.cells.some((c) => c.col === 1 && String(c.value).startsWith('January 2027')),
+    )!;
+    const at = (col: number) => monthRow.cells.find((c) => c.col === col)?.value as number;
+    assert.equal(at(3), Math.round(result.storage[0]!.retainedMeasurements));
+    assert.equal(at(4), Math.round(result.storage[0]!.retainedOther));
+    assert.ok(at(3) > at(4) * 1000, 'measurements dominate this fleet, and it is visible');
     // GiB-months has to be said somewhere, or a reader divides by twelve.
     assert.ok(
       allValues().some((v) => typeof v === 'string' && v.includes('GiB-months')),

@@ -442,9 +442,13 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
         'Storage is billed on what the database holds at the end of each calendar month, ' +
           'captured every month and added up over the period -- so the quantity is a sum in ' +
           'GiB-months, and the period total below is what the ODS line is filled in from. ' +
-          'Retention is a rule per measurement type, and the scenario default for a type ' +
-          `without one is ${fallback} days. Measurements only: events, alarms, inventory writes ` +
-          'and operations are stored too, but the source figure was measured on datapoints.',
+          'Retention is a rule per type -- measurement type, event type, alarm type, one per ' +
+          `operation -- and the scenario default for a type without one is ${fallback} days. ` +
+          'An inventory write is the exception: it overwrites the managed object in place, so ' +
+          'nothing accumulates, and the object itself is not retention-governed -- every device ' +
+          'registered stays counted. The byte figure was measured on datapoints, so the ' +
+          '"other" column is the part of the estimate resting on the weaker assumption; it is ' +
+          'counted in because leaving it out understates the bill.',
         'note',
       ),
     ]),
@@ -452,11 +456,12 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
       text(1, 'Month', 'heading'),
       text(2, 'Values written', 'heading'),
       text(3, 'Values at month end', 'heading'),
-      text(4, 'Days of history', 'heading'),
-      text(5, 'GiB at 100 B', 'heading'),
-      text(6, 'GiB at 400 B', 'heading'),
-      text(7, 'DataHub GiB, low', 'heading'),
-      text(8, 'DataHub GiB, high', 'heading'),
+      text(4, 'Other at month end', 'heading'),
+      text(5, 'Days of history', 'heading'),
+      text(6, 'GiB at 100 B', 'heading'),
+      text(7, 'GiB at 400 B', 'heading'),
+      text(8, 'DataHub GiB, low', 'heading'),
+      text(9, 'DataHub GiB, high', 'heading'),
     ]),
   ];
 
@@ -475,11 +480,12 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
         text(1, `Period ${index} total (${period.monthsCounted} months) - GiB-months`, 'heading'),
         text(2, ''),
         text(3, ''),
-        text(4, `${retentionSpan(period)} retained`),
-        { col: 5, value: Number(period.lowGiBMonths.toFixed(2)), style: 'numberBold' },
-        { col: 6, value: Number(period.highGiBMonths.toFixed(2)), style: 'numberBold' },
-        { col: 7, value: Number(period.dataHubLowGiBMonths.toFixed(2)) },
-        { col: 8, value: Number(period.dataHubHighGiBMonths.toFixed(2)) },
+        text(4, ''),
+        text(5, `${retentionSpan(period)} retained`),
+        { col: 6, value: Number(period.lowGiBMonths.toFixed(2)), style: 'numberBold' },
+        { col: 7, value: Number(period.highGiBMonths.toFixed(2)), style: 'numberBold' },
+        { col: 8, value: Number(period.dataHubLowGiBMonths.toFixed(2)) },
+        { col: 9, value: Number(period.dataHubHighGiBMonths.toFixed(2)) },
       ]),
     );
     r += 2;
@@ -492,12 +498,13 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
       row(r, [
         text(1, `${formatMonth(month.year, month.month)}${isPeak ? ' (fullest)' : ''}`),
         num(2, Math.round(month.written)),
-        num(3, Math.round(month.retained), isPeak ? 'numberBold' : 'number'),
-        num(4, Math.round(month.daysCovered)),
-        { col: 5, value: Number(month.lowGiB.toFixed(2)) },
-        { col: 6, value: Number(month.highGiB.toFixed(2)) },
-        { col: 7, value: Number(month.dataHubLowGiB.toFixed(2)) },
-        { col: 8, value: Number(month.dataHubHighGiB.toFixed(2)) },
+        num(3, Math.round(month.retainedMeasurements), isPeak ? 'numberBold' : 'number'),
+        num(4, Math.round(month.retainedOther)),
+        num(5, Math.round(month.daysCovered)),
+        { col: 6, value: Number(month.lowGiB.toFixed(2)) },
+        { col: 7, value: Number(month.highGiB.toFixed(2)) },
+        { col: 8, value: Number(month.dataHubLowGiB.toFixed(2)) },
+        { col: 9, value: Number(month.dataHubHighGiB.toFixed(2)) },
       ]),
     );
     previous = month.periodIndex;
@@ -524,7 +531,7 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
 
   return {
     name: 'Storage',
-    columnWidths: [20, 16, 16, 15, 14, 14, 17, 18],
+    columnWidths: [26, 16, 18, 17, 15, 14, 14, 17, 18],
     freezeRows: 5,
     rows,
   };

@@ -632,10 +632,15 @@ describe('operational storage', () => {
     assert.equal(first.retentionDays, 30);
     assert.equal(first.daysCovered, 30);
     assert.ok(
-      Math.abs(first.retained - (month.storedValues / month.days) * 30) < 1,
-      `${first.retained} vs ${month.storedValues}`,
+      Math.abs(first.retainedMeasurements - (month.storedValues / month.days) * 30) < 1,
+      `${first.retainedMeasurements} vs ${month.storedValues}`,
     );
-    assert.ok(first.retained < first.written, 'less than the month wrote, because a day fell out');
+    assert.ok(
+      first.retainedMeasurements < first.written,
+      'less than the month wrote, because a day fell out',
+    );
+    // And the total is that plus the documents, which age on their own windows.
+    assert.equal(first.retained, first.retainedMeasurements + first.retainedOther);
   });
 
   test('GiB is the values on disk at 100 and at 400 bytes, and nothing in between', () => {
@@ -703,9 +708,23 @@ describe('operational storage', () => {
       result.storage[5]!.retained > result.storage[3]!.retained * 1.5,
       `${result.storage[3]!.retained} -> ${result.storage[5]!.retained}`,
     );
-    const peak = result.peakStorage!;
+    // By the last two months the measurement stream has stopped growing: the
+    // 90-day window is full at the 4x rate either way.
     const last = result.storage[result.storage.length - 1]!;
-    assert.equal(peak.retained, last.retained, 'the fullest month is the last one');
+    const before = result.storage[result.storage.length - 2]!;
+    assert.equal(before.retainedMeasurements, last.retainedMeasurements, 'levelled off');
+    // Which of the two is fractionally fullest is decided by documents, not by
+    // measurements, and by an artefact rather than by anything real: a monthly
+    // command campaign does not scale with month length, so a 30-day month
+    // packs the same commands into fewer days and a window ending there catches
+    // marginally more of them. It is 0.006 % and it is not worth modelling
+    // away -- but do not turn this back into "the fullest month is the last
+    // one", because that is only true while nothing but measurements counts.
+    assert.ok(
+      Math.abs(before.retained / last.retained - 1) < 0.0001,
+      `${before.retained} vs ${last.retained}`,
+    );
+    assert.ok(result.peakStorage!.retained >= last.retained);
   });
 
   test('bundling is visible in the storage figure, not just the message count', () => {
@@ -715,9 +734,28 @@ describe('operational storage', () => {
     // four values -- the ratio that decides where in the range the truth sits.
     assert.ok(peak.valuesPerMeasurement > 3.5, `${peak.valuesPerMeasurement}`);
     assert.ok(peak.valuesPerMeasurement < 4, 'the two flags travel alone and pull it under four');
-    // And measurements are what this fleet writes, which is what makes
-    // "measurements only" a fair simplification here.
-    assert.ok(peak.nonMeasurementShare < 0.01, `${peak.nonMeasurementShare}`);
+    // And measurements are almost all of what this fleet keeps -- which is what
+    // the panel says, rather than what it assumes: the documents and the
+    // registered devices are in the total, at 0.03 % of it.
+    assert.ok(peak.retainedOther / peak.retained < 0.01, `${peak.retainedOther}`);
+    assert.ok(peak.retainedOther > 0, 'but they are counted, not dropped');
+  });
+
+  test('the fullest month is the month it filled up, not the last one that tied', () => {
+    // A flat fleet plateaus in month one and every month after is level with
+    // it. A strict maximum picked February, because a monthly command campaign
+    // packs the same commands into 28 days and a window ending there catches
+    // 97 more documents out of 174 million -- true, and useless as a label.
+    const result = computeScenario(conceptSection9Scenario());
+    const peak = result.peakStorage!;
+    assert.equal(peak.month, 1, 'January, where it reached its level');
+    // The tie really is a tie, and really is broken by documents.
+    const feb = result.storage[1]!;
+    assert.equal(feb.retainedMeasurements, peak.retainedMeasurements);
+    assert.ok(feb.retainedOther > peak.retainedOther, 'February holds a few more documents');
+    assert.ok(feb.retained > peak.retained, 'so it is fractionally fuller, and still not the label');
+    // And the quantity is untouched by the ranking: it is a sum over months.
+    assert.ok(Math.abs(result.storageByPeriod[0]!.giBMonths - 778.05) < 0.01);
   });
 
   test('nothing to store, nothing to report', () => {
@@ -752,10 +790,13 @@ describe('storage is the month ends, added up', () => {
     // is the twelve of them added up.
     assert.equal(period.monthsCounted, 12);
     for (const month of result.storage) {
-      assert.ok(Math.abs(month.retained - 174_000_000) < 500_000, `${month.retained}`);
+      assert.ok(Math.abs(month.retainedMeasurements - 174_000_000) < 500_000, `${month.retained}`);
     }
-    assert.ok(Math.abs(period.giBMonths - 777.84) < 0.01, `${period.giBMonths}`);
-    assert.ok(Math.abs(period.averageGiB - 64.82) < 0.01, `${period.averageGiB}`);
+    // Plus 47,500 documents a month on the same 30 days and 1,000 managed
+    // objects that never age out: 778.05 GiB-months rather than 777.84, and the
+    // 0.03 % gap is what "measurements dominate" means for this fleet.
+    assert.ok(Math.abs(period.giBMonths - 778.05) < 0.01, `${period.giBMonths}`);
+    assert.ok(Math.abs(period.averageGiB - 64.84) < 0.01, `${period.averageGiB}`);
     assert.equal(
       Number(period.giBMonths.toFixed(6)),
       Number(result.storage.reduce((sum, m) => sum + m.quotedGiB, 0).toFixed(6)),
@@ -913,11 +954,17 @@ describe('retention is a rule per measurement type', () => {
     // everything it ever wrote (90 values) and the 7-day type holds 7.
     const result = computeScenario(twoTypes([90, 7]));
     const third = result.storage[2]!;
-    assert.ok(Math.abs(third.retained - 97) < 0.01, `${third.retained}`);
+    assert.ok(Math.abs(third.retainedMeasurements - 97) < 0.01, `${third.retainedMeasurements}`);
+    // The one machine is also one managed object, registered once and never
+    // aged out -- so the total is the values plus it.
+    assert.equal(third.retainedOther, 1);
+    assert.ok(Math.abs(third.retained - 98) < 0.01, `${third.retained}`);
     // And the same fleet on one window holds what that window says, so the
     // mixed figure is genuinely the two of them and not an average.
-    assert.ok(Math.abs(computeScenario(twoTypes([90, 90])).storage[2]!.retained - 180) < 0.01);
-    assert.ok(Math.abs(computeScenario(twoTypes([7, 7])).storage[2]!.retained - 14) < 0.01);
+    const meas = (kept: [number, number]) =>
+      computeScenario(twoTypes(kept)).storage[2]!.retainedMeasurements;
+    assert.ok(Math.abs(meas([90, 90]) - 180) < 0.01);
+    assert.ok(Math.abs(meas([7, 7]) - 14) < 0.01);
   });
 
   test('the shortest and longest windows are both reported, so a mixed tenant reads as mixed', () => {
@@ -955,7 +1002,10 @@ describe('retention is a rule per measurement type', () => {
       [0, 90],
     );
     // Month three: the 90-day type has 90 values, the other has none.
-    assert.ok(Math.abs(result.storage[2]!.retained - 90) < 0.01, `${result.storage[2]!.retained}`);
+    assert.ok(
+      Math.abs(result.storage[2]!.retainedMeasurements - 90) < 0.01,
+      `${result.storage[2]!.retainedMeasurements}`,
+    );
   });
 
   test('retention moves no counter, whichever type carries it', () => {
@@ -963,7 +1013,171 @@ describe('retention is a rule per measurement type', () => {
     const long = computeScenario(twoTypes([900, 900]));
     assert.equal(long.peakMonth.total, short.peakMonth.total);
     assert.equal(long.months[0]!.storedValues, short.months[0]!.storedValues);
-    assert.ok(long.storage[2]!.retained > short.storage[2]!.retained * 50);
+    assert.ok(long.storage[2]!.retainedMeasurements > short.storage[2]!.retainedMeasurements * 50);
+  });
+
+  /**
+   * One machine, one of each discrete kind, one a day. A 31-day month then
+   * makes every figure countable: 31 events, 31 alarms, 31 commands, 31
+   * inventory writes -- and one managed object, from registration.
+   */
+  const discreteFleet = (kept: {
+    event?: number; alarm?: number; command?: number; inventory?: number;
+  }): Scenario => ({
+    name: 'one of each',
+    notes: '',
+    settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme', retentionDays: 30 },
+    periods: [{ index: 1, months: 3, machineCountOverrides: {}, commercial: {} }],
+    machineTypes: [
+      {
+        id: 'mt',
+        name: 'Machine',
+        machineCount: 1,
+        onlinePct: 100,
+        bundles: [],
+        metrics: [
+          {
+            id: 'e', name: 'Door opened', unit: '', kind: 'occurrence',
+            cadence: { mode: 'onChange', perDay: 1 }, semanticGroup: '',
+            retentionDays: kept.event,
+          },
+          {
+            id: 'a', name: 'Overheat', unit: '', kind: 'condition',
+            cadence: { mode: 'onChange', perDay: 1 }, semanticGroup: '',
+            retentionDays: kept.alarm,
+          },
+          {
+            id: 'c', name: 'Restart', unit: '', kind: 'command',
+            cadence: { mode: 'command', perDay: 1, transitions: 2 }, semanticGroup: '',
+            retentionDays: kept.command,
+          },
+          {
+            id: 'i', name: 'Firmware version', unit: '', kind: 'inventory',
+            cadence: { mode: 'onChange', perDay: 1 }, semanticGroup: '',
+            retentionDays: kept.inventory,
+          },
+        ],
+      },
+    ],
+  });
+
+  test('events, alarms and operations each carry their own rule', () => {
+    const month = computeScenario(discreteFleet({ event: 7, alarm: 365, command: 90 })).months[0]!;
+    assert.deepEqual(
+      month.documentsByRetention,
+      [
+        { retentionDays: 7, values: 31 },
+        { retentionDays: 90, values: 31 },
+        { retentionDays: 365, values: 31 },
+      ],
+      'one document a day into each of three windows',
+    );
+  });
+
+  test('a create stores one document; the updates that follow modify it', () => {
+    const month = computeScenario(discreteFleet({ alarm: 30 })).months[0]!;
+    // The alarm bills twice -- raise and clear -- and stores once. Same for the
+    // command: one operation plus two status transitions is three messages and
+    // one stored operation. Counting updates as documents would have doubled
+    // the alarms and tripled the operations.
+    assert.equal(month.counters.alarmsCreated, 31);
+    assert.equal(month.counters.alarmsUpdated, 31);
+    assert.equal(month.counters.operationsCreated, 31);
+    assert.equal(month.counters.operationsUpdated, 62);
+    const stored = month.documentsByRetention.reduce((sum, b) => sum + b.values, 0);
+    assert.equal(stored, 93, '31 events + 31 alarms + 31 operations');
+  });
+
+  test('an inventory write stores nothing, so its retention has nothing to act on', () => {
+    // A PUT overwrites the managed object in place: 31 billable messages, no
+    // accumulation. Giving it a 900-day rule must change no figure at all.
+    const brief = computeScenario(discreteFleet({ inventory: 1 }));
+    const forever = computeScenario(discreteFleet({ inventory: 900 }));
+    assert.equal(brief.months[0]!.counters.inventoriesUpdated, 31);
+    assert.deepEqual(
+      forever.months[0]!.documentsByRetention,
+      brief.months[0]!.documentsByRetention,
+    );
+    assert.equal(forever.storage[2]!.retained, brief.storage[2]!.retained);
+    // And no window of 900 days leaks into the reported span from a field that
+    // does nothing.
+    assert.equal(forever.storage[2]!.retentionDays, 30);
+  });
+
+  test('managed objects accumulate, because no retention rule removes one', () => {
+    const s = discreteFleet({});
+    // Ten machines in period 1, forty in period 2: fifty registrations, none of
+    // which ever age out.
+    const growing: Scenario = {
+      ...s,
+      machineTypes: [{ ...s.machineTypes[0]!, machineCount: 10 }],
+      periods: [
+        { index: 1, months: 2, machineCountOverrides: {}, commercial: {} },
+        { index: 2, months: 2, machineCountOverrides: { mt: 40 }, commercial: {} },
+      ],
+    };
+    const r = computeScenario(growing);
+    assert.deepEqual(r.months.map((m) => m.permanentDocuments), [10, 0, 30, 0]);
+    // Month 4 still holds all forty, though the last registration was two
+    // months ago and everything else in the scenario is kept for 30 days.
+    assert.ok(r.storage[3]!.retainedOther > 40, `${r.storage[3]!.retainedOther}`);
+    // A device that stops sending is still stored: drop the fleet to nothing
+    // and only the objects are left, which is the whole claim.
+    const quiet = computeScenario({
+      ...growing,
+      periods: [
+        growing.periods[0]!,
+        { index: 2, months: 2, machineCountOverrides: { mt: 0 }, commercial: {} },
+      ],
+    });
+    assert.equal(quiet.months[3]!.total, 0, 'nothing sent in the last month');
+    assert.equal(quiet.storage[3]!.retainedOther, 10, 'and the ten devices are still there');
+  });
+
+  test('a tenant that keeps alarms far longer than measurements is dominated by alarms', () => {
+    // The case a single scenario-wide retention number cannot express, and the
+    // reason non-measurement documents had to be counted at all: on this fleet
+    // the "measurements outnumber everything by three orders of magnitude"
+    // simplification inverts.
+    const s = discreteFleet({ alarm: 3650 });
+    const withSeries: Scenario = {
+      ...s,
+      machineTypes: [
+        {
+          ...s.machineTypes[0]!,
+          machineCount: 1,
+          // One reading a minute, kept a week.
+          bundles: [{
+            id: 'b', fragmentName: 'acme_Fast', intervalSeconds: 60,
+            metricIds: ['m'], retentionDays: 7,
+          }],
+          metrics: [
+            ...s.machineTypes[0]!.metrics,
+            {
+              id: 'm', name: 'Temperature', unit: 'C', kind: 'continuous',
+              cadence: { mode: 'interval', seconds: 60 }, semanticGroup: '', bundleId: 'b',
+            },
+          ],
+        },
+      ],
+      // Ten years, so the alarm window actually fills.
+      periods: [{ index: 1, months: 120, machineCountOverrides: {}, commercial: {} }],
+    };
+    const last = computeScenario(withSeries).storage.at(-1)!;
+    // A week of minute readings is ~10,080 values. Ten years of daily alarms is
+    // ~3,650 documents plus the events and operations on 30-day windows.
+    assert.ok(
+      Math.abs(last.retainedMeasurements - 10_080) < 200,
+      `${last.retainedMeasurements}`,
+    );
+    assert.ok(last.retainedOther > 3_500, `${last.retainedOther}`);
+    assert.ok(
+      last.retainedOther / last.retained > 0.25,
+      `documents are ${(last.retainedOther / last.retained) * 100} % of the total`,
+    );
+    // Both ends of the span are reported, so the panel can say "7 to 3,650".
+    assert.equal(last.retentionDaysShortest, 7);
+    assert.equal(last.retentionDays, 3650);
   });
 
   test('a lone series carries its own rule, because it is its own measurement type', () => {

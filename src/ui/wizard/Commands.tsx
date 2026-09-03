@@ -8,10 +8,22 @@
  * three sections of the machine talking, then one of the platform talking back.
  */
 
-import { perMonthEquivalent, type MachineType, type Scenario } from '../../../lib/engine/index.js';
+import {
+  DEFAULT_RETENTION_DAYS,
+  perMonthEquivalent,
+  type MachineType,
+  type Scenario,
+} from '../../../lib/engine/index.js';
 import { COMMANDS, TRANSITIONS } from '../../../lib/presets/catalog.js';
-import { addDatapoint, patchCadence, removeMetric, setCadence, setDatapointName } from '../store.js';
-import { Choice, Every, Teach } from '../parts.js';
+import {
+  addDatapoint,
+  patchCadence,
+  removeMetric,
+  setCadence,
+  setDatapointName,
+  setMetricRetentionDays,
+} from '../store.js';
+import { Choice, Every, Retention, Teach } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { type Collapse } from '../collapse.js';
 import { Prose, useT } from '../i18n.js';
@@ -86,10 +98,19 @@ function CommandTable({
           <table class="dp">
             <thead>
               <tr>
-                <th style="min-width:200px">{t('commands.col.command')}</th>
+                {/* Trimmed to make room for the retention column: the German
+                    row was overflowing its wrapper and taking the delete button
+                    off-screen with it. The transitions dropdown truncates its
+                    longest option either way, so 280 px bought nothing. */}
+                <th style="min-width:180px">{t('commands.col.command')}</th>
                 <th style="min-width:230px">{t('commands.col.howOften')}</th>
-                <th style="min-width:280px">{t('commands.col.transitions')}</th>
-                <th class="num" style="width:130px">{t('commands.col.each')}</th>
+                <th style="min-width:230px">{t('commands.col.transitions')}</th>
+                {/* min-width, not width: the transitions dropdown is wide and
+                    this was the only column that could give, so it collapsed
+                    into three wrapped lines when the retention column arrived.
+                    The row scrolls in its wrapper instead. */}
+                <th class="num" style="min-width:130px">{t('commands.col.each')}</th>
+                <th style="min-width:130px">{t('retention.col')}</th>
                 <th style="width:34px" />
               </tr>
             </thead>
@@ -129,6 +150,18 @@ function CommandTable({
                       <div class="hint" style="margin:0">
                         {t('commands.breakdown', { count: transitions })}
                       </div>
+                    </td>
+                    <td>
+                      {/* An operation is one document; its status transitions
+                          update it as it runs rather than adding more. So the
+                          rule governs one stored operation per command. */}
+                      <Retention
+                        days={metric.retentionDays}
+                        fallback={scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS}
+                        onChange={(days) =>
+                          onChange(setMetricRetentionDays(scenario, mt.id, metric.id, days))
+                        }
+                      />
                     </td>
                     <td>
                       <button class="ghost" onClick={() => onChange(removeMetric(scenario, mt.id, metric.id))}>

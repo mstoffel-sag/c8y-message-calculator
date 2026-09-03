@@ -270,11 +270,12 @@ export function totalOf(counters: Counters): number {
 /* ------------------------------------------------------------------- results */
 
 /**
- * Values written in one month under one retention rule.
+ * Stored units written in one month under one retention rule.
  *
- * The engine groups by the number of days rather than by measurement type: two
- * types kept for the same 30 days age out identically, and carrying their names
- * this far would only invite a per-type storage table nobody asked for.
+ * A unit is one measurement series value or one document -- an event, an alarm,
+ * an operation. The engine groups by the number of days rather than by type:
+ * two types kept for the same 30 days age out identically, and carrying their
+ * names this far would only invite a per-type storage table nobody asked for.
  */
 export interface RetentionBucket {
   retentionDays: number;
@@ -306,6 +307,27 @@ export interface MonthResult {
    * cannot do from a single total. Buckets sum to `storedValues`.
    */
   storedByRetention: RetentionBucket[];
+  /**
+   * Documents this month created outside the Measurement API -- one per event,
+   * one per alarm raised, one per operation -- split by the retention rule
+   * governing each type.
+   *
+   * Counted from the *creates* only. An alarm clear and an operation's status
+   * transitions bill as messages and update the document they belong to; they
+   * do not add a second one. An inventory write is the same: a PUT overwrites
+   * the managed object in place, so it stores nothing new -- which is why an
+   * inventory metric has no retention to speak of.
+   */
+  documentsByRetention: RetentionBucket[];
+  /**
+   * Managed objects registered this month.
+   *
+   * Kept apart from the buckets because they never age out: a retention rule
+   * covers alarms, audit logs, events, measurements and operations -- a device
+   * stays in the inventory until somebody deletes it. So these accumulate over
+   * the whole run, and a long term is where they finally become visible.
+   */
+  permanentDocuments: number;
   /** Every series its own measurement, every state interval-sampled. */
   naiveTotal: number;
   /** One-off registration volume landing in this month. */
@@ -345,6 +367,8 @@ export interface StorageMonth {
   periodIndex: number;
   /** Measurement values written during this month. */
   written: number;
+  /** Documents and managed objects created during this month. */
+  writtenOther: number;
   /**
    * Values still inside their retention windows at the end of the month.
    *
@@ -354,6 +378,19 @@ export interface StorageMonth {
    * figure, and `PeriodStorage.giBMonths` is the sum that gets quoted.
    */
   retained: number;
+  /** The measurement series values inside that total. */
+  retainedMeasurements: number;
+  /**
+   * Everything else inside it: event, alarm and operation documents still
+   * inside their windows, plus every managed object registered so far.
+   *
+   * Broken out because the byte figure behind the GiB columns was measured on
+   * datapoints, so this is the part of the estimate resting on the weaker
+   * assumption -- and because retention is what decides whether it matters. A
+   * tenant keeping measurements for a week and alarms for five years has an
+   * ODS bill this share dominates, which no fleet-wide ratio would predict.
+   */
+  retainedOther: number;
   /**
    * The longest retention window in play, in days -- the one that decides how
    * long storage keeps climbing. Equal to `retentionDaysShortest` when every
@@ -386,11 +423,6 @@ export interface StorageMonth {
    * of the range than the top.
    */
   valuesPerMeasurement: number;
-  /**
-   * Non-measurement documents as a share of all documents written. The byte
-   * figures cover measurements only, so this is how far off that can be.
-   */
-  nonMeasurementShare: number;
 }
 
 /**

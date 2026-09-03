@@ -661,15 +661,17 @@ export function setSeriesFragmentName(
 }
 
 /**
- * How long the tenant keeps the measurement type a lone series sends in.
+ * How long the tenant keeps the type this metric is its own copy of.
  *
- * Same shape as `setSeriesFragmentName`, and for the same reason: a bundled
- * series takes its type -- and therefore its retention rule -- from the bundle,
- * so this is for the ones that travel alone. Clearing the box drops the
- * override rather than storing a number, because an empty field means "the
- * tenant default", which is what the placeholder in it says.
+ * Every kind but `continuous` is its own type -- an event type, an alarm type,
+ * one operation, the measurement type a lone flag sends in -- so the rule lives
+ * on the metric. A bundled continuous series takes its type, and therefore its
+ * rule, from the bundle: `setBundleRetentionDays` is that case.
+ *
+ * Clearing the box drops the override rather than storing a number, because an
+ * empty field means "the tenant default", which is what the placeholder says.
  */
-export function setSeriesRetentionDays(
+export function setMetricRetentionDays(
   scenario: Scenario,
   machineTypeId: string,
   metricId: string,

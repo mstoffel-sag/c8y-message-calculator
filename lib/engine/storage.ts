@@ -38,14 +38,16 @@
  *    the ramp actually produced. In period 1 that is the difference between a
  *    truthful figure and one that assumes a full window from day one.
  *
- * What this deliberately does not model: events, alarms, inventory and
- * operations. They are stored too, but the source measured datapoints, and in
- * every fleet this tool has modelled the measurements outnumber everything else
- * by three orders of magnitude. `nonMeasurementShare` reports that ratio so the
- * assumption can be checked rather than trusted.
+ * What this counts: everything stored, and it says which half is which.
+ * Measurements alone used to be the whole model, on the grounds that they
+ * outnumber everything else by three orders of magnitude. Per-type retention
+ * destroys that argument -- the ratio held only while everything was kept for
+ * the same time -- so event, alarm and operation documents are counted on their
+ * own windows, registered devices are counted permanently, and `retainedOther`
+ * reports how much of the total they are.
  */
 
-import type { MonthResult, PeriodStorage, StorageMonth } from './types.js';
+import type { MonthResult, PeriodStorage, RetentionBucket, StorageMonth } from './types.js';
 
 /** Bytes per stored value, low end: independent tests on Edge, and a rule of thumb. */
 export const BYTES_PER_VALUE_LOW = 100;
@@ -74,27 +76,44 @@ function gib(values: number, bytesPerValue: number): number {
 }
 
 /**
- * The windows in play across the whole run, and the values in each per month.
+ * The windows in play across one stream, and the units in each per month.
  *
- * A measurement type added in period 2 has no bucket in period 1, and a window
- * nobody uses any more still has to be walked through the months that wrote
- * into it -- so the set of windows is collected across every month rather than
- * read off the first one.
+ * Called twice -- once for measurement values, once for documents -- because
+ * the two rest on different evidence and the estimate has to be able to say how
+ * much of itself is which. A type added in period 2 has no bucket in period 1,
+ * and a window nobody uses any more still has to be walked through the months
+ * that wrote into it, so the set of windows is collected across every month
+ * rather than read off the first one.
  *
- * A month carrying no buckets at all is read as one bucket at `fallback`. That
- * is not a live code path -- the engine always fills them in -- but it keeps a
- * hand-built month series computable, which several tests and any future
- * caller depend on.
+ * `orElse` covers a month carrying no buckets at all: it is read as one bucket
+ * at `fallback`. Not a live code path for the engine's own output -- it always
+ * fills them in -- but it keeps a hand-built month series computable, which
+ * several tests and any future caller depend on.
+ *
+ * That stand-in only applies when there is something in it. A stream that wrote
+ * nothing must register no window at all: an empty document list read as "the
+ * default, holding zero" put 30 days into the reported span of a tenant that
+ * keeps everything for 45, which is a wrong answer to the one question the
+ * span exists to answer.
  */
-function windowsOf(months: MonthResult[], fallback: number): {
+function windowsOf(
+  months: MonthResult[],
+  fallback: number,
+  bucketsOf: (month: MonthResult) => RetentionBucket[] | undefined,
+  orElse: (month: MonthResult) => number,
+): {
   windows: number[];
   valuesIn: (monthIndex: number, retentionDays: number) => number;
 } {
   const windows = new Set<number>();
   const perMonth = months.map((month) => {
-    const buckets = month.storedByRetention?.length
-      ? month.storedByRetention
-      : [{ retentionDays: fallback, values: month.storedValues }];
+    const given = bucketsOf(month);
+    const standIn = orElse(month);
+    const buckets = given?.length
+      ? given
+      : standIn > 0
+        ? [{ retentionDays: fallback, values: standIn }]
+        : [];
     const map = new Map<number, number>();
     for (const bucket of buckets) {
       const days = Math.max(bucket.retentionDays, 0);
@@ -114,7 +133,7 @@ function windowsOf(months: MonthResult[], fallback: number): {
  * How much of one window's writing is still there at the end of month `i`, and
  * how many days of history stand behind it.
  *
- * A month's values are spread evenly across its days: the engine has no daily
+ * A month's units are spread evenly across its days: the engine has no daily
  * resolution, and inventing a within-month shape would be inventing precision.
  * So a 30-day window reaching into a 31-day month takes thirty thirty-firsts of
  * what that month wrote.
@@ -139,12 +158,36 @@ function walkBack(
   return { retained, daysCovered: Math.max(retentionDays, 0) - remaining };
 }
 
+/** Every window across both streams, so the reported span covers the tenant. */
+function spanOf(...sets: number[][]): { longest: number; shortest: number } | undefined {
+  const all = sets.flat();
+  return all.length > 0
+    ? { longest: Math.max(...all), shortest: Math.min(...all) }
+    : undefined;
+}
+
 /**
  * One entry per month: what the database holds when that month closes, with
  * every retention window walked backwards through the months already computed.
  *
- * @param defaultRetentionDays the tenant default, for measurement types with no
- *   rule of their own. Individual windows arrive on the months themselves.
+ * Three things are added up, and they age differently:
+ *
+ * - **measurement values**, per their measurement type's window;
+ * - **event, alarm and operation documents**, per their type's window;
+ * - **managed objects**, which no retention rule removes, so every one ever
+ *   registered is still there.
+ *
+ * The byte figure behind the GiB columns was measured on datapoints, so
+ * applying it to a document is the weaker half of the estimate. It is applied
+ * anyway, and `retainedOther` reports how much of the total rests on it --
+ * because the alternative, counting measurements alone, understates the bill,
+ * and on a commit-to-consume contract understating is the expensive direction.
+ * Retention is also exactly what decides whether the simplification holds: a
+ * tenant keeping measurements for a week and alarms for five years is one no
+ * fleet-wide document ratio would have predicted.
+ *
+ * @param defaultRetentionDays the tenant default, for types with no rule of
+ *   their own. Individual windows arrive on the months themselves.
  */
 export function storageByMonth(
   months: MonthResult[],
@@ -155,31 +198,48 @@ export function storageByMonth(
   // Outside the measured range is allowed -- somebody may have verified it -- but
   // a nonsensical figure is not.
   const perValue = bytesPerValue > 0 ? bytesPerValue : BYTES_PER_VALUE_HIGH;
-  const { windows, valuesIn } = windowsOf(months, fallback);
+
+  const series = windowsOf(months, fallback, (m) => m.storedByRetention, (m) => m.storedValues);
+  // No stand-in for documents: a month with no document buckets wrote none, and
+  // there is no single total to fall back to that would not double-count the
+  // measurement stream.
+  const docs = windowsOf(months, fallback, (m) => m.documentsByRetention, () => 0);
 
   // The longest window decides how long storage keeps climbing, and the pair is
   // what the UI reports when a tenant keeps its types for different times.
-  const longest = windows.length > 0 ? windows[windows.length - 1]! : fallback;
-  const shortest = windows.length > 0 ? windows[0]! : fallback;
+  const span = spanOf(series.windows, docs.windows) ?? { longest: fallback, shortest: fallback };
+
+  // Managed objects accumulate: month i holds every one registered up to it.
+  let permanent = 0;
+  const permanentBy = months.map((month) => (permanent += month.permanentDocuments ?? 0));
 
   return months.map((month, i) => {
-    let retained = 0;
-    for (const window of windows) {
-      retained += walkBack(months, i, window, valuesIn).retained;
+    let retainedMeasurements = 0;
+    for (const window of series.windows) {
+      retainedMeasurements += walkBack(months, i, window, series.valuesIn).retained;
     }
+    let retainedOther = permanentBy[i]!;
+    for (const window of docs.windows) {
+      retainedOther += walkBack(months, i, window, docs.valuesIn).retained;
+    }
+    const retained = retainedMeasurements + retainedOther;
 
     const measurements = month.counters.measurementsCreated;
-    const documents = month.total;
 
     return {
       year: month.year,
       month: month.month,
       periodIndex: month.periodIndex,
       written: month.storedValues,
+      writtenOther:
+        (month.documentsByRetention?.reduce((sum, b) => sum + b.values, 0) ?? 0) +
+        (month.permanentDocuments ?? 0),
       retained,
-      retentionDays: longest,
-      retentionDaysShortest: shortest,
-      daysCovered: walkBack(months, i, longest, valuesIn).daysCovered,
+      retainedMeasurements,
+      retainedOther,
+      retentionDays: span.longest,
+      retentionDaysShortest: span.shortest,
+      daysCovered: walkBack(months, i, span.longest, series.valuesIn).daysCovered,
       lowGiB: gib(retained, BYTES_PER_VALUE_LOW),
       highGiB: gib(retained, BYTES_PER_VALUE_HIGH),
       quotedGiB: gib(retained, perValue),
@@ -187,19 +247,39 @@ export function storageByMonth(
       dataHubLowGiB: gib(retained, BYTES_PER_VALUE_LOW) * DATAHUB_SHARE_LOW,
       dataHubHighGiB: gib(retained, BYTES_PER_VALUE_HIGH) * DATAHUB_SHARE_HIGH,
       valuesPerMeasurement: measurements > 0 ? month.storedValues / measurements : 0,
-      nonMeasurementShare: documents > 0 ? (documents - measurements) / documents : 0,
     };
   });
 }
 
 /**
- * The month holding the most at its close. Not necessarily the peak *message*
- * month: storage is cumulative, so it keeps climbing while the fleet grows even
- * through a quiet month.
+ * How much bigger a month has to be to count as fuller: one part in ten
+ * thousand.
+ *
+ * Without a tolerance this reads as a strict maximum, and a strict maximum on a
+ * flat fleet is decided by noise. A monthly command campaign does not scale
+ * with month length, so February packs the same commands into 28 days and a
+ * 30-day window ending there catches marginally more of them -- which named
+ * February the fullest month of a fleet that had not grown since January, by 97
+ * documents out of 174 million. The figure was true and the label was useless.
+ */
+const FULLER_BY = 1.0001;
+
+/**
+ * The month holding the most at its close, and the earliest of those when
+ * several are level.
+ *
+ * "Fullest" is a label a reader uses to ask when the fleet stopped filling up,
+ * so on a plateau the answer they want is the month it reached, not the last
+ * one that tied. Not necessarily the peak *message* month either: storage is
+ * cumulative, so it keeps climbing while the fleet grows even through a quiet
+ * month.
+ *
+ * This ranks for display only -- the quantity is `PeriodStorage.giBMonths`, a
+ * sum over every month -- so a tolerance here cannot move a quoted figure.
  */
 export function peakStorageMonth(storage: StorageMonth[]): StorageMonth | undefined {
   return storage.reduce<StorageMonth | undefined>(
-    (best, m) => (!best || m.retained > best.retained ? m : best),
+    (best, m) => (!best || m.retained > best.retained * FULLER_BY ? m : best),
     undefined,
   );
 }

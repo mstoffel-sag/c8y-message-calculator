@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 22 — storage is month ends added up, and retention is a rule per measurement type · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-03
+**Status:** draft for review, rev 23 — storage is month ends added up; retention is a rule per type, on every element that stores one · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-03
 
 ---
 
@@ -357,23 +357,43 @@ A well-bundled fleet has room *below* the quoted figure and none above it: the 1
 on values stored one per measurement, and a measurement carrying four values pays for its envelope
 once rather than four times. That is another reason the top of the range is the safe end to write.
 
-#### Retention is a rule per measurement type
+#### Retention is a rule per type
 
 **Retention decides the size, not the traffic.** What survives to the end of the month is what is
 still inside its retention window, so identical traffic held for 90 days occupies three times what it
 does at 30. It moves no counter.
 
-**And a retention rule is attached to a measurement type**, which is where the tool asks for it: a
-column in the measurements table, on the row that names the type. A tenant keeping `acme_Climate` for
-90 days and `acme_Vibration` for 7 is the ordinary case, and a single scenario-wide number cannot
-express it — a fleet with one long-lived type and one short-lived one would be quoted at whichever of
-the two somebody typed. The scenario setting survives as the **tenant default**, for every type with
-no rule of its own, and an empty field means exactly that.
+**And a retention rule is attached to a type**, which is where the tool asks for it: a column on the
+row that owns the type. A tenant keeping `acme_Climate` for 90 days and `acme_Vibration` for 7 is the
+ordinary case, and a single scenario-wide number cannot express it — a fleet with one long-lived type
+and one short-lived one would be quoted at whichever of the two somebody typed. The scenario setting
+survives as the **tenant default**, for every type with no rule of its own, and an empty field means
+exactly that.
 
-So the engine hands the storage model one bucket of values per window rather than a single total, and
-walks each bucket back through its own window. Types kept for the same time share a bucket, because
-they age out together and nothing downstream needs their names. Zero is a real answer — "we do not
-keep this" — and has to survive every layer that might read it as absent and refill it with 30.
+Which row owns a type differs by element, and so does what a rule has to act on:
+
+| Element | Stores | Where the rule is asked | Counted as |
+|---|---|---|---|
+| **Measurement** | one document, N series values | the measurements table, on the row naming the type — once per bundle, not once per series | values |
+| **Event** | one document per occurrence | the events table, every row | documents |
+| **Alarm** | one document per raise; the clear **updates** it | the alarms table, every row | documents |
+| **Operation** | one document per command; the status transitions **update** it | the commands table, every row | documents |
+| **Inventory** | **nothing new** — a write overwrites the managed object in place | not asked, and the panel says why | — |
+
+Two of those rows are the reason the table is worth writing down. An alarm bills twice per incident
+and stores once; an operation bills three or four times and stores once. Counting the updates as
+documents would have doubled the alarms and tripled the operations.
+
+And **inventory is the exception that proves retention is not universal**: an update overwrites, so
+nothing accumulates to age out, and a managed object is not one of the types a retention rule covers.
+Every device registered stays in the inventory, and counts towards storage, until somebody deletes
+it — so registrations accumulate over the whole term and are the one component that never shrinks.
+Offering a retention field there would be offering a control that changes no number.
+
+So the engine hands the storage model one bucket per window rather than a single total, and walks
+each bucket back through its own window. Types kept for the same time share a bucket, because they
+age out together and nothing downstream needs their names. Zero is a real answer — "we do not keep
+this" — and has to survive every layer that might read it as absent and refill it with 30.
 
 **The ramp means the period is not full yet.** A fleet three months into a rollout has three months of
 history, not thirty days of steady state at its final size. Each window is walked backwards day by
@@ -382,10 +402,15 @@ climbing for months after the message count has levelled off, which is a propert
 calculation can show. That behaviour is enforced by test, and it is also why the period is a sum:
 the months genuinely differ from one another.
 
-**What it covers: measurements.** Events, alarms, inventory writes and operations are stored too, but
-the source measured datapoints. Rather than assert that the difference is small, the tool reports the
-non-measurement share of documents alongside the estimate — under 1 % for the §9 fleet — so the
-simplification can be checked instead of trusted.
+**What it covers: everything that is stored, and it says which half is which.** The tool used to
+count measurements alone, on the grounds that they outnumber everything else by three orders of
+magnitude — under 1 % of documents for the §9 fleet. **Per-type retention destroys that argument.**
+The ratio held only while everything was kept for the same time; a tenant keeping measurements for a
+week and alarms for five years has an ODS bill the alarms dominate, and no fleet-wide document ratio
+would have predicted it. So documents are counted, and the estimate reports how much of itself they
+are. The 100–400 B was measured on datapoints, so applying it to a document is the weaker half of
+the assumption — but leaving them out is a silent understatement, and on a commit-to-consume contract
+understating is the expensive direction (§6.6).
 
 **Bundling shows up here too.** The source notes that putting several datapoints in one measurement
 "can reduce required diskspace significantly", because the envelope is paid once per measurement
@@ -471,7 +496,8 @@ Metric
   semanticGroup                          // free text; drives bundle proposal
   bundleId?                              // continuous only; null = own measurement
   fragmentName?                          // the type it sends in when it travels alone
-  retentionDays?                         // likewise; absent = the scenario default
+  retentionDays?                         // this metric's own type; absent = the scenario default
+                                         // ignored for 'inventory': a write stores nothing new
 
 Bundle
   fragmentName, intervalSeconds, metricIds[]
@@ -499,8 +525,11 @@ command     → N × perMonth × (1 + transitions) → Operations Created + Upda
 onboarding  → machineCount, once, in its period → Inventories Created
 
 // storage, separately: not a counter, and the only figure retention touches
-stored[w]   = values written this month into types kept w days
-retained    = Σ over w of (that window walked back day by day through prior months)
+values[w]   = measurement series values written this month into types kept w days
+docs[w]     = event + alarm + operation documents likewise -- from the CREATES only,
+              since a clear or a transition updates the document it belongs to
+objects     = machines registered so far          // no retention rule removes one
+retained    = Σ over w of walkBack(values[w]) + Σ over w of walkBack(docs[w]) + objects
 period ODS  = Σ over the period's months of retained, at bytesPerValue   // GiB-months
 
 counters[9]        = each counter summed independently, for one calendar month
@@ -534,7 +563,7 @@ every input visibly moves the number.
 |---|---|---|---|
 | 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
 | 2 | `series` | **Measurements** | One table, one row per **series**. Its **rhythm** is a column: on a timer, or when the value moves. The interactive explainer sits here. The tool groups timed series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. An on-change series has no measurement type to *choose* — the row says why, which is §4.4 delivered where the mistake would be made — but the type it sends in is still named there, and the name is still the customer's. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). |
-| 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. |
+| 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. Events, alarms and commands each carry a **retention** column, since each row is a type of its own; inventory carries none, and says why (§4.6). |
 | 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs — the default retention and the bytes per value. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
 | 5 | `results` | **Results** | §7. |
 

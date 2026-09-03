@@ -18,7 +18,13 @@
  * customer reads is translated.
  */
 
-import { perMonthEquivalent, type MachineType, type MetricKind, type Scenario } from '../../../lib/engine/index.js';
+import {
+  DEFAULT_RETENTION_DAYS,
+  perMonthEquivalent,
+  type MachineType,
+  type MetricKind,
+  type Scenario,
+} from '../../../lib/engine/index.js';
 import type { Key } from '../../../lib/i18n/index.js';
 import { catalogFor } from '../../../lib/presets/catalog.js';
 import {
@@ -27,8 +33,9 @@ import {
   setCadence,
   setDatapointName,
   setResentOnTimer,
+  setMetricRetentionDays,
 } from '../store.js';
-import { Choice, Every, Teach, Empty } from '../parts.js';
+import { Choice, Every, Retention, Teach, Empty } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
 import { Prose, Rich, useT } from '../i18n.js';
@@ -51,6 +58,16 @@ interface KindSpec {
   rateKey: Key;
   placeholderKey: Key;
   addKey: Key;
+  /**
+   * Whether a retention rule has anything to act on here.
+   *
+   * Events and alarms are documents: one per occurrence, kept until the rule
+   * removes it. An inventory write is not -- a PUT overwrites the managed
+   * object in place, so nothing accumulates to age out, and the object itself
+   * is not one of the types a retention rule covers. Offering the field there
+   * would be offering a control that changes no number.
+   */
+  retention: boolean;
 }
 
 const SPECS: KindSpec[] = [
@@ -64,6 +81,7 @@ const SPECS: KindSpec[] = [
     rateKey: 'discrete.occurrence.rate',
     placeholderKey: 'discrete.occurrence.placeholder',
     addKey: 'discrete.occurrence.add',
+    retention: true,
   },
   {
     kind: 'condition',
@@ -75,6 +93,7 @@ const SPECS: KindSpec[] = [
     rateKey: 'discrete.condition.rate',
     placeholderKey: 'discrete.condition.placeholder',
     addKey: 'discrete.condition.add',
+    retention: true,
   },
   {
     kind: 'inventory',
@@ -86,6 +105,7 @@ const SPECS: KindSpec[] = [
     rateKey: 'discrete.inventory.rate',
     placeholderKey: 'discrete.inventory.placeholder',
     addKey: 'discrete.inventory.add',
+    retention: false,
   },
 ];
 
@@ -101,6 +121,12 @@ export function StepDiscrete({ scenario, onChange }: Props) {
     <>
       <Teach title={t('discrete.teach.title')}>
         <Prose k="discrete.teach.body" />
+        <p class="hint">
+          <Rich
+            k="discrete.retentionNote"
+            p={{ days: String(scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS) }}
+          />
+        </p>
       </Teach>
 
       {SPECS.map((spec) => (
@@ -115,9 +141,14 @@ export function StepDiscrete({ scenario, onChange }: Props) {
             <Teach title={t(spec.questionKey)}>
               <Prose k={spec.teachKey} />
               {spec.kind === 'inventory' && (
-                <p class="hint">
-                  <Rich k="discrete.inventory.registrationNote" />
-                </p>
+                <>
+                  <p class="hint">
+                    <Rich k="discrete.inventory.registrationNote" />
+                  </p>
+                  <p class="hint">
+                    <Rich k="discrete.inventory.retentionNote" />
+                  </p>
+                </>
               )}
             </Teach>
             {scenario.machineTypes.map((mt) => (
@@ -173,6 +204,7 @@ function KindTable({
                 {spec.kind === 'inventory' && (
                   <th style="width:210px">{t('discrete.inventory.timerColumn')}</th>
                 )}
+                {spec.retention && <th style="width:130px">{t('retention.col')}</th>}
                 <th style="width:34px" />
               </tr>
             </thead>
@@ -211,6 +243,17 @@ function KindTable({
                         />
                         {t('discrete.inventory.timerLabel')}
                       </label>
+                    </td>
+                  )}
+                  {spec.retention && (
+                    <td>
+                      <Retention
+                        days={metric.retentionDays}
+                        fallback={scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS}
+                        onChange={(days) =>
+                          onChange(setMetricRetentionDays(scenario, mt.id, metric.id, days))
+                        }
+                      />
                     </td>
                   )}
                   <td>

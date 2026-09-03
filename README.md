@@ -136,10 +136,18 @@ twelve-month period reads roughly twelve times what the database holds at any on
 deliberately neither the fullest month, which would charge a year at the level it only reached in
 month twelve, nor the last, which would under-state a fleet that shrank.
 
-**Retention is a rule per measurement type**, asked in a column of the measurements table on the row
-that names the type — a tenant keeping `acme_Climate` for 90 days and `acme_Vibration` for 7 is the
-ordinary case. The scenario setting on the Contract step is the tenant default, used by every type
-with no rule of its own.
+**Retention is a rule per type**, asked in a column on the row that owns the type: once per
+measurement type in the measurements table, and on every row of the events, alarms and commands
+tables, since each of those is a type of its own. A tenant keeping `acme_Climate` for 90 days and
+`acme_Vibration` for 7 is the ordinary case. The scenario setting on the Contract step is the tenant
+default, used by every type with no rule of its own.
+
+Two elements behave differently and the tool says so. An **alarm** bills twice per incident — raise
+and clear — and stores once, because the clear updates the document the raise created; an
+**operation** bills three or four times and likewise stores once. And **inventory has no retention at
+all**: a write overwrites the managed object in place, so nothing accumulates to age out, and a
+managed object is not one of the types a retention rule covers — every device registered counts
+towards storage until somebody deletes it.
 
 The Configurator's ODS cell (`D37`) is filled in from all of this, at the assumed bytes per value —
 **400 B by default, the top of the range**, because under-stating usage on a commit-to-consume

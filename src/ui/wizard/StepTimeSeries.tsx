@@ -50,10 +50,10 @@ import {
   setDatapointName,
   setRhythm,
   setSeriesFragmentName,
-  setSeriesRetentionDays,
+  setMetricRetentionDays,
   setInterval as setMetricInterval,
 } from '../store.js';
-import { Choice, Duration, Every, Teach, Txt, Empty } from '../parts.js';
+import { Choice, Duration, Every, Retention, Teach, Txt, Empty } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
 import { compact, interval as fmtInterval, nf1 } from '../format.js';
@@ -151,55 +151,6 @@ function Solo({
   );
 }
 
-/**
- * How long the tenant keeps this measurement type.
- *
- * A retention rule in Cumulocity is attached to a measurement type, so this
- * control belongs to the type and not to the row -- the same rule that gives
- * the name field to the first series in a bundle and nobody else.
- *
- * Empty means the tenant's default, which is why this is a bare input with a
- * placeholder rather than a `Num`: a spinner cannot be empty, and pre-filling
- * every row with 30 would say the customer had decided something they have not
- * even seen. Clearing the box hands the type back to the default.
- */
-function Retention({
-  days, fallback, onChange,
-}: {
-  days: number | undefined;
-  fallback: number;
-  onChange: (days: number | undefined) => void;
-}) {
-  const t = useT();
-  const effective = days ?? fallback;
-  return (
-    <label class="field" title={t('series.retention.title')}>
-      <span style="display:flex;align-items:center;gap:5px">
-        <input
-          type="number"
-          min={0}
-          step={1}
-          style="width:76px"
-          value={days === undefined ? '' : days}
-          placeholder={String(fallback)}
-          onInput={(e) => {
-            const raw = (e.target as HTMLInputElement).value.trim();
-            if (raw === '') return onChange(undefined);
-            const parsed = Number(raw);
-            onChange(Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined);
-          }}
-        />
-        <em style="font-style:normal;color:var(--ink-faint);font-size:12px">
-          {t.plural('unit.day', effective)}
-        </em>
-      </span>
-      {days === undefined && (
-        <span class="hint" style="margin:3px 0 0">{t('series.retention.inherited')}</span>
-      )}
-    </label>
-  );
-}
-
 function MachineBlock({
   machineType: mt, scenario, onChange, collapse,
 }: Props & { machineType: MachineType; collapse: Collapse }) {
@@ -235,7 +186,7 @@ function MachineBlock({
                 <th style="min-width:150px">{t('series.col.unit')}</th>
                 <th style="min-width:230px">{t('series.col.howOften')}</th>
                 <th style="min-width:250px">{t('series.col.type')}</th>
-                <th style="width:130px">{t('series.col.retention')}</th>
+                <th style="width:130px">{t('retention.col')}</th>
                 <th style="width:34px" />
               </tr>
             </thead>
@@ -386,14 +337,14 @@ function MachineBlock({
                             }
                           />
                         ) : (
-                          <span class="hint">{t('series.retention.shared')}</span>
+                          <span class="hint">{t('retention.shared')}</span>
                         )
                       ) : (
                         <Retention
                           days={metric.retentionDays}
                           fallback={defaultRetention}
                           onChange={(days) =>
-                            onChange(setSeriesRetentionDays(scenario, mt.id, metric.id, days))
+                            onChange(setMetricRetentionDays(scenario, mt.id, metric.id, days))
                           }
                         />
                       )}

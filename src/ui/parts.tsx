@@ -19,6 +19,57 @@ import {
 } from '../../lib/engine/cadence.js';
 import type { Cadence, MetricKind } from '../../lib/engine/types.js';
 
+/**
+ * How long the tenant keeps one type of thing.
+ *
+ * A retention rule in Cumulocity is attached to a type -- a measurement type,
+ * an event type, an alarm type -- so this control belongs to the type and not
+ * to the row that happens to render it. In the measurements table that means
+ * the first series in a bundle and nobody else; in the discrete tables every
+ * row is its own type, so every row gets one.
+ *
+ * Empty means the tenant's default, which is why this is a bare input with a
+ * placeholder rather than a `Num`: a spinner cannot be empty, and pre-filling
+ * every row with 30 would say the customer had decided something they have not
+ * even seen. Clearing the box hands the type back to the default.
+ */
+export function Retention({
+  days, fallback, onChange,
+}: {
+  days: number | undefined;
+  fallback: number;
+  onChange: (days: number | undefined) => void;
+}) {
+  const t = useT();
+  const effective = days ?? fallback;
+  return (
+    <label class="field" title={t('retention.title')}>
+      <span style="display:flex;align-items:center;gap:5px">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          style="width:76px"
+          value={days === undefined ? '' : days}
+          placeholder={String(fallback)}
+          onInput={(e) => {
+            const raw = (e.target as HTMLInputElement).value.trim();
+            if (raw === '') return onChange(undefined);
+            const parsed = Number(raw);
+            onChange(Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined);
+          }}
+        />
+        <em style="font-style:normal;color:var(--ink-faint);font-size:12px">
+          {t.plural('unit.day', effective)}
+        </em>
+      </span>
+      {days === undefined && (
+        <span class="hint" style="margin:3px 0 0">{t('retention.inherited')}</span>
+      )}
+    </label>
+  );
+}
+
 export function Num({
   label, value, onChange, min = 0, max, step = 1, width = '100%', title, suffix,
 }: {
