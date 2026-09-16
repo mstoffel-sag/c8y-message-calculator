@@ -266,9 +266,12 @@ describe('the wizard renders', () => {
   });
 
   test('discrete: states the real cost of a command', () => {
+    // The claim, not the sentence: the step has to say that a command is
+    // several messages and name the statuses that make it so. The wording has
+    // been shortened once already -- assert what it must convey.
     const html = render(<StepDiscrete {...props} />);
     assert.match(html, /PENDING/);
-    assert.match(html, /three or four messages/i);
+    assert.match(html, /four messages per command/i);
   });
 
   test('contract: lists every asked line item with its cell', () => {

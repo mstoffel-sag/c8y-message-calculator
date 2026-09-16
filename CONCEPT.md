@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 25 — the Web SDK build exists: one engine, two apps · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-16
+**Status:** draft for review, rev 26 — the teaching prose is shorter, and speaks of creating and updating rather than of POST and PUT · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-16
 
 ---
 
@@ -851,7 +851,7 @@ English and German need. A dependency that has to be learned before a sentence c
 dependency that stops sentences being corrected. The Angular port swaps this file for
 `@ngx-translate` and keeps every word (§8, the port table).
 
-**The prose keeps its emphasis.** Half the teaching in this tool is in the bold: *"one **POST** is
+**The prose keeps its emphasis.** Half the teaching in this tool is in the bold: *"creating one is
 **one message**"*. Taking the JSX out meant putting something back that a translator can retype, so
 the catalogue carries four marks — `**bold**`, `*emphasis*`, `` `code` `` and a blank line for a
 paragraph — and `rich.ts` turns them into elements. Deliberately not Markdown: a link or a heading

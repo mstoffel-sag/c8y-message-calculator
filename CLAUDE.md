@@ -136,6 +136,14 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
   binding per change detection pass.
 - The catalogue's markup is `**bold**`, `*emphasis*`, `` `code` `` and a blank line between
   paragraphs. Punctuation is literal — em dashes and curly quotes, not HTML entities.
+- **Prose says "create" and "update", never `POST` and `PUT`.** The reader being taught is modelling
+  a fleet, not writing the client. The one place the verb survives is the payload panel's request
+  line (`POST /measurement/measurements`), which comes from `lib/engine/payload.ts` and is the
+  actual call a developer makes — API surface, like the REST paths beside it.
+- **Short.** A teaching paragraph earns its length by changing a number or preventing a mistake; an
+  illustration that restates the paragraph above it does not. Avoid a coy headline that withholds
+  the point ("this one costs more than it looks") — state the point ("one command is more than one
+  message"). The bodies were cut by about a third in one pass; do not grow them back.
 - Engine-side prose travels as keys plus parameters, never as sentences: `Finding.titleKey`,
   `PayloadExample.noteKeys`, `LineItem.helpKey`, `Seed.blurbKey`.
 - **What stays English** (`NOT_TRANSLATED` in `lib/i18n/index.ts`): Configurator row labels and

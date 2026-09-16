@@ -410,7 +410,22 @@
   padding: calc(var(--u) * 1.5);
   margin: 4px 0 calc(var(--u) * 2);
 }
-.mc-diagram svg { display: block; width: 100%; height: auto; }
+.mc-diagram svg {
+  display: block;
+  /*
+   * Capped at the geometry's own width rather than stretched to the column.
+   *
+   * The viewBox is 648 units for the explainer and 700 for the configuration
+   * diagram, and every font size inside them is chosen in those units. Left at
+   * width:100% the whole picture scales with the content area, so on a wide
+   * screen a 14px label renders at 28px and the diagram shouts. Capping at the
+   * intrinsic width means it shrinks on a narrow screen and never grows past
+   * the size it was drawn at.
+   */
+  width: 100%;
+  max-width: 700px;
+  height: auto;
+}
 
 .dg-cap {
   font: 600 10px var(--sans);
