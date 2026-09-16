@@ -9,7 +9,7 @@
 import type { Key, Params } from '../i18n/index.js';
 import { looksLikeFlag, type Bundle, type Metric, type MachineType } from './types.js';
 import { resolveBundles } from './compute.js';
-import { fragmentNameFor } from './bundling.js';
+import { bundleFragmentName } from './bundling.js';
 
 /**
  * Which namespace a name lives in. Measurement fragments, event types, alarm
@@ -129,9 +129,16 @@ function measurementBody(fragment: string, metrics: Metric[]): string {
 }
 
 
-function bundleExample(bundle: Bundle, members: Metric[], prefix: string): PayloadExample {
-  const fragment =
-    bundle.fragmentName.trim() || fragmentNameFor(prefix, 'readings', bundle.intervalSeconds);
+function bundleExample(
+  bundle: Bundle,
+  members: Metric[],
+  prefix: string,
+  machineTypeName: string,
+): PayloadExample {
+  // The machine type's name, not the literal 'readings' this used to pass: an
+  // unnamed bundle would otherwise be acme_Readings60s in the payload example
+  // and acme_RooftopHvacUnit60s in the diagram, for the same measurement type.
+  const fragment = bundleFragmentName(prefix, machineTypeName, bundle);
   return {
     titleKey: 'payload.title.bundle',
     titleParams: { count: members.length, seconds: bundle.intervalSeconds },
@@ -239,7 +246,7 @@ export function payloadsFor(machineType: MachineType, prefix = 'acme'): PayloadE
   const { bundles, loneContinuous } = resolveBundles(machineType);
 
   for (const { bundle, members } of bundles) {
-    if (members.length > 0) out.push(bundleExample(bundle, members, prefix));
+    if (members.length > 0) out.push(bundleExample(bundle, members, prefix, machineType.name));
   }
   for (const metric of loneContinuous) {
     out.push({

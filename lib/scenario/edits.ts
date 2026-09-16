@@ -432,7 +432,11 @@ export function normalise(input: unknown): Scenario {
     protocol: typeof mt?.protocol === 'string' ? mt.protocol : undefined,
     bundles: (Array.isArray(mt?.bundles) ? mt.bundles : []).map((b) => ({
       id: b?.id ?? nextId('b'),
-      fragmentName: b?.fragmentName ?? 'acme_Readings',
+      // Empty means "nobody named this", which is a real state -- the tool
+      // derives the name on read. A scenario saved before that was true, or by
+      // hand without the field, gets the derived name rather than a literal
+      // acme_Readings that was never anybody's intent.
+      fragmentName: typeof b?.fragmentName === 'string' ? b.fragmentName : '',
       intervalSeconds: typeof b?.intervalSeconds === 'number' ? b.intervalSeconds : 60,
       metricIds: Array.isArray(b?.metricIds) ? b.metricIds : [],
       // Absent means "the tenant default", which is a different scenario from

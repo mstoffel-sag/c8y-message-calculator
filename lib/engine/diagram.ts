@@ -16,7 +16,7 @@ import type { MachineType, Metric } from './types.js';
 import { resolveBundles } from './compute.js';
 import { REFERENCE_DAYS, SECONDS_PER_DAY } from './calendar.js';
 import { ownFragmentName, seriesNameOf } from './payload.js';
-import { fragmentNameFor } from './bundling.js';
+import { bundleFragmentName } from './bundling.js';
 
 const REFERENCE_SECONDS = REFERENCE_DAYS * SECONDS_PER_DAY;
 
@@ -93,7 +93,7 @@ export function measurementView(
     if (members.length === 0) continue;
     groups.push({
       id: bundle.id,
-      fragmentName: bundle.fragmentName.trim() || fragmentNameFor(prefix, machineType.name, bundle.intervalSeconds),
+      fragmentName: bundleFragmentName(prefix, machineType.name, bundle),
       intervalSeconds: bundle.intervalSeconds,
       shared: members.length > 1,
       timed: true,

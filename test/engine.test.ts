@@ -22,7 +22,9 @@ import {
   computeMachineTypeMonth,
   daysInMonth,
   expandMonths,
+  fragmentNameFor,
   lintScenario,
+  measurementView,
   onboardingByPeriod,
   payloadsFor,
   resolveBundles,
@@ -32,7 +34,18 @@ import {
   type MachineType,
   type Scenario,
 } from '../lib/engine/index.js';
-import { blankScenario, conceptSection9Scenario, presetByKey } from '../lib/presets/index.js';
+import {
+  blankMachineType,
+  blankScenario,
+  conceptSection9Scenario,
+  presetByKey,
+} from '../lib/presets/index.js';
+import {
+  addDatapoint,
+  addMachineType,
+  patchBundle,
+  patchMachineType,
+} from '../lib/scenario/edits.js';
 
 /** Narrows and fails with a useful message, which assert.ok does not do here. */
 function must<T>(value: T | undefined | null, message: string): T {
@@ -575,6 +588,50 @@ describe('fragment and type names', () => {
     assert.equal(wide[0]?.name, 'acme_Climate');
   });
 });
+
+describe('a measurement type the tool created is a suggestion, not a decision', () => {
+  // Reported from a tenant: acme_RooftopHvacUnit60s appeared in the Measurement
+  // type column of a series that had not been configured at all. It was being
+  // stored by autoAssign the moment the row was added, so the box looked filled
+  // in by the customer. The name is now derived on read.
+  const withOneFreshSeries = () => {
+    let scenario = addMachineType(conceptSection9Scenario(), blankMachineType());
+    const id = scenario.machineTypes[scenario.machineTypes.length - 1]!.id;
+    scenario = patchMachineType(scenario, id, { name: 'Rooftop HVAC unit' });
+    return { scenario: addDatapoint(scenario, id, 'continuous'), id };
+  };
+
+  test('adding a series stores no name for the type it lands in', () => {
+    const { scenario, id } = withOneFreshSeries();
+    const machineType = scenario.machineTypes.find((mt) => mt.id === id)!;
+    assert.equal(machineType.bundles.length, 1);
+    assert.equal(machineType.bundles[0]!.fragmentName, '');
+  });
+
+  test('every reader still names it, and names it the same thing', () => {
+    const { scenario, id } = withOneFreshSeries();
+    const machineType = scenario.machineTypes.find((mt) => mt.id === id)!;
+    const prefix = scenario.settings.fragmentPrefix;
+    const derived = fragmentNameFor(prefix, machineType.name, 60);
+
+    assert.equal(derived, 'acme_RooftopHvacUnit60s');
+    assert.equal(measurementView(machineType, prefix).groups[0]!.fragmentName, derived);
+    // This one used to read acme_Readings60s -- the same type under two names.
+    assert.equal(payloadsFor(machineType, prefix)[0]!.name, derived);
+  });
+
+  test('a typed name wins everywhere, and is what gets stored', () => {
+    const { scenario, id } = withOneFreshSeries();
+    const bundleId = scenario.machineTypes.find((mt) => mt.id === id)!.bundles[0]!.id;
+    const named = patchBundle(scenario, id, bundleId, { fragmentName: 'acme_Climate' });
+    const machineType = named.machineTypes.find((mt) => mt.id === id)!;
+    const prefix = named.settings.fragmentPrefix;
+
+    assert.equal(machineType.bundles[0]!.fragmentName, 'acme_Climate');
+    assert.equal(measurementView(machineType, prefix).groups[0]!.fragmentName, 'acme_Climate');
+    assert.equal(payloadsFor(machineType, prefix)[0]!.name, 'acme_Climate');
+  });
+})
 
 describe('lib/ imports nothing but itself', () => {
   // CONCEPT.md section 8 rests on this: the engine is meant to move to an

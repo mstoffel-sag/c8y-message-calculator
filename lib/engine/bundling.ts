@@ -13,7 +13,7 @@
  * splits them afterwards (L6).
  */
 
-import type { MachineType, Metric } from './types.js';
+import type { Bundle, MachineType, Metric } from './types.js';
 import { resolveBundles } from './compute.js';
 import { SECONDS_PER_DAY } from './calendar.js';
 
@@ -49,6 +49,32 @@ function pascal(text: string): string {
 export function fragmentNameFor(prefix: string, machineTypeName: string, seconds: number): string {
   const clean = prefix.replace(/[^\p{L}\p{N}]+/gu, '') || 'acme';
   return `${clean}_${pascal(machineTypeName)}${intervalSlug(seconds)}`;
+}
+
+/**
+ * What a measurement type is called, whether or not anybody named it.
+ *
+ * A bundle the tool created by grouping on interval carries **no** name: it was
+ * a default, not a decision, and storing a name for a series nobody has
+ * configured yet puts `acme_RooftopHvacUnit60s` in front of a customer who has
+ * not said what the machine measures. So the name is derived on read, and the
+ * wizard shows it as a placeholder -- a suggestion you can type over, which is
+ * what the column always claimed to be.
+ *
+ * A bundle the customer *split out* keeps its stored name, because choosing
+ * "a measurement type of its own" for a named series is a decision, and the
+ * name that follows from it (`acme_SupplyAirTemp`) is not derivable from the
+ * machine type and the interval.
+ *
+ * Every reader goes through here, so the diagram, the payload examples, the
+ * workbook and the findings cannot disagree about what a type is called.
+ */
+export function bundleFragmentName(
+  prefix: string,
+  machineTypeName: string,
+  bundle: Pick<Bundle, 'fragmentName' | 'intervalSeconds'>,
+): string {
+  return bundle.fragmentName.trim() || fragmentNameFor(prefix, machineTypeName, bundle.intervalSeconds);
 }
 
 export interface BundleProposal {
@@ -153,7 +179,9 @@ export function applyProposal(machineType: MachineType, prefix: string): Machine
     if (!bundle) {
       bundle = {
         id: `b_${proposal.intervalSeconds}_${Math.random().toString(36).slice(2, 8)}`,
-        fragmentName: proposal.fragmentName,
+        // Unnamed on purpose -- see bundleFragmentName. The proposal panel
+        // shows the name this will read as, and it is the same one.
+        fragmentName: '',
         intervalSeconds: proposal.intervalSeconds,
         metricIds: [],
       };
@@ -204,7 +232,8 @@ export function autoAssign(machineType: MachineType, metricId: string, prefix: s
 
   const bundle = {
     id: `b_${seconds}_${Math.random().toString(36).slice(2, 8)}`,
-    fragmentName: fragmentNameFor(prefix, machineType.name, seconds),
+    // Unnamed on purpose -- see bundleFragmentName.
+    fragmentName: '',
     intervalSeconds: seconds,
     metricIds: [metricId],
   };

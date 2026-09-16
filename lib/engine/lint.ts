@@ -8,11 +8,13 @@
 
 import {
   looksLikeFlag,
+  type Bundle,
   type Finding,
   type MachineType,
   type Metric,
   type Scenario,
 } from './types.js';
+import { bundleFragmentName } from './bundling.js';
 import { resolveBundles } from './compute.js';
 import { REFERENCE_DAYS, SECONDS_PER_DAY } from './calendar.js';
 import { commandsInMonth } from './cadence.js';
@@ -43,17 +45,20 @@ function effectiveInterval(metric: Metric, bundleInterval: number | undefined): 
   return metric.cadence.mode === 'interval' ? metric.cadence.seconds : undefined;
 }
 
-function lintMachineType(machineType: MachineType): Finding[] {
+function lintMachineType(machineType: MachineType, prefix: string): Finding[] {
   const findings: Finding[] = [];
   const { bundles } = resolveBundles(machineType);
   const n = online(machineType);
+  // A finding that says "acme_" because nobody has typed a name yet is a
+  // finding nobody can act on. Same resolution as the diagram and the payloads.
+  const nameOf = (bundle: Bundle) => bundleFragmentName(prefix, machineType.name, bundle);
 
   const bundleOf = new Map<string, { id: string; fragmentName: string; interval: number }>();
   for (const { bundle, members } of bundles) {
     for (const member of members) {
       bundleOf.set(member.id, {
         id: bundle.id,
-        fragmentName: bundle.fragmentName,
+        fragmentName: nameOf(bundle),
         interval: bundle.intervalSeconds,
       });
     }
@@ -121,6 +126,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
         titleParams: {
           name: metric.name,
           kind: metric.kind,
+          // Already resolved: this one comes out of bundleOf, not the bundle.
           fragment: bundle.fragmentName,
         },
         detailKey: 'lint.L3.detail',
@@ -173,7 +179,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
         rule: 'L4',
         severity: 'warning',
         titleKey: 'lint.L4.title',
-        titleParams: { fragment: bundle.fragmentName },
+        titleParams: { fragment: nameOf(bundle) },
         detailKey: 'lint.L4.detail',
         // Grouped digits, but not localised: the engine has no locale, and the
         // UI cannot reformat a number once it is inside a sentence. A figure
@@ -193,7 +199,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
         rule: 'L6',
         severity: 'warning',
         titleKey: 'lint.L6.size.title',
-        titleParams: { fragment: bundle.fragmentName, count: members.length },
+        titleParams: { fragment: nameOf(bundle), count: members.length },
         detailKey: 'lint.L6.size.detail',
         detailParams: { max: MAX_SERIES_PER_BUNDLE },
         machineTypeId: machineType.id,
@@ -213,7 +219,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
         rule: 'L6',
         severity: 'warning',
         titleKey: 'lint.L6.mixed.title',
-        titleParams: { fragment: bundle.fragmentName, count: semantics.size },
+        titleParams: { fragment: nameOf(bundle), count: semantics.size },
         detailKey: 'lint.L6.mixed.detail',
         detailParams: { semantics: [...semantics].join(', '), units: units.size },
         machineTypeId: machineType.id,
@@ -330,7 +336,11 @@ function lintFragmentNames(scenario: Scenario): Finding[] {
         .map((m) => m.name.trim().toLowerCase())
         .sort()
         .join('|');
-      note(bundle.fragmentName.trim(), { machineType, signature, bundleId: bundle.id });
+      note(bundleFragmentName(scenario.settings.fragmentPrefix, machineType.name, bundle), {
+        machineType,
+        signature,
+        bundleId: bundle.id,
+      });
     }
     for (const metric of loneContinuous) {
       note(ownFragmentName(scenario.settings.fragmentPrefix, metric).trim(), {
@@ -370,7 +380,7 @@ const SEVERITY_ORDER: Record<Finding['severity'], number> = {
 
 export function lintScenario(scenario: Scenario): Finding[] {
   const findings = [
-    ...scenario.machineTypes.flatMap(lintMachineType),
+    ...scenario.machineTypes.flatMap(mt => lintMachineType(mt, scenario.settings.fragmentPrefix)),
     ...lintFragmentNames(scenario),
   ];
   return findings.sort(
