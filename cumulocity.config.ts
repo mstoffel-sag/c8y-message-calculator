@@ -13,10 +13,21 @@
 import type { ConfigurationOptions } from '@c8y/devkit';
 import { version, description } from './package.json';
 
+/**
+ * Said once, because the icon's URL has to contain it.
+ *
+ * An application icon is applied as a CSS `background-image`, so the platform
+ * needs a path that resolves from the server root rather than from the app --
+ * which means the context path is spelled into it. Changing one and not the
+ * other gives a working app with no icon, and nothing reports that.
+ */
+const contextPath = 'message-calculator';
+const icon = `url('/apps/${contextPath}/assets/app-icon.svg')`;
+
 export default {
   runTime: {
     name: 'Message Calculator',
-    contextPath: 'message-calculator',
+    contextPath,
     key: 'message-calculator-application-key',
     version,
     description,
@@ -26,7 +37,12 @@ export default {
     /** A presales tool belongs in the app switcher next to Cockpit. */
     noAppSwitcher: false,
     globalTitle: 'Message Calculator',
-    icon: { class: 'c8y-icon-calculator' },
+    /**
+     * `src/c8y/assets/app-icon.svg`, copied to the build by the `assets` entry
+     * in angular.json. The app switcher and the header bar both read this.
+     */
+    icon: { url: icon },
+    faviconUrl: `/apps/${contextPath}/assets/app-icon.svg`,
     /**
      * The calculator reaches no API and stores nothing in the tenant, so there
      * is no platform documentation to link into and no plugin surface to
