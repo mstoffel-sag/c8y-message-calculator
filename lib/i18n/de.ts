@@ -16,6 +16,7 @@ import type { Key } from './en.js';
 
 export const de: Record<Key, string> = {
   /* ------------------------------------------------------- app chrome */
+  'app.title': 'Nachrichtenrechner',
   'app.tagline': 'Nachrichtenrechner — eine Mengenschätzung, kein Angebot',
   'app.scenarioName': 'Name des Szenarios',
   'app.stat.peakMonth': 'Nachrichten / Spitzenmonat',

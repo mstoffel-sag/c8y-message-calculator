@@ -1,9 +1,18 @@
 # Working in this repo
 
-A preact webapp that turns a fleet description into **Cumulocity messages per calendar month**,
-mapped onto the nine counters of the `[CTC] Sales Configurator`. [CONCEPT.md](CONCEPT.md) is the
-design document and the argument for every decision in here; read the section it names before
+Two webapps over one engine, turning a fleet description into **Cumulocity messages per calendar
+month**, mapped onto the nine counters of the `[CTC] Sales Configurator`. [CONCEPT.md](CONCEPT.md)
+is the design document and the argument for every decision in here; read the section it names before
 changing behaviour it describes.
+
+- **`src/c8y`** — the Web SDK build: Angular 21 + `@c8y/ngx-components` 1024.18.0 (`y2027-lts`),
+  inside the Cumulocity shell. The one meant for a tenant.
+- **`src/ui`** — the standalone build: preact, draws its own frame, needs no backend.
+- **`lib/`** — everything that decides a number, shared by both and framework-free.
+
+**A change to behaviour is a change to both apps.** They are not a fork: if you find yourself
+writing the same logic twice, it belongs in `lib/`. That is how `lib/scenario`, `lib/format`,
+`lib/diagram` and `lib/wizard` got there.
 
 ## The one hard constraint
 
@@ -22,25 +31,49 @@ history is forever.
 
 ## Commands
 
-Node is not on the default PATH:
+Node is not on the default PATH, and the default version is **too old for Angular 21**, which wants
+`^20.19 || ^22.12 || >=24`. Use 22:
 
 ```
-export PATH="$HOME/.nvm/versions/node/v20.18.2/bin:$PATH"
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 ```
 
 ```
-npm test         # tsc -p tsconfig.test.json && node --test dist-test/test/
-npm run typecheck
-npm run build    # static bundle in dist/
-npm run package  # dist-package/*.zip for a tenant upload
-npm run dev      # http://127.0.0.1:5173
+npm test              # tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js
+npm run typecheck     # the standalone app and lib/
+npm run c8y:typecheck # the Web SDK app, templates included
+
+npm run dev           # standalone, http://127.0.0.1:5173
+npm run build         # standalone -> dist/
+npm run package       # standalone -> dist-package/*.zip
+
+npm run c8y:start     # Web SDK dev server; -- -u https://<tenant>.cumulocity.com
+npm run c8y:build     # Web SDK -> dist-c8y/message-calculator/ and .zip
+npm run c8y:deploy    # uploads it
 ```
 
-`npm test` and `npm run typecheck` both pass before anything is called done.
+`npm test`, `npm run typecheck` **and** `npm run c8y:typecheck` all pass before anything is called
+done.
+
+**`npm run c8y:build` type-checks nothing.** The devkit builds with `aot: false` and transpiles
+through babel, so a type error and a broken template both produce a green build. `c8y:typecheck`
+runs `ngc` and is the only thing that reads an Angular template. A green `c8y:build` means nothing
+on its own.
+
+The test script globs `dist-test/test/*.test.js` rather than passing the directory: `node --test
+<dir>` resolves the path as a module on Node 22 and fails.
 
 ## Verifying UI and workbook changes
 
-There is no browser here. Every UI check is `preact-render-to-string` plus a WebKit snapshot:
+**The Web SDK app cannot be rendered here at all.** It boots by fetching the tenant's options
+before Angular starts, so there is no headless render, no snapshot and no dev server without a
+Cumulocity instance to point at. What can be checked is `npm run c8y:typecheck` (templates
+included), that `npm run c8y:build` produces a zip with `index.html` and `cumulocity.json` in its
+root, and reasoning. Say which of those you did; do not describe an Angular screen as if you had
+seen it.
+
+The standalone app can be rendered. Every UI check there is `preact-render-to-string` plus a WebKit
+snapshot:
 
 ```
 node tools/render_step.mjs <step> <out.html> [scrollPx] [locale]   # reads dist-test/: npm test first
@@ -59,13 +92,19 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 
 - `lib/` is portable by test: no `document.` / `window.` / `localStorage` / `navigator.` / `fetch(` /
   `Blob(` / `process.`, no `@angular`, `@c8y` or `preact`, and every import relative and resolving
-  inside `lib/`. It has to survive being ported into an Angular app. The guard requires the dot to
-  touch a property name, so prose ending in "…the retention window." is fine.
-- `src/ui/` is the preact app. `src/ui/store.ts` holds every immutable scenario edit, so the same
-  operations can be reused by another framework's store.
-- `normalise()` in the store is the compatibility layer for saved scenarios (localStorage and
-  exported JSON). A rename that silently drops metrics would under-count, which is the one failure
-  this tool cannot have — migrate the old value there and test it.
+  inside `lib/`. It survived being ported into an Angular app, which is what that guard bought.
+  `document.`, `window.`, `navigator.` and `process.` need the dot to touch a property name, so
+  prose ending in "…the retention window." is fine — but **`localStorage` and `preact` are matched
+  as bare words**, so they cannot appear in a comment either.
+- `lib/scenario/edits.ts` holds every immutable scenario edit. Both stores are three lines over it:
+  hold the scenario, call one of these, keep what comes back. Persistence is *not* there, because
+  `lib/` may not see browser storage.
+- `lib/format`, `lib/diagram` and `lib/wizard` are there for the same reason — two apps needed them.
+- `normalise()` in `lib/scenario/edits.ts` is the compatibility layer for saved scenarios (browser
+  storage and exported JSON). A rename that silently drops metrics would under-count, which is the
+  one failure this tool cannot have — migrate the old value there and test it.
+- **Both apps read the same storage key**, so a scenario started in one opens in the other. That is
+  deliberate; it is also why `normalise` has to cope with either app's output.
 - **A test that reads source files has to find the repo first.** Tests run compiled, from
   `dist-test/test/`, where `resolve(__dirname, '..')` is `dist-test/` and there is not one `.ts` file
   to be found — two guards were passing on an empty string that way. Walk up to the `package.json`
@@ -89,8 +128,12 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 
 - **No prose in a component.** Every user-visible string lives in `lib/i18n/en.ts` (the source of
   truth) with a German twin in `de.ts`, typed `Record<Key, string>` so a missing translation is a
-  compile error. Components call `t('key')`, `<Rich k="key" />` for one marked-up string, or
-  `<Prose k="key" />` for paragraphs.
+  compile error. The standalone app calls `t('key')`, `<Rich k="key" />` for one marked-up string,
+  or `<Prose k="key" />` for paragraphs; the Web SDK app calls `{{ 'key' | t }}`,
+  `<c8y-mc-rich k="key" />` and `<c8y-mc-prose k="key" />`. Same catalogue, same keys, same markup.
+- The `t` pipe is **impure**, because the thing that changes is the session's locale and that is not
+  an argument to anything. Each instance caches its last answer, so the cost is one comparison per
+  binding per change detection pass.
 - The catalogue's markup is `**bold**`, `*emphasis*`, `` `code` `` and a blank line between
   paragraphs. Punctuation is literal — em dashes and curly quotes, not HTML entities.
 - Engine-side prose travels as keys plus parameters, never as sentences: `Finding.titleKey`,
@@ -98,10 +141,18 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 - **What stays English** (`NOT_TRANSLATED` in `lib/i18n/index.ts`): Configurator row labels and
   units, counter names, the metric catalogue, REST paths, and the generated workbook, which reads
   the English catalogue directly rather than keeping a second copy of it.
-- Numbers and month names come from `Intl` via `src/ui/format.ts`, which holds the session locale as
-  module state — `setFormatLocale` — so `n()` and `compact()` did not each grow a parameter.
+- Numbers and month names come from `Intl` via `lib/format`, which holds the session locale as
+  module state — `setFormatLocale` — so `n()` and `compact()` did not each grow a parameter. **In
+  the Angular app that module state is invisible to signals**: a `computed()` that formats a number
+  without also calling `t()` has to read `locales.locale()` to say so, or it will not re-run when
+  the language changes. There is a comment saying this in `contract.component.ts`.
+- The Web SDK app has **no language switch**. The user picked a language in their Cumulocity
+  profile; `LocaleService` follows the shell's `TranslateService` and maps anything that is not
+  German to English.
 - `test/i18n.test.tsx` enforces the rest: no empty or copy-pasted German, matching placeholders, no
-  dead keys, and no English function words left on a German render of any step.
+  dead keys, and no English function words left on a German render of any step. The dead-key scan
+  reads every `.ts`/`.tsx` under `src/` and `lib/` **except paths containing `/i18n/`** — so a key
+  used only inside `src/c8y/app/i18n/` does not count as used, and would be reported dead.
 - **German runs about a fifth longer than English**, so a new string in a fixed-width row is a layout
   change: snapshot the German render too. The top bar is the tight one — it is capped at 1240 px and
   already wrapped once.
@@ -123,7 +174,9 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 
 ## Known unknowns
 
-- **No tenant.** The upload path is unverified.
+- **No tenant.** The upload path is unverified, and the Web SDK app has never been rendered by
+  anything: it cannot boot without a Cumulocity instance to fetch its options from. It compiles and
+  it type-checks; that is the whole of what is known about it.
 - The storage model's bytes-per-value figures are rules of thumb marked "to be verified" at source,
   and the tool reports the range rather than a midpoint on purpose (`lib/engine/storage.ts`).
 - Nobody has confirmed where a live tenant reports the nine counters for a past calendar month. That

@@ -14,6 +14,10 @@
 
 export const en = {
   /* ------------------------------------------------------- app chrome */
+  // The page's own title, shown by the shell's `c8y-title` in the Web SDK
+  // build. The standalone build has no header to put it in -- it is the browser
+  // tab there -- so this key belongs to one of the two apps.
+  'app.title': 'Message calculator',
   'app.tagline': 'Message calculator — a volume estimate, never a quote',
   'app.scenarioName': 'Scenario name',
   'app.stat.peakMonth': 'messages / peak month',

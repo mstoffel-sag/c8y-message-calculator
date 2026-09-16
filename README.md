@@ -4,73 +4,113 @@ Estimates **messages per calendar month** from a description of a fleet. Volume 
 billable units. The commit-to-consume commitment is computed in *quantities* and multiplied by prices
 the file does not contain. See [CONCEPT.md](CONCEPT.md) for the design and the reasoning.
 
-First draft. Runs locally, and packages into a zip a Cumulocity tenant will host.
+First draft. There are **two builds of the same tool**, from one engine:
+
+| Build | What it is | Where it runs |
+|---|---|---|
+| **Web SDK** (`src/c8y`) | An Angular application on `@c8y/ngx-components`, inside the Cumulocity shell -- navigator, header, branding, login and language all the platform's | A tenant |
+| **Standalone** (`src/ui`) | A 345 kB preact bundle that draws its own frame and needs no backend at all | Anywhere: a laptop, a share, a tenant |
+
+Everything that decides a number is in `lib/` and is shared: the engine, the string catalogue, the
+scenario edits, the formatters, the diagram geometry, the workbook writer. The two `src/` folders
+are the drawing, and nothing else.
 
 ## Run it
 
-Node 20 or newer.
+**Node 20.19 or newer** -- Angular 21 will not start on anything older, and the repo's own default
+(`v20.18.2`) is just below that line. If nvm is installed:
+
+```
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+```
 
 ```
 npm install
-npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 ```
+
+Shared by both builds:
 
 ```
 npm test         # the engine, the cell map, the xlsx writer, and a render pass over every step
 npm run typecheck
-npm run build    # static bundle in dist/
-npm run package  # dist-package/message-calculator-<version>.zip, ready to upload
 ```
+
+The standalone build:
+
+```
+npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
+npm run build    # static bundle in dist/
+npm run package  # dist-package/message-calculator-standalone-<version>.zip
+```
+
+The Web SDK build:
+
+```
+npm run c8y:typecheck   # ngc, including the templates -- see the warning below
+npm run c8y:start       # dev server; add -- -u https://<tenant>.cumulocity.com
+npm run c8y:build       # dist-c8y/message-calculator/ and message-calculator.zip
+npm run c8y:deploy      # uploads it, given -- -u <url> -U <user>
+```
+
+> **`npm run c8y:build` does not type-check anything.** The devkit builds with `aot: false` and
+> transpiles TypeScript through babel, so a type error and a broken template both compile
+> perfectly. `npm run c8y:typecheck` is the one that runs the Angular compiler. Run it.
 
 ## Deploy it to a Cumulocity tenant
 
+Both builds are hosted web applications: a zip with `index.html` and `cumulocity.json` in its
+**root**, uploaded at **Administration → Ecosystem → Applications → Add application → Upload web
+application**.
+
+| | Web SDK build | Standalone build |
+|---|---|---|
+| Build | `npm run c8y:build` | `npm run package` |
+| Zip | `dist-c8y/message-calculator.zip` | `dist-package/message-calculator-standalone-<version>.zip` |
+| Manifest | [cumulocity.config.ts](cumulocity.config.ts) | [cumulocity.json](cumulocity.json) |
+| Opens at | `/apps/message-calculator/` | `/apps/message-calculator-standalone/` |
+| Size | ~7 MB | ~450 kB |
+
+**Two manifests, two identities.** A `contextPath` is unique in a tenant, so the two builds cannot
+both be `message-calculator`. The Web SDK build takes the plain name because it is the one meant to
+live in a tenant; the standalone build is suffixed. Upload either, or both -- they are the same tool
+and they read the same `localStorage` key, so a scenario started in one is there in the other.
+
+The Web SDK build can also be deployed without the browser:
+
 ```
-npm run package
+npm run c8y:deploy -- -u https://<tenant>.cumulocity.com -U <user>
 ```
 
-Then in the tenant: **Administration → Ecosystem → Applications → Add application →
-Upload web application**, drop the zip, and open `/apps/message-calculator/`.
+Four things that make either build work without a rewrite:
 
-The manifest is [cumulocity.json](cumulocity.json) at the repo root. The platform's only
-structural requirement is that `index.html` and `cumulocity.json` sit in the **root** of the
-zip, not inside a folder -- so the archive is built from the contents of `dist/`, and
-`npm run package` fails rather than shipping a zip that would install and then 404.
-
-| Field | Why it is what it is |
-|---|---|
-| `"type": "HOSTED"` | The platform serves the files itself. A plain static bundle qualifies; nothing here needs Angular or `@c8y/ngx-components`. |
-| `"contextPath"` | Becomes the URL: `/apps/message-calculator/`. |
-| `"key"` | Must be unique in the tenant. Change it before uploading a second copy alongside the first. |
-| `"availability": "PRIVATE"` | One tenant only. `"MARKET"` would offer it to subtenants, which is a decision about who may see the tool, not a build setting. |
-| `"noAppSwitcher": false` | It appears in the application switcher. |
-| `"version"` | Stamped from `package.json` at build time, so there is one place to bump. |
-
-Three things that make this work without a rewrite:
-
-- **Every asset path is relative** -- `app.js`, `styles.css`, `fonts/`. An absolute `/styles.css`
-  resolves against the tenant root, not the app, and 404s.
-- **Public Sans is self-hosted**, so nothing depends on reaching a font CDN from inside a tenant.
+- **Every asset path is relative.** An absolute `/styles.css` resolves against the tenant root, not
+  the app, and 404s.
 - **Nothing calls the platform.** All arithmetic is in the browser, so the app needs no
-  `requiredRoles`, no auth handling and no microservice. Cumulocity still gates `/apps/...`
-  behind tenant login, so the page is only reachable by someone with an account.
+  `requiredRoles`, no auth handling and no microservice. Cumulocity still gates `/apps/...` behind
+  tenant login, so the page is only reachable by someone with an account.
+- **The standalone build self-hosts Public Sans**, so nothing depends on reaching a font CDN from
+  inside a tenant. The Web SDK build uses the platform's own fonts and does not ship any.
+- **No prices anywhere**, which is what makes one artifact safe for a tenant, a prospect and a
+  public share alike (CONCEPT.md section 1).
 
-What this deployment does *not* give you: the Cumulocity navigator and app shell. The app draws
-its own header, because it is a static bundle rather than an `@c8y/ngx-components` app. That is
-the trade for shipping today, and the reason CONCEPT.md section 8 keeps `/lib` framework-free --
-when the Angular shell is wanted, `/lib` moves across and only `/src/ui` is rewritten.
+### What the Web SDK build gets that the standalone one cannot
+
+The shell. The left navigator, the header bar, the user menu, tenant branding, the dark theme, and
+the language the user picked in their own profile -- the calculator has no language switch of its
+own there, because the platform already asked. `@c8y/style` replaces 700 lines of hand-copied
+design tokens with the real package, the step rail becomes `c8y-stepper`, and copying the nine
+counters raises a platform toast instead of relabelling its own button.
+
+What it costs: **7 MB against 450 kB**, and a toolchain. CONCEPT.md section 8 said that number could
+only be measured rather than read off a manifest; it has now been measured.
 
 ### The zip
 
-`scripts/package.mjs` reuses the store-only zip writer from `lib/xlsx/zip.ts` -- the one the Excel
-export already depends on -- rather than adding a second implementation that can drift. Entries are
-stored, not deflated, so the archive is about the size of `dist/` (330 kB). The source map is left
-out: it is the largest file in the build and nothing in a tenant reads it.
-
-If `node` is not on your PATH but nvm is installed:
-
-```
-export PATH="$HOME/.nvm/versions/node/v20.18.2/bin:$PATH"
-```
+`scripts/package.mjs` (standalone) reuses the store-only zip writer from `lib/xlsx/zip.ts` -- the one
+the Excel export already depends on -- rather than adding a second implementation that can drift.
+Entries are stored, not deflated, so the archive is about the size of `dist/`. The source map is left
+out: it is the largest file in the build and nothing in a tenant reads it. The Web SDK build's zip is
+the devkit's own, written by `@c8y/devkit:build`.
 
 ## What is here
 
@@ -88,12 +128,29 @@ lib/engine/       the arithmetic. No framework, no DOM, no SDK -- this is the ha
   workbook.ts     the downloadable workbook: quantities, and a Quote sheet with empty price cells
 lib/xlsx/         a dependency-free .xlsx writer: zip.ts (store-only ZIP) + writer.ts
 lib/presets/      five machine archetypes, each built the way the tool recommends
-src/ui/Machine.tsx  the collapsible machine-type block, and the summary its header carries
-src/ui/collapse.ts  which machine types are folded -- a viewer preference, never scenario data
-src/ui/styles.css the Cumulocity design tokens, and this app's semantic layer over them
-src/ui/fonts/     Public Sans, self-hosted -- a tenant may not reach a font CDN
-src/ui/wizard/    the five steps and the hand-off table
 lib/i18n/         every word the user reads, in English and German
+lib/scenario/     every immutable edit to a Scenario. Both apps' stores are three lines over this
+lib/format/       every number, duration and month name, in the session's language
+lib/diagram/      the two SVG diagrams' geometry -- shared by both renderers and by the test
+lib/wizard/       the five steps, in order. The only statement of order anywhere
+
+src/c8y/          the Web SDK app (Angular 21 + @c8y/ngx-components)
+  app/app.config.ts        hookNavigator + hookRoute: where it attaches to the shell
+  app/scenario.store.ts    one signal, and everything on screen computed from it
+  app/i18n/                lib/i18n wired into Angular: a `t` pipe, and the catalogue's markup
+  app/controls/            the shared fields, over @c8y/style's form markup
+  app/wizard/              the c8y-stepper and the five steps
+  app/results/             the hand-off table, the result panels, findings, payloads
+  app/diagram/             the explainer and the configuration diagram
+  styles.css               only what the design system does not draw: the diagrams and the tiles
+
+src/ui/           the standalone app (preact)
+  Machine.tsx     the collapsible machine-type block, and the summary its header carries
+  collapse.ts     which machine types are folded -- a viewer preference, never scenario data
+  styles.css      the Cumulocity design tokens copied by hand, and a semantic layer over them
+  fonts/          Public Sans, self-hosted -- a tenant may not reach a font CDN
+  wizard/         the five steps and the hand-off table
+
 test/             the CONCEPT.md section 9 acceptance test, and a render pass over every step
 tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurator
 ```
@@ -160,6 +217,14 @@ the message count has levelled off.
 
 ### Styling follows the Cumulocity design system
 
+In the Web SDK build it follows it by loading it: `@c8y/style/main.scss` is a global style in
+`angular.json`, so buttons, fields, tables and the page frame are the platform's own, and
+`src/c8y/styles.css` is 400 lines holding only what the design system does not draw -- the two SVG
+diagrams, the teaching boxes, the stat tiles, the machine-type disclosure and the findings list.
+Its colours are all `--c8y-palette-*`, so tenant branding and the dark theme reach the diagrams
+without that file knowing either exists.
+
+The standalone build has no design system to load, so it copies one.
 `src/ui/styles.css` opens with the `--c8y-*` tokens copied verbatim from the styleguide bundle
 (`cumulocity.com/codex/styles.css`, the `:root,.c8y-light-theme` and `.c8y-dark-theme` blocks):
 the palette ramps, Public Sans at a 14px base, the 8px spacing unit, square geometry with 4px only
@@ -260,9 +325,14 @@ point of writing them down is that nobody has to guess which.
 
 ## Not done
 
-- No tenant deployment: no `cumulocity.json`, no `c8ycli`, no `@c8y/ngx-components`.
-- Persistence is `localStorage`, not managed objects.
-- No i18n, no A/B scenario comparison, no pre-fill from tenant statistics.
+- **Neither build has been opened in a tenant.** Both compile, both produce the zip the platform
+  wants, and the Web SDK build type-checks including its templates -- but nobody has logged into a
+  Cumulocity instance and clicked it. Treat the upload path and every runtime behaviour as
+  unverified.
+- Persistence is `localStorage` in both builds, not managed objects -- so a scenario belongs to a
+  browser rather than to a tenant, and cannot be shared by sending a link.
+- No A/B scenario comparison, and no pre-fill from tenant statistics. The Web SDK build is where
+  that becomes possible, because it has an authenticated `@c8y/client` to hand; it does not use it.
 - One open question, which the engine cannot answer for itself: **where does a live tenant report
   these nine counters for a past calendar month?** Until that is known, the arithmetic is unvalidated
   against reality -- it is only validated against the concept.

@@ -14,5 +14,6 @@
     "jsxImportSource": "preact",
     "verbatimModuleSyntax": true
   },
-  "include": ["lib", "src", "test"]
+  "include": ["lib", "src", "test"],
+  "exclude": ["src/c8y"]
 }

@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 24 — one rhythm: the on-change state kind is gone, and a status is a series read on its own interval · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-03
+**Status:** draft for review, rev 25 — the Web SDK build exists: one engine, two apps · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-16
 
 ---
 
@@ -872,68 +872,78 @@ number, and the browser already knows every language's months. The lint findings
 parameters rather than sentences (`Finding.titleKey`, `titleParams`), so the guidance panel is not
 the one English island left on a German screen.
 
-**On the UI framework.** The first draft is preact so it could be built and clicked immediately
-rather than after an Angular install. The target remains Angular + `@c8y/ngx-components`; when that
-is scaffolded, `/lib` moves across unchanged and only `/src/ui` is rewritten. Keeping the engine free
-of every framework, SDK and DOM reference is what makes that a port rather than a rewrite, and it is
+**On the UI framework.** The first draft was preact so it could be built and clicked immediately
+rather than after an Angular install. **Both now exist**: `src/c8y` is Angular +
+`@c8y/ngx-components`, `src/ui` is the preact bundle, and neither is a fork of the other because
+everything that decides a number lives in `lib/`. Keeping the engine free of every framework, SDK
+and DOM reference is what made that a port rather than a rewrite, and it is
 enforced by test — `lib/ imports nothing but itself` in `test/engine.test.ts` walks every source
 under `/lib` and fails on a non-relative import, on anything resolving outside `/lib`, and on
 `document`, `window`, `localStorage`, `navigator`, `fetch`, `Blob`, `process`, `@angular/`, `@c8y/`
 or `preact`.
 
-### The Angular port, evaluated
+### The Angular port, built
 
-Checked against `@c8y/ngx-components` 1023.14.208 (`y2026-lts`). Every wizard construct has an SDK
-component; nothing here needs inventing.
+Built against `@c8y/ngx-components` 1024.18.0 (`y2027-lts`, Angular 21). The table below was
+written as a prediction and is kept as one, with a column for what actually happened.
 
-| What this app does | What the SDK gives it |
-|---|---|
-| The seven-step rail | `c8y-stepper` + `cdk-step`. Extends the CDK stepper, renders the `(1)—(2)—(3)` progress itself, `linear` forces the order, `onStepChange` for navigation, `c8yStepperIcon` to override per-step icons |
-| Per-step validation, which the draft does not have | `[stepControl]` on a `cdk-step` takes a `FormGroup`, sync or async, and a linear stepper refuses to advance while it is invalid |
-| Back / Next | `c8y-stepper-buttons` |
-| Every labelled field | `c8y-form-group`, plus `@ngx-formly/core` 6.1.3 for schema-driven forms if the datapoint tables are worth generating |
-| Inline validation text | `c8y-messages` / `c8y-message` |
-| The results and hand-off tables | `c8y-data-grid` (`DataGridComponent`, `hookDataGridActionControls`) |
-| Guidance findings | `AlertService`, or `c8y-messages` where they belong inline |
-| Page chrome the draft fakes with its own topbar | `c8y-title`, `c8y-action-bar-item`, `c8y-breadcrumb`, `c8y-help`, `c8y-list-group` |
-| Placement in the shell | `hookNavigator` and `hookRoute` |
-| The `.xlsx` download | `file-saver` 2.0.5 is already an SDK dependency |
-| The zip inside the `.xlsx` | `@zip.js/zip.js` 2.7.71 is already an SDK dependency, so `lib/xlsx/zip.ts` could go — or stay, since it is tested and has no cost |
-| The ramp and bar visuals | `echarts` 6 + `ngx-echarts`, both already dependencies |
-| i18n | `@ngx-translate/core` 17 and the `translate` directive; extraction via the devkit's gettext tooling |
-| Scenario persistence (P3) | `InventoryService` from `@c8y/client` — managed objects, as §8 already intends |
+| What this app does | What the SDK gives it | What was used |
+|---|---|---|
+| The step rail | `c8y-stepper` + `cdk-step` | **Yes.** Not `linear`: a linear stepper refuses to advance past an invalid step, and this wizard has no invalid steps — an unnamed series is a *finding* with a cost attached, not a barrier |
+| Per-step validation, which the draft does not have | `[stepControl]` on a `cdk-step` takes a `FormGroup` | **No**, for the same reason. The guidance panel already does this job, and it quantifies |
+| Back / Next | `c8y-stepper-buttons` | **Yes** |
+| Every labelled field | `c8y-form-group`, plus `@ngx-formly/core` for schema-driven forms | **Partly.** `.form-group` / `.form-control` markup, wrapped in seven small controls. Formly was not used: these tables are not a schema, and the interesting behaviour in them (the unit that does not re-derive mid-edit, the retention box that means "default" when empty) is not expressible as one |
+| Inline validation text | `c8y-messages` / `c8y-message` | **No.** The findings panel is one list with a rule id and a message delta per row; splitting it across the fields would lose the arithmetic |
+| The results and hand-off tables | `c8y-data-grid` | **No.** A data grid is for a collection of like rows that can be sorted, filtered and paged. The hand-off table is a fixed list of line items with a Configurator cell reference under each number, and one column per contract period — a layout, not a grid |
+| Guidance findings | `AlertService`, or `c8y-messages` | **The alert channel, yes** — copying the nine counters raises a platform toast via `ClipboardService` instead of the button relabelling itself. The findings stay a panel |
+| Page chrome the draft fakes with its own topbar | `c8y-title`, `c8y-action-bar-item` | **Yes.** The scenario name, expert mode, load-example, reset, import and export are all action bar items |
+| Placement in the shell | `hookNavigator` and `hookRoute` | **Yes**, one route. A route per step would put step ordinals in the URL, and section 6 keeps ordinals in exactly one table |
+| The `.xlsx` download | `file-saver` 2.0.5 is already an SDK dependency | **No.** It arrives transitively through `@c8y/ngx-components`; twelve lines of anchor beat a dependency the manifest does not admit to |
+| The zip inside the `.xlsx` | `@zip.js/zip.js` 2.7.71 is already an SDK dependency | **No**, `lib/xlsx/zip.ts` stayed. It is tested, it has no cost, and it is what keeps `lib/` portable |
+| The ramp and bar visuals | `echarts` 6 + `ngx-echarts` | **No.** The ramp is one flex row of divs and the bars are one div each. Charting 36 numbers with a library that pulls `three` is not a trade worth making |
+| i18n | `@ngx-translate/core` 17, extraction via the devkit's gettext tooling | **Only to ask the shell what language it is in.** The catalogue stayed in `lib/i18n`, because it is typed (a missing German string is a compile error), and because the workbook renders from it too. Anything but `en` or `de` falls back to English |
+| Scenario persistence (P3) | `InventoryService` from `@c8y/client` | **Not yet.** Still `localStorage`, under the same key as the standalone build |
 
-Three things the SDK does **not** cover, all known and none blocking:
+Three things the SDK does **not** cover, all as predicted and none blocking:
 
 - **`WizardComponent` is the wrong primitive.** It is built on `BsModalRef` — it is the modal
   "Add device" pattern with hookable entries, not a full-page flow. The stepper is the right one.
 - **The explainer and configuration diagrams stay hand-written SVG.** There is no SDK equivalent, nor
-  should there be. The geometry already lives in `lib/engine/diagram.ts`; only the rendering moves.
-- **Most of `src/ui/styles.css` goes away.** It exists because there is no `@c8y/style` in a preact
-  build, so it copies that package's tokens by hand. In an Angular app the real package replaces it.
+  should there be. The geometry moved to `lib/diagram/`, where both renderers and the layout test
+  read the same constants; only the rendering was written twice.
+- **Most of `src/ui/styles.css` goes away.** 727 lines became 400, and the 400 are only what the
+  design system does not draw. The other 327 were a hand-copied `@c8y/style`.
 
-The costs are version coupling and weight, not capability:
+### What it actually cost
 
-- **The SDK version has to match the tenant's.** Angular is pinned per line: `y2025-lts` (1021.22)
-  wants Angular 18, `y2026-lts` (1023.14) Angular 20.3, `y2027-lts` (1024.15) Angular 21. Pick the
-  line the target tenant runs, not `latest`.
-- **The tooling moved.** `@c8y/cli` stops at 1018.x (`y2024-lts`); current builds use `@c8y/devkit`.
-- **Weight.** `@c8y/ngx-components` unpacks to 40 MB over 1,094 files and pulls `three`,
-  `monaco-editor`, `leaflet`, `@xterm/xterm` and `@novnc/novnc` transitively. Today's whole
-  application is a 222 kB bundle in a 330 kB zip. Tree-shaking decides how much of that survives, and
-  it is the one number in this table that cannot be read off a manifest — it has to be measured.
+- **Weight, as feared.** `@c8y/ngx-components` unpacks to 40 MB over 1,094 files; `node_modules`
+  went from 6 MB to 774 MB. The built application is **7.0 MB in 2,691 files**, against the
+  standalone build's 450 kB in nine. That is the 15× this table said could only be measured.
+- **Version coupling, as feared.** Angular is pinned per SDK line: `y2025-lts` (1021.22) wants
+  Angular 18, `y2026-lts` (1023.14) Angular 20.3, `y2027-lts` (1024.18) Angular 21. This is built
+  against `y2027-lts`. Moving a tenant across a line moves this app with it.
+- **A Node floor nobody asked for.** Angular 21 requires Node ≥ 20.19; the repo was on 20.18.2.
+- **One genuine surprise: the build type-checks nothing.** `@c8y/devkit:build` runs with `aot:
+  false` and transpiles TypeScript through babel, so a type error and a broken template both produce
+  a green build and a broken page. `npm run c8y:typecheck` runs `ngc` over the same tsconfig, and is
+  the only thing in this repo that checks an Angular template.
+- **`lib/` grew four folders.** `scenario/`, `format/`, `diagram/` and `wizard/` were all previously
+  in `src/ui`, and were all things the second app needed. That is the honest measure of how well the
+  original split held: what had to move was small, and none of it was the engine.
 
-So: possible, with no gaps. The question it turns on is not capability but whether the platform
-navigator, the shared form and grid components and the i18n pipeline are worth an Angular toolchain
-and an order-of-magnitude larger bundle for a presales calculator that already runs.
+So: possible, with no gaps, and done. What it buys is the platform navigator, the header, the user
+menu, tenant branding, the dark theme and the language the user already chose — for fifteen times
+the bytes. Which is why both builds are kept.
 
 - **Client-side only.** All arithmetic in the browser. No microservice, nothing to operate, no
   customer data leaves the tenant.
-- **One build, two deploy targets.** Uploaded as a `HOSTED` web application, and usable as a plain
-  static bundle for public presales use. Because the bundle contains no pricing data (§1), these are
-  literally the same artifact — the reason that constraint is worth keeping. The tenant upload needs
-  no `c8ycli`: a hosted application is a zip with `index.html` and `cumulocity.json` in its root,
-  which is what `npm run package` builds. `c8ycli` becomes relevant when the Angular shell does.
+- **Two builds, one engine.** The Web SDK build (`src/c8y`) is the one for a tenant: it runs inside
+  the shell and is uploaded as a `HOSTED` web application. The standalone build (`src/ui`) is the one
+  for everywhere else — a 450 kB bundle that needs no backend, for a laptop on a customer site or a
+  public share. Both are `HOSTED` zips with `index.html` and `cumulocity.json` in the root, so both
+  can be uploaded; they take different `contextPath`s because that name is unique per tenant.
+  Because neither bundle contains pricing data (§1), neither needs a different audience — the reason
+  that constraint is worth keeping.
 - **Persistence.** Scenarios as managed objects (`type: acme_PricingScenario`) so a tenant's
   scenarios are shared and versioned by the platform; `localStorage` for the standalone build; JSON
   import/export in both.
@@ -945,6 +955,7 @@ and an order-of-magnitude larger bundle for a presales calculator that already r
 |---|---|---|
 | P0 | ~~`/lib/engine`: the nine counters, kind→counter mapping, lint rules, payload generator, tests, validated against §9~~ **done** — plus the bundle proposal and the Configurator cell map | — |
 | P1 | ~~The wizard steps and results~~ · ~~deployable into a tenant~~ **done** — `npm run package` produces the hosted-application zip; manifest at `cumulocity.json` | — |
+| P1b | ~~The Web SDK build~~ **done** — Angular 21 + `@c8y/ngx-components` 1024.18.0 in `src/c8y`, inside the shell, from the same `lib/`. Compiles and type-checks; **never opened in a tenant** | — |
 | P2 | ~~Explainer, quantified guidance report, machine presets~~ **done** | — |
 | P3 | Persistence, export, standalone build | ~1 week |
 | P4 | Pre-fill from tenant statistics; A/B scenario comparison | later |

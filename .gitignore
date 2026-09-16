@@ -2,6 +2,8 @@ node_modules/
 dist/
 dist-test/
 dist-package/
+dist-c8y/
+.angular/
 .DS_Store
 
 # The Sales Configurator workbook is the internal price list. It is the

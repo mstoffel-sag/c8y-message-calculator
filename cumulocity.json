@@ -1,8 +1,8 @@
 {
-  "name": "Message Calculator",
-  "description": "Estimates Cumulocity messages per calendar month from a fleet description. Volume only, never prices.",
-  "key": "c8y-message-calculator-key",
-  "contextPath": "message-calculator",
+  "name": "Message Calculator (standalone)",
+  "description": "Estimates Cumulocity messages per calendar month from a fleet description. Volume only, never prices. The build without the shell.",
+  "key": "c8y-message-calculator-standalone-key",
+  "contextPath": "message-calculator-standalone",
   "type": "HOSTED",
   "resourcesUrl": "/",
   "availability": "PRIVATE",

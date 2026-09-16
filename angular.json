@@ -1,0 +1,80 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "projects",
+  "projects": {
+    "message-calculator": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src/c8y",
+      "prefix": "c8y-mc",
+      "schematics": {
+        "@schematics/angular:component": { "standalone": true, "style": "css" }
+      },
+      "architect": {
+        "build": {
+          "builder": "@c8y/devkit:build",
+          "options": {
+            "main": "src/c8y/main.ts",
+            "tsConfig": "tsconfig.app.json",
+            "outputPath": "dist-c8y/message-calculator",
+            "resourcesOutputPath": "resources",
+            "aot": false,
+            "buildOptimizer": false,
+            "styles": ["@c8y/style/main.scss", "src/c8y/styles.css"],
+            "scripts": [],
+            "assets": [],
+            "allowedCommonJsDependencies": [
+              "regenerator-runtime/runtime",
+              "@cordobo/qrcode",
+              "zone.js/dist/zone",
+              "chroma-js"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "optimization": true,
+              "outputHashing": "all",
+              "sourceMap": false,
+              "namedChunks": false,
+              "extractLicenses": true,
+              "vendorChunk": false,
+              "budgets": [
+                { "type": "initial", "maximumWarning": "8mb", "maximumError": "16mb" },
+                { "type": "anyComponentStyle", "maximumWarning": "64kb", "maximumError": "128kb" }
+              ]
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true,
+              "namedChunks": true,
+              "vendorChunk": true,
+              "extractLicenses": false
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@c8y/devkit:dev-server",
+          "options": {
+            "buildTarget": "message-calculator:build:development",
+            "port": 9000
+          },
+          "configurations": {
+            "production": { "buildTarget": "message-calculator:build:production" }
+          }
+        },
+        "deploy": {
+          "builder": "@c8y/devkit:deploy",
+          "configurations": {
+            "production": { "buildTarget": "message-calculator:build:production" },
+            "development": { "buildTarget": "message-calculator:build:development" }
+          },
+          "defaultConfiguration": "production"
+        },
+        "extract-i18n": { "builder": "@c8y/devkit:extract-i18n" },
+        "compile-i18n": { "builder": "@c8y/devkit:compile-i18n" }
+      }
+    }
+  }
+}

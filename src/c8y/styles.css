@@ -1,0 +1,459 @@
+/**
+ * What this app draws that the design system does not.
+ *
+ * The standalone build's stylesheet is 700 lines because a static bundle has no
+ * design system: it copies the Cumulocity tokens by hand, then builds buttons,
+ * inputs, tables and a top bar out of them. Here `@c8y/style` is loaded for real
+ * (see angular.json), so all of that is gone. Buttons are `.btn`, fields are
+ * `.form-control`, tables are `.table`, and the page frame is the shell's.
+ *
+ * What is left is what is genuinely this tool's own: the two SVG diagrams, the
+ * teaching boxes, the stat tiles, the machine-type disclosure and the findings
+ * list. Every colour below is a platform token, so a tenant's branding and the
+ * dark theme reach the diagrams without this file knowing about either.
+ */
+
+.mc-shell {
+  /* ---------------------------------------------------------------- */
+  /*  the semantic layer, mapped onto @c8y/style's tokens              */
+  /* ---------------------------------------------------------------- */
+  --panel: var(--c8y-palette-high, #fff);
+  --panel-2: var(--c8y-palette-gray-100, #f9fafb);
+  --ink: var(--c8y-palette-gray-10, #212121);
+  --ink-mute: var(--c8y-palette-gray-30, #4c5967);
+  --ink-faint: var(--c8y-palette-gray-40, #657381);
+  --line: var(--c8y-palette-gray-70, #e3e5e8);
+  --line-soft: var(--c8y-palette-gray-80, #e8ebed);
+
+  /* Brand green fills and borders; green-30 wherever the green becomes text
+     or a small mark. #119d11 on white is 3.6:1 -- fine for a 3px border, short
+     of AA for a 12px label. #0f880f is 4.6:1. */
+  --brand: var(--c8y-brand-primary, #119d11);
+  --accent: var(--c8y-palette-green-30, #0f880f);
+  --accent-soft: var(--c8y-palette-green-80, #eff9ef);
+  --accent-line: var(--c8y-palette-green-60, #a5daa5);
+
+  --error: var(--c8y-palette-red-20, #a51b1b);
+  --error-soft: var(--c8y-palette-red-80, #fdeeee);
+  --warn: var(--c8y-palette-orange-20, #8a4b00);
+  --warn-soft: var(--c8y-palette-orange-80, #fdf1e3);
+  --suggest: var(--c8y-palette-blue-20, #044d9c);
+  --suggest-soft: var(--c8y-palette-blue-80, #eaf2fc);
+  --good: var(--c8y-palette-green-20, #0a5c0a);
+
+  --mono: var(--c8y-font-family-mono-spaced, monospace);
+  --sans: var(--c8y-font-family-sans-serif, sans-serif);
+  --radius: var(--c8y-border-radius-large, 8px);
+  --u: var(--c8y-unit-base, 8px);
+
+  padding: 0 0 calc(var(--u) * 4);
+  color: var(--ink);
+}
+
+/**
+ * Dark theme. The gray ramp inverts in the platform's own dark block, so the
+ * neutral aliases above follow it without being restated; only the colours that
+ * carry meaning have to step along their ramp to stay readable on near-black.
+ */
+.c8y-dark-theme .mc-shell {
+  --accent: var(--c8y-palette-green-60, #a5daa5);
+  --accent-soft: color-mix(in srgb, var(--c8y-palette-green-10, #084708) 55%, var(--c8y-palette-gray-100, #191a1a));
+  --accent-line: var(--c8y-palette-green-50, #6ac26a);
+  --error: var(--c8y-palette-red-50, #e97878);
+  --error-soft: color-mix(in srgb, var(--c8y-palette-red-10, #7a1414) 45%, var(--c8y-palette-gray-100, #191a1a));
+  --warn: var(--c8y-palette-orange-60, #f0c08a);
+  --warn-soft: color-mix(in srgb, var(--c8y-palette-orange-20, #8a4b00) 45%, var(--c8y-palette-gray-100, #191a1a));
+  --suggest: var(--c8y-palette-blue-60, #b0d0f2);
+  --suggest-soft: color-mix(in srgb, var(--c8y-palette-blue-10, #033c79) 45%, var(--c8y-palette-gray-100, #191a1a));
+  --good: var(--c8y-palette-green-60, #a5daa5);
+}
+
+/* ------------------------------------------------------------ layout */
+
+.mc-topline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--u) * 2);
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: calc(var(--u) * 2) 0;
+}
+.mc-name { flex: 1 1 260px; max-width: 420px; margin-bottom: 0; }
+
+.mc-runner { display: flex; gap: calc(var(--u) * 3); flex-wrap: wrap; }
+.mc-fig { text-align: right; }
+.mc-fig b {
+  display: block;
+  font: 600 22px/1.1 var(--mono);
+  color: var(--accent);
+}
+.mc-fig.mc-alt b { color: var(--ink); }
+.mc-fig b.mc-error { color: var(--error); }
+.mc-fig span {
+  display: block;
+  font-size: var(--c8y-font-size-xs, 11px);
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mc-step-head { margin: calc(var(--u) * 2) 0 calc(var(--u) * 2); }
+.mc-step-head h1 { margin: 0 0 4px; font-size: var(--c8y-font-size-h2, 22px); }
+.mc-step-head p { margin: 0; color: var(--ink-mute); max-width: 90ch; }
+
+.mc-row { display: flex; flex-wrap: wrap; gap: var(--u); align-items: flex-start; }
+.mc-row-middle { align-items: center; }
+.mc-spacer { flex: 1 1 auto; }
+.mc-flex { flex: 1 1 320px; }
+.mc-nowrap { white-space: nowrap; }
+.mc-lbl {
+  align-self: center;
+  font-size: var(--c8y-font-size-small, 12px);
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.mc-scroll { overflow-x: auto; }
+.mc-grid { display: grid; gap: calc(var(--u) * 2); }
+.mc-two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.mc-four { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+
+/* --------------------------------------------------------- typography */
+
+.mc-hint {
+  font-size: var(--c8y-font-size-small, 12px);
+  color: var(--ink-faint);
+  margin: 0;
+}
+.mc-help { max-width: 78ch; }
+.mc-muted { font-size: 13px; color: var(--ink-mute); margin: 0; }
+.mc-faint { font-size: 11px; color: var(--ink-faint); }
+.mc-strong { font-weight: 500; }
+.mc-mono { font-family: var(--mono); font-size: 11.5px; }
+.mc-accent { color: var(--accent); }
+.mc-note {
+  margin: 0;
+  padding: var(--u) calc(var(--u) * 1.5);
+  border-left: 3px solid var(--accent-line);
+  background: var(--accent-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 13.5px;
+}
+.mc-disclaimer {
+  margin: calc(var(--u) * 3) 0 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+  max-width: 100ch;
+}
+
+/* -------------------------------------------------------------- panels */
+
+.mc-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: calc(var(--u) * 2);
+}
+.mc-panel > header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--u);
+  align-items: baseline;
+  padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
+  border-bottom: 1px solid var(--line-soft);
+}
+.mc-panel > header h2,
+.mc-panel > header h3 { margin: 0; font-size: var(--c8y-font-size-h4, 16px); }
+.mc-sub-label { font-size: var(--c8y-font-size-small, 12px); color: var(--ink-faint); }
+.mc-body { padding: calc(var(--u) * 2); }
+.mc-body.mc-tight { padding: 0; }
+.mc-panel.mc-sub { background: transparent; }
+
+/* The explainer is a <details>, so it can be folded away once it has landed. */
+.mc-explain > summary {
+  padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* --------------------------------------------------------- teach/empty */
+
+.mc-teach {
+  padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
+  margin-bottom: calc(var(--u) * 2);
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+}
+.mc-teach > b { display: block; margin-bottom: 4px; }
+.mc-teach p { margin: 0 0 var(--u); max-width: 90ch; }
+.mc-teach p:last-child { margin-bottom: 0; }
+
+.mc-empty,
+.mc-clean {
+  padding: calc(var(--u) * 3);
+  text-align: center;
+  color: var(--ink-faint);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.mc-clean { border: 0; color: var(--good); }
+
+/* -------------------------------------------------------------- tables */
+
+.mc-table { margin-bottom: 0; }
+.mc-table th {
+  font-size: var(--c8y-font-size-xs, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+.mc-table td { vertical-align: top; }
+.mc-table .form-group { margin-bottom: 0; }
+.mc-table tr.mc-total td { font-weight: 600; border-top: 2px solid var(--line); }
+.mc-group-row {
+  font-size: var(--c8y-font-size-xs, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  background: var(--panel-2);
+}
+.mc-indent { padding-left: 26px !important; }
+.mc-col-sub { font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+/* A Configurator cell reference, e.g. D27. Always next to the number it fills. */
+.mc-cell {
+  font: 11px var(--mono);
+  color: var(--ink-faint);
+  margin-top: 3px;
+}
+
+/* Where a hand-off number came from, said in its weight rather than in a word. */
+.mc-origin-calculated { font-weight: 600; }
+.mc-origin-estimated { font-style: italic; }
+.mc-origin-none { color: var(--ink-faint); }
+
+.mc-check-right { justify-content: flex-end; }
+.mc-file { margin-bottom: 0; cursor: pointer; }
+.mc-unit { max-width: 7em; }
+.mc-slider { max-width: 320px; margin-bottom: 0; }
+
+/* ------------------------------------------------- machine type block */
+
+.mc-mt {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: calc(var(--u) * 1.5);
+  background: var(--panel);
+}
+.mc-mt > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--u);
+  align-items: center;
+  padding: calc(var(--u) * 1.5);
+  cursor: pointer;
+}
+.mc-mt-head { display: flex; gap: var(--u); align-items: center; flex-wrap: wrap; }
+.mc-mt-name { font-weight: 600; }
+.mc-mt-tag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-mute);
+}
+.mc-mt-text {
+  flex: 1 1 260px;
+  font-size: 12px;
+  color: var(--ink-mute);
+  display: flex;
+  flex-direction: column;
+}
+.mc-mt-mix { color: var(--ink-faint); }
+.mc-mt-empty { flex: 1 1 auto; font-size: 12px; color: var(--ink-faint); font-style: italic; }
+.mc-mt-fig { text-align: right; white-space: nowrap; }
+.mc-mt-fig b { display: block; font: 600 15px var(--mono); color: var(--accent); }
+.mc-mt-fig span { font-size: 11px; color: var(--ink-faint); }
+.mc-metrics { padding: 0 calc(var(--u) * 1.5) calc(var(--u) * 1.5); }
+.mc-metrics h4 { margin: var(--u) 0; font-size: 13px; }
+
+/* ------------------------------------------------------ bundle proposal */
+
+.mc-proposal {
+  display: flex;
+  gap: calc(var(--u) * 2);
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: calc(var(--u) * 2);
+  padding: calc(var(--u) * 1.5);
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+}
+.mc-proposal.mc-ok { border-color: var(--line); background: var(--panel-2); }
+
+.mc-delta { font: 600 15px var(--mono); }
+.mc-delta.mc-saves { color: var(--good); }
+.mc-delta.mc-costs { color: var(--warn); }
+.mc-saves b { color: var(--good); }
+.mc-per-month {
+  font: 400 10px var(--sans);
+  color: var(--ink-faint);
+  text-align: right;
+}
+
+/* ---------------------------------------------------------- stat tiles */
+
+.mc-stat {
+  padding: calc(var(--u) * 1.5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.mc-stat > span {
+  display: block;
+  font-size: var(--c8y-font-size-xs, 11px);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+.mc-stat > b { display: block; font: 600 24px/1.2 var(--mono); margin: 4px 0; }
+.mc-stat > small { display: block; font-size: 11.5px; color: var(--ink-faint); }
+
+/* A share of a maximum, drawn rather than written. */
+.mc-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line-soft);
+  overflow: hidden;
+  margin-top: 5px;
+}
+.mc-bar i { display: block; height: 100%; background: var(--brand); }
+
+.mc-ramp {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 96px;
+}
+.mc-ramp i {
+  flex: 1 1 auto;
+  min-width: 3px;
+  background: var(--accent-line);
+  border-radius: 2px 2px 0 0;
+}
+.mc-ramp i.mc-peak { background: var(--brand); }
+
+/* ------------------------------------------------------------ findings */
+
+.mc-finding {
+  display: flex;
+  gap: var(--u);
+  align-items: flex-start;
+  padding: calc(var(--u) * 1.5);
+  border-bottom: 1px solid var(--line-soft);
+}
+.mc-finding:last-child { border-bottom: 0; }
+.mc-finding .mc-rule {
+  font: 600 10px var(--mono);
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: var(--suggest-soft);
+  color: var(--suggest);
+}
+.mc-finding.mc-error .mc-rule { background: var(--error-soft); color: var(--error); }
+.mc-finding.mc-warning .mc-rule { background: var(--warn-soft); color: var(--warn); }
+.mc-finding .mc-txt { flex: 1 1 auto; }
+.mc-finding .mc-txt b { display: block; }
+.mc-finding .mc-txt p { margin: 2px 0 0; font-size: 13px; color: var(--ink-mute); }
+
+/* ------------------------------------------------------------ payloads */
+
+.mc-payload {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: calc(var(--u) * 1.5);
+  margin-bottom: var(--u);
+  background: var(--panel-2);
+}
+.mc-payload > header {
+  display: flex;
+  gap: var(--u);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--u);
+}
+.mc-frag { font: 600 12px var(--mono); color: var(--accent); background: none; }
+.mc-path { font: 11.5px var(--mono); color: var(--ink-mute); background: none; }
+.mc-payload pre {
+  margin: 4px 0 0;
+  padding: var(--u);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  background: var(--panel);
+  font: 11.5px var(--mono);
+  overflow-x: auto;
+}
+.mc-payload-note { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-mute); }
+.mc-payload-note b { color: var(--ink); }
+
+/* ------------------------------------------------------------ diagrams */
+
+.mc-diagram {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: calc(var(--u) * 1.5);
+  margin: 4px 0 calc(var(--u) * 2);
+}
+.mc-diagram svg { display: block; width: 100%; height: auto; }
+
+.dg-cap {
+  font: 600 10px var(--sans);
+  fill: var(--ink-faint);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.dg-sensor { fill: var(--panel-2); stroke: var(--line); stroke-width: 1; }
+.dg-dot { fill: var(--brand); }
+.dg-label { font: 12px var(--mono); fill: var(--ink-mute); }
+.dg-wire { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.dg-msg { fill: var(--accent-soft); stroke: var(--brand); stroke-width: 1.5; }
+.dg-msg-title { font: 600 14px var(--sans); fill: var(--accent); }
+.dg-msg-sub { font: 10px var(--sans); fill: var(--ink-faint); }
+.dg-total { font: 600 30px var(--mono); fill: var(--accent); }
+
+/* The configuration diagram reuses the explainer's grammar. */
+.dg-unit { fill: var(--ink-faint); font-size: 10px; }
+.dg-more { font: italic 12px var(--sans); fill: var(--ink-faint); }
+.dg-msg-solo { fill: var(--panel-2); stroke: var(--line); stroke-width: 1.5; }
+.dg-frag { font: 600 12px var(--mono); fill: var(--accent); }
+.dg-rate { font: 10px var(--sans); fill: var(--ink-faint); }
+.dg-count { font: 600 14px var(--mono); fill: var(--ink-mute); }
+
+@media (max-width: 620px) {
+  .dg-label { font-size: 11px; }
+}
+
+.dg-legend {
+  display: flex;
+  gap: calc(var(--u) * 2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--u);
+  padding-top: var(--u);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--c8y-font-size-small, 12px);
+  color: var(--ink-faint);
+}
+.dg-legend b { color: var(--ink); font-family: var(--mono); }
+/* The bold number inside the saving line, which the catalogue emphasises. */
+.dg-legend .mc-saves b { color: var(--good); }
+.dg-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.dg-legend i.key { width: 22px; height: 12px; border-radius: 2px; display: inline-block; }
+.dg-legend i.key.shared { background: var(--accent-soft); border: 1.5px solid var(--brand); }
+.dg-legend i.key.solo { background: var(--panel-2); border: 1.5px solid var(--line); }
