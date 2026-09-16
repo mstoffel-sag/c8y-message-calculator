@@ -118,11 +118,11 @@ import { StepSeriesComponent } from './series.component.js';
       </div>
 
       <c8y-stepper (onStepChange)="toTop()">
-        @for (step of steps; track step.key) {
-          <cdk-step [label]="step.titleKey | t">
+        @for (step of stepViews(); track step.key) {
+          <cdk-step [label]="step.title">
             <div class="mc-step-head">
-              <h1>{{ step.titleKey | t }}</h1>
-              <p>{{ step.leadKey | t }}</p>
+              <h1>{{ step.title }}</h1>
+              <p>{{ step.lead }}</p>
             </div>
 
             @switch (step.key) {
@@ -141,7 +141,18 @@ import { StepSeriesComponent } from './series.component.js';
               <c8y-mc-findings />
             }
 
-            <c8y-stepper-buttons />
+            <!-- Which buttons a step shows is stated, not inferred.
+                 c8y-stepper-buttons works it out for itself in
+                 ngAfterContentInit by comparing its own CdkStep against
+                 stepper._steps.first and .last -- a query over content that a
+                 for-block creates, so what it sees depends on when it happens
+                 to look. Passing showButtons sets the component's forceShowBtns
+                 and skips that guess entirely.
+
+                 The Next button is labelled with the step it leads to, not
+                 "Next": a wizard that says where the next click goes is a
+                 wizard somebody can walk without reading the rail. -->
+            <c8y-stepper-buttons [showButtons]="step.buttons" [labels]="step.labels" />
           </cdk-step>
         }
       </c8y-stepper>
@@ -154,11 +165,31 @@ export class WizardComponent {
   private readonly alerts = inject(AlertService);
   private readonly shell = viewChild<ElementRef<HTMLElement>>('shell');
 
-  protected readonly steps = STEPS;
-
   readonly scenario = this.store.scenario;
   readonly expert = this.store.expert;
   readonly findingCount = computed(() => this.store.findings().length);
+
+  /**
+   * The five steps, with everything the template needs already resolved.
+   *
+   * Built once per locale rather than per change detection pass: `showButtons`
+   * and `labels` are inputs with setters, and a fresh object literal in the
+   * template would re-run them on every cycle.
+   */
+  readonly stepViews = computed(() => {
+    const t = this.locales.t();
+    const last = STEPS.length - 1;
+    return STEPS.map((step, i) => ({
+      key: step.key,
+      title: t(step.titleKey),
+      lead: t(step.leadKey),
+      buttons: { back: i > 0, next: i < last },
+      labels: {
+        back: t('nav.back'),
+        next: i < last ? t(STEPS[i + 1]!.titleKey) : '',
+      },
+    }));
+  });
 
   readonly figures = computed(() => {
     const t = this.locales.t();
