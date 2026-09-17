@@ -22,17 +22,14 @@ import {
   derivedTypeName,
   fragmentNameFor,
   measurementView,
-  proposalApplied,
-  proposeBundles,
   type Bundle,
   type MachineType,
   type Metric,
 } from '../../../../lib/engine/index.js';
-import { compact, interval as fmtInterval } from '../../../../lib/format/index.js';
+import { compact } from '../../../../lib/format/index.js';
 import { DATAPOINTS, STATES, UNITS, type Choice } from '../../../../lib/presets/catalog.js';
 import {
   addDatapoint,
-  applyBundleProposal,
   assignBundle,
   assignOwnBundle,
   patchBundle,
@@ -225,31 +222,6 @@ interface Row {
         <c8y-mc-measurement-diagram [view]="view()" />
       }
 
-      @if (proposals().shown.length > 0) {
-        <div class="mc-proposal" [class.mc-ok]="proposals().applied">
-          <div>
-            <b>{{ proposals().title }}</b>
-            <div class="mc-hint m-t-4">
-              @for (line of proposals().lines; track line.key) {
-                <div><code>{{ line.fragmentName }}</code> &middot; {{ line.interval }} &middot; {{ line.text }}</div>
-              }
-            </div>
-          </div>
-          <div class="text-right mc-nowrap">
-            @if (proposals().saving > 0) {
-              <div class="mc-delta mc-saves m-b-4">
-                &minus;{{ proposals().savingLabel }}
-                <div class="mc-hint">{{ 'series.messagesPerMonthShort' | t }}</div>
-              </div>
-            }
-            @if (!proposals().applied) {
-              <button type="button" class="btn btn-primary btn-sm" (click)="applyProposal()">
-                {{ 'series.apply' | t }}
-              </button>
-            }
-          </div>
-        </div>
-      }
     </c8y-mc-machine>
   `,
 })
@@ -337,47 +309,6 @@ export class SeriesMachineComponent {
 
   readonly retentionParams = computed(() => ({ days: String(this.defaultRetention()) }));
 
-  /**
-   * Only the groupings still on offer: a fleet can be half-grouped, and
-   * counting a saving already banked into the "apply this" figure overstates it
-   * by whatever is already bundled.
-   */
-  readonly proposals = computed(() => {
-    const t = this.locales.t();
-    const mt = this.machineType();
-    const all = proposeBundles(mt, this.prefix());
-    const pending = all.filter(p => !proposalApplied(mt, p));
-    const applied = pending.length === 0;
-    const shown = applied ? all : pending;
-
-    const apart = shown.reduce((sum, p) => sum + p.messagesApart, 0);
-    const together = shown.reduce((sum, p) => sum + p.messagesTogether, 0);
-    const saving = (apart - together) * mt.machineCount * (mt.onlinePct / 100);
-
-    return {
-      shown: all.length > 0 ? shown : [],
-      applied,
-      saving,
-      savingLabel: compact(saving),
-      title: applied
-        ? t.plural('series.bundled', shown.length)
-        : t.plural('series.suggestion', shown.length),
-      lines: shown.map(p => ({
-        key: p.intervalSeconds,
-        fragmentName: p.fragmentName,
-        interval: fmtInterval(p.intervalSeconds),
-        text:
-          t('series.proposalLine', {
-            series: t.plural('series.count', p.metrics.length),
-            messages: compact(p.messagesTogether),
-          }) +
-          (p.metrics.length > 1
-            ? ` ${t('series.insteadOf', { count: compact(p.messagesApart) })}`
-            : ''),
-      })),
-    };
-  });
-
   rename(metricId: string, name: string): void {
     this.edit(s => setDatapointName(s, this.machineType().id, metricId, name));
   }
@@ -420,10 +351,6 @@ export class SeriesMachineComponent {
 
   addSeries(): void {
     this.edit(s => addDatapoint(s, this.machineType().id, 'continuous'));
-  }
-
-  applyProposal(): void {
-    this.edit(s => applyBundleProposal(s, this.machineType().id));
   }
 
   private edit(fn: Parameters<ScenarioStore['patch']>[0]): void {

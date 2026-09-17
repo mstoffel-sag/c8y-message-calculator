@@ -601,17 +601,6 @@ table.dp tr:not(:last-child) td { border-bottom: 1px solid var(--line-soft); }
 .check { display: inline-flex; gap: 6px; align-items: center; font-size: var(--c8y-font-size-small); color: var(--ink-mute); cursor: pointer; }
 .check input { width: auto; min-height: 0; accent-color: var(--brand); }
 
-.proposal {
-  display: flex; gap: calc(var(--u) * 2); align-items: flex-start;
-  background: var(--accent-soft);
-  border-left: var(--c8y-alert-border-width) solid var(--brand);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  padding: calc(var(--u) * 1.5) calc(var(--u) * 2); margin: calc(var(--u) * 2) 0 0;
-}
-.proposal > div:first-child { flex: 1; }
-.proposal.ok { background: var(--panel-2); border-left-color: var(--line); }
-.proposal .hint code { background: transparent; color: var(--accent); padding: 0; }
-.proposal .delta { font: 600 var(--c8y-font-size-large) var(--mono); }
 
 .delta.saves { color: var(--good); }
 .delta.costs { color: var(--warn); }

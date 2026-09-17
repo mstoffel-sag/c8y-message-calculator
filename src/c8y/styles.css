@@ -280,20 +280,7 @@
 .mc-metrics { padding: 0 calc(var(--u) * 1.5) calc(var(--u) * 1.5); }
 .mc-metrics h4 { margin: var(--u) 0; font-size: 13px; }
 
-/* ------------------------------------------------------ bundle proposal */
-
-.mc-proposal {
-  display: flex;
-  gap: calc(var(--u) * 2);
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-top: calc(var(--u) * 2);
-  padding: calc(var(--u) * 1.5);
-  border: 1px solid var(--accent-line);
-  background: var(--accent-soft);
-  border-radius: var(--radius);
-}
-.mc-proposal.mc-ok { border-color: var(--line); background: var(--panel-2); }
+/* ---------------------------------------------------------- saved/cost marks */
 
 .mc-delta { font: 600 15px var(--mono); }
 .mc-delta.mc-saves { color: var(--good); }

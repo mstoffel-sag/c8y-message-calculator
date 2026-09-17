@@ -298,14 +298,6 @@ export const de: Record<Key, string> = {
   'series.namingNote': 'Ein Messtyp ist das Fragment, das Ihr Gerät sendet. Wählen Sie etwas, das ein Dashboard-Ersteller wiedererkennt — und **ändern Sie dann nicht die Serien darin**: ein Fragment, dessen Form von Nachricht zu Nachricht variiert, ist genau das, was Schreib- und Abfrageleistung verschlechtert.',
   'series.add': '+ Serie',
   'series.whatItSends': 'Was eine dieser Maschinen sendet',
-  'series.bundled.one': 'Gebündelt in {count} Messtyp, einen pro Intervall',
-  'series.bundled.other': 'Gebündelt in {count} Messtypen, einen pro Intervall',
-  'series.suggestion.one': 'Vorschlag: {count} Messtyp, einer pro Intervall',
-  'series.suggestion.other': 'Vorschlag: {count} Messtypen, einer pro Intervall',
-  'series.proposalLine': '{series} → {messages} Nachrichten/Maschine/Monat',
-  'series.insteadOf': 'statt {count}',
-  'series.messagesPerMonthShort': 'Nachrichten / Monat',
-  'series.apply': 'Übernehmen',
 
   /* ------------------------------------------ payload examples */
   'payload.heading': 'Payloads für das Geräteteam',

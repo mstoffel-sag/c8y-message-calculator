@@ -307,14 +307,6 @@ export const en = {
   'series.namingNote': 'A measurement type is the fragment your device sends. Pick something a dashboard builder will recognise — and then **do not change the series inside it**: a fragment whose shape varies from one message to the next is what degrades write and query performance.',
   'series.add': '+ Series',
   'series.whatItSends': 'What one of these machines sends',
-  'series.bundled.one': 'Bundled into {count} measurement type, one per interval',
-  'series.bundled.other': 'Bundled into {count} measurement types, one per interval',
-  'series.suggestion.one': 'Suggestion: {count} measurement type, one per interval',
-  'series.suggestion.other': 'Suggestion: {count} measurement types, one per interval',
-  'series.proposalLine': '{series} → {messages} messages/machine/month',
-  'series.insteadOf': 'instead of {count}',
-  'series.messagesPerMonthShort': 'messages / month',
-  'series.apply': 'Apply',
 
   /* ------------------------------------------ payload examples */
   'payload.heading': 'Payloads to hand the device team',

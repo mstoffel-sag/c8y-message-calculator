@@ -62,7 +62,7 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(html, /placeholder="Name the protocol"/);
   });
 
-  test('series: teaches bundling and shows the proposal', () => {
+  test('series: teaches bundling and names the measurement types', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /one timestamp/i);
     assert.match(html, /acme_Climate/);
@@ -239,7 +239,11 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(render(<StepDiscrete {...props} />), /Quoted/);
   });
 
-  test('series: offers to bundle when nothing is bundled yet', () => {
+  test('series: no bundling panel, whether or not anything is bundled', () => {
+    // Grouping by interval happens on add, and lint L1 quantifies what is left
+    // to gain. A panel that offered a third account of the same thing is gone,
+    // along with the Apply button that was the only way to reach applyProposal
+    // from the wizard.
     const hvac = presetByKey('hvac')!;
     const loose = {
       ...blankScenario(),
@@ -251,9 +255,12 @@ describe('the wizard renders', () => {
         },
       ],
     };
-    const html = render(<StepTimeSeries scenario={loose} onChange={noop} />);
-    assert.match(html, /Suggestion/, 'four 60 s readings in four measurements should be flagged');
-    assert.match(html, /Apply/);
+    for (const scenario of [props.scenario, loose]) {
+      const html = render(<StepTimeSeries scenario={scenario} onChange={noop} />);
+      assert.doesNotMatch(html, /Suggestion/);
+      assert.doesNotMatch(html, /Bundled into/);
+      assert.doesNotMatch(html, />Apply</);
+    }
   });
 
   test('discrete: explains events, alarms and inventory', () => {

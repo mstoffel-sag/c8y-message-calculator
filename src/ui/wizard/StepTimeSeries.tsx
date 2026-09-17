@@ -30,8 +30,6 @@ import {
   fragmentNameFor,
   measurementView,
   perMonthEquivalent,
-  proposalApplied,
-  proposeBundles,
   type MachineType,
   type Metric,
   type Scenario,
@@ -39,7 +37,6 @@ import {
 import { DATAPOINTS, STATES, UNITS } from '../../../lib/presets/catalog.js';
 import {
   addDatapoint,
-  applyBundleProposal,
   assignBundle,
   assignOwnBundle,
   patchBundle,
@@ -55,7 +52,7 @@ import {
 import { Choice, Duration, Every, Retention, Teach, Txt, Empty } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
-import { compact, interval as fmtInterval, nf1 } from '../format.js';
+import { compact } from '../format.js';
 import { Prose, Rich, useT } from '../i18n.js';
 import { Explainer } from '../Explainer.js';
 import { MeasurementDiagram } from '../MeasurementDiagram.js';
@@ -150,20 +147,9 @@ function MachineBlock({
   const t = useT();
   // Everything this machine measures. One kind now, so one filter.
   const series = mt.metrics.filter((m) => m.kind === 'continuous');
-  const proposals = proposeBundles(mt, scenario.settings.fragmentPrefix);
-  // Only the groupings still on offer: a fleet can be half-grouped, and
-  // counting a saving already banked into the "apply this" figure overstates
-  // it by whatever is already bundled.
-  const pending = proposals.filter((p) => !proposalApplied(mt, p));
-  const applied = pending.length === 0;
-  const shown = applied ? proposals : pending;
-
   const prefix = scenario.settings.fragmentPrefix;
   const defaultRetention = scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
   const view = measurementView(mt, prefix);
-  const apart = shown.reduce((s, p) => s + p.messagesApart, 0);
-  const together = shown.reduce((s, p) => s + p.messagesTogether, 0);
-  const saving = (apart - together) * mt.machineCount * (mt.onlinePct / 100);
 
   return (
     <Machine
@@ -349,48 +335,6 @@ function MachineBlock({
           <h4 style="margin-top:18px">{t('series.whatItSends')}</h4>
           <MeasurementDiagram view={view} />
         </>
-      )}
-
-      {proposals.length > 0 && (
-        <div class={`proposal ${applied ? 'ok' : ''}`}>
-          <div>
-            <b>
-              {applied
-                ? t.plural('series.bundled', shown.length)
-                : t.plural('series.suggestion', shown.length)}
-            </b>
-            <div class="hint" style="margin-top:4px">
-              {shown.map((p) => (
-                <div key={p.intervalSeconds}>
-                  <code>{p.fragmentName}</code> &middot; {fmtInterval(p.intervalSeconds)} &middot;{' '}
-                  {t('series.proposalLine', {
-
-                    series: t.plural('series.count', p.metrics.length),
-
-                    messages: compact(p.messagesTogether),
-
-                  })}
-                  {p.metrics.length > 1 && (
-                    <> {t('series.insteadOf', { count: compact(p.messagesApart) })}</>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style="text-align:right;white-space:nowrap">
-            {saving > 0 && (
-              <div class="delta saves" style="margin-bottom:6px">
-                &minus;{compact(saving)}
-                <div class="hint" style="margin:0">{t('series.messagesPerMonthShort')}</div>
-              </div>
-            )}
-            {!applied && (
-              <button class="primary" onClick={() => onChange(applyBundleProposal(scenario, mt.id))}>
-                {t('series.apply')}
-              </button>
-            )}
-          </div>
-        </div>
       )}
 
     </Machine>
