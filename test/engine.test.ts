@@ -21,10 +21,13 @@ import {
   computeScenario,
   computeMachineTypeMonth,
   daysInMonth,
+  applyProposal,
   expandMonths,
   fragmentNameFor,
   lintScenario,
   measurementView,
+  proposalApplied,
+  proposeBundles,
   onboardingByPeriod,
   payloadsFor,
   resolveBundles,
@@ -589,11 +592,12 @@ describe('fragment and type names', () => {
   });
 });
 
-describe('a measurement type the tool created is a suggestion, not a decision', () => {
-  // Reported from a tenant: acme_RooftopHvacUnit60s appeared in the Measurement
-  // type column of a series that had not been configured at all. It was being
-  // stored by autoAssign the moment the row was added, so the box looked filled
-  // in by the customer. The name is now derived on read.
+describe('a measurement type is named, and the name it is given is the real one', () => {
+  // Reported from a tenant: the bundling panel went on offering
+  // acme_RooftopHvacUnit60s after the series had been put into acme_Climate,
+  // and kept saying it in the "already bundled" state, where it is the only
+  // name on screen. proposeBundles was deriving a name instead of reading the
+  // measurement type applyProposal would actually reuse.
   const withOneFreshSeries = () => {
     let scenario = addMachineType(conceptSection9Scenario(), blankMachineType());
     const id = scenario.machineTypes[scenario.machineTypes.length - 1]!.id;
@@ -601,20 +605,19 @@ describe('a measurement type the tool created is a suggestion, not a decision', 
     return { scenario: addDatapoint(scenario, id, 'continuous'), id };
   };
 
-  test('adding a series stores no name for the type it lands in', () => {
+  test('adding a series names the type it lands in, there and then', () => {
     const { scenario, id } = withOneFreshSeries();
     const machineType = scenario.machineTypes.find((mt) => mt.id === id)!;
     assert.equal(machineType.bundles.length, 1);
-    assert.equal(machineType.bundles[0]!.fragmentName, '');
+    assert.equal(machineType.bundles[0]!.fragmentName, 'acme_RooftopHvacUnit60s');
   });
 
-  test('every reader still names it, and names it the same thing', () => {
+  test('every reader names it the same thing', () => {
     const { scenario, id } = withOneFreshSeries();
     const machineType = scenario.machineTypes.find((mt) => mt.id === id)!;
     const prefix = scenario.settings.fragmentPrefix;
     const derived = fragmentNameFor(prefix, machineType.name, 60);
 
-    assert.equal(derived, 'acme_RooftopHvacUnit60s');
     assert.equal(measurementView(machineType, prefix).groups[0]!.fragmentName, derived);
     // This one used to read acme_Readings60s -- the same type under two names.
     assert.equal(payloadsFor(machineType, prefix)[0]!.name, derived);
@@ -630,6 +633,31 @@ describe('a measurement type the tool created is a suggestion, not a decision', 
     assert.equal(machineType.bundles[0]!.fragmentName, 'acme_Climate');
     assert.equal(measurementView(machineType, prefix).groups[0]!.fragmentName, 'acme_Climate');
     assert.equal(payloadsFor(machineType, prefix)[0]!.name, 'acme_Climate');
+  });
+
+  test('the proposal quotes the measurement type that exists, not one it would mint', () => {
+    // The §9 HVAC unit: four climate readings already bundled as acme_Climate.
+    const machineType = presetByKey('hvac')!;
+    const bundled = proposeBundles(machineType, 'acme').find((p) => p.intervalSeconds === 60)!;
+    assert.equal(bundled.fragmentName, 'acme_Climate');
+    assert.equal(proposalApplied(machineType, bundled), true);
+  });
+
+  test('with nothing bundled yet it quotes the name it will create', () => {
+    const hvac = presetByKey('hvac')!;
+    const loose: MachineType = {
+      ...hvac,
+      bundles: [],
+      metrics: hvac.metrics.map((m) => ({ ...m, bundleId: null })),
+    };
+    const proposal = proposeBundles(loose, 'acme').find((p) => p.intervalSeconds === 60)!;
+    assert.equal(proposal.fragmentName, 'acme_RooftopHvacUnit60s');
+
+    // And applying it stores exactly that name, rather than leaving the type
+    // to be named on read.
+    const applied = applyProposal(loose, 'acme');
+    assert.equal(applied.bundles.find((b) => b.intervalSeconds === 60)!.fragmentName,
+      'acme_RooftopHvacUnit60s');
   });
 })
 
