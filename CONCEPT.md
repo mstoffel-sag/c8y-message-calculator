@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 31 — the measurement-type selector says what a choice costs, and the prose around it is a third shorter · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-22
+**Status:** draft for review, rev 32 — the 100-series recommendation is advice again: the tool quotes the design it is given and warns · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-22
 
 ---
 
@@ -260,28 +260,33 @@ two live in the same table and a fleet can be described partly in named readings
 counts — which is what actually happens, because the two or three readings a customer cares about
 are the ones they can name.
 
-**450 series do not go in one measurement.** The platform recommends at most 100 (§11), and that
-ceiling is what turns a count into a number worth quoting:
+**450 series in one measurement is allowed, and the tool quotes it.** The platform recommends at
+most 100 (§11) — a recommendation about document shape, not a limit it enforces. It accepts a wider
+measurement and bills it as **one message**, so that is what the estimate says:
 
 ```
-types    = ceil(series / 100)                  // as few as the recommendation allows
+types    = 1 per pooled row set, plus one per series for a row sending them separately
 messages = ticks x types                       // per machine per month
 stored   = ticks x series                      // unchanged by how they are grouped
 ```
 
 450 tags on a 60 s scan across 1,000 machines, in a 31-day month:
 
-| Design | Messages | Why it is not the answer |
+| Design | Messages | |
 |---|---|---|
 | One series per message | 20,088,000,000 | The naive baseline. What a tag-per-request agent actually does |
-| **5 measurement types of 100** | **223,200,000** | The recommendation, and what the tool quotes |
-| One measurement of 450 series | 44,640,000 | Arithmetic's floor, and a document shape the platform asks you not to write |
+| **One measurement of 450 series** | **44,640,000** | What the tool quotes, because it is what was described |
+| 5 measurement types of 100 | 223,200,000 | What the recommendation asks for, and it costs 178 M more a month |
 
-The bottom row is the reason the split is modelled rather than warned about. Quoting 44.6 M would be
-quoting a design nobody should build, and a warning saying so leaves the wrong number on the page
-next to it. The tool spreads the series and charges for them; **L6 then reports the split and what it
-cost**, because that is the part a customer can act on — fewer tags on this tick, or a slower tick
-for the ones that do not need it. Splitting them some other way changes nothing.
+The tool briefly did the opposite: it spread the series over `ceil(series / 100)` types and quoted
+the 223 M, on the grounds that the cheapest number should not be a design nobody should build. That
+was wrong in a way worth recording. It over-stated by 5× every fleet whose agent genuinely does post
+one fat measurement — and those exist — and it offered no way to say so. **A tool that refuses to
+quote what the customer built is not estimating their fleet, it is estimating a different one.**
+
+So **L6 is a warning and the arithmetic obeys the customer.** It names the width, says the cost is
+document shape rather than volume, and prices what following the advice would add — 178 M messages a
+month here, which is the number that makes the trade a real decision rather than a rule.
 
 **A count does not say the series share a message.** That was the first version's mistake. Ten tags
 is a fact about the machine; whether they arrive as one request or ten is a fact about the *agent*,
@@ -294,7 +299,7 @@ So a row says where it sends, and there are three answers, not two:
 | The row says | Measurement types | Messages a tick |
 |---|---|---|
 | it shares `acme_Climate` with whatever else is on this tick | the type it joined | it rides along free |
-| *One measurement for all series* | `ceil(series / 100)` | the same |
+| *One measurement for all series* | 1 | the same |
 | ***One measurement per series*** | `series` | **one each** |
 
 They are mutually exclusive — a row cannot both ride in `acme_Climate` and send each series
@@ -305,9 +310,8 @@ only where it differs from the second, which is when the count is above one.
 The options are named for what they cost, not for what they are: *One measurement for all series*
 and *One measurement per series*, under the headings *Shares a message* and *On its own*. They used
 to be named after the model — "a measurement type of its own" — which stated the mechanism and left
-the consequence to be worked out. One caveat the label cannot carry: above the 100-series
-recommendation "all series" is the intent rather than the count, and the line under the field says
-what it really costs.
+the consequence to be worked out. The labels are now literally true at every count: *all series* really is
+one measurement, however many there are.
 
 The third answer makes the row its own naive baseline: it shows no bundling saving, because there
 is none to show. That is the honest reading of a fleet that posts one tag per request, and it is
@@ -593,7 +597,7 @@ N = machineCount × online
 
 series      = Σ over the type's rows of seriesCount    // 1 a row unless counted (§4.2)
 types       = Σ over rows sending one type per series of seriesCount
-            + ceil(Σ the rest / 100)           // the platform recommendation, §11
+            + 1 if any row pools                // no cap: §11 is advice, and L6 gives it
 bundle      → N × SPM / intervalSeconds × types → Measurements Created
 occurrence  → N × perDay × DPM                 → Events Created
 condition   → N × perDay × DPM × 2             → Alarms Created + Alarms Updated
@@ -904,7 +908,7 @@ asserted.
 | L3 | A non-measurement metric has been forced into a measurement type | **Error** — violates §4.3; reachable only by import |
 | L4 | Bundle interval below 1 s | Warning — offer edge-aggregation model |
 | L5 | Inventory updates exceed 1 per machine per minute | Warning — wrong element (§3) |
-| L6 | A measurement type carries more than **100 series** — the platform recommendation — and is therefore sent as several, or it mixes semantic groups | Warning — reports the split and what it costs (§4.2) |
+| L6 | A measurement type carries more than **100 series** — the platform recommendation — or mixes semantic groups | Warning — the estimate still counts it as one message; the finding prices what splitting would add (§4.2) |
 | L7 | One fragment name, two different series sets — bundled or solo, since a lone series carries a fragment name the customer can type | **Error** — variable bundle |
 | L8 | Alarm rate implies repeatedly re-raising the same alarm type | Suggestion — use alarm lifecycle |
 | L9 | Command transitions unmodelled, or more than 4 per command | Warning — each update bills (§3) |
@@ -1166,7 +1170,7 @@ the invoice does, because it buys query latency, headroom and a database that st
 | **What is a month?** | **Calendar month.** | Removed the month-basis setting; the engine works in real month lengths and sizes on the longest month (§2, §9) |
 | **Do no-op `PUT`s count?** | **Yes. Every `PUT` counts.** | New guard-rail (§3) and lint rule L10 |
 | **Bytes per stored value?** | **100–400 B in MongoDB, unverified** (StorageCalculation.txt). | §4.6 reports the full range and its provenance, and writes the top of it into the ODS cell where a single number is required; §4.4 still rests on message count and transition timing, not on a storage saving, because a 4x spread cannot carry an argument |
-| **Maximum series per measurement?** | **Do not exceed 100.** | The engine models the ceiling rather than warning about it: a type asked to carry more is sent as `ceil(series / 100)` types and counted that way, which is what makes a tag count quotable (§4.2). L6 reports the split and its cost |
+| **Maximum series per measurement?** | **Do not exceed 100** — a recommendation about document shape, not a limit the platform enforces. | L6 warns above 100 and prices what splitting would add. The engine counts the design as described: one measurement, one message, however wide (§4.2). It briefly enforced the ceiling instead, which over-stated by 5× every fleet whose agent really does post one fat measurement |
 | **Do failed requests count?** | **No.** Only successful writes. | A retry loop costs network, not messages (§2). The no-op `PUT` rule stands — a *successful* write that changes nothing still counts |
 | **Reads?** | **Confirmed not counted.** | — |
 | **Who handles withdrawal against the commit?** | **An attached billing system.** | Removed billable units, utilisation, headroom, commit sizing and overage from the tool entirely (§2, §7) |
