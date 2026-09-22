@@ -196,7 +196,12 @@ export function assignBundle(
 ): Scenario {
   return mapMachineType(scenario, machineTypeId, (mt) => ({
     ...mt,
-    metrics: mt.metrics.map((m) => (m.id === metricId ? { ...m, bundleId } : m)),
+    // Joining a measurement type cancels one-type-per-series: a row cannot both
+    // ride in acme_Climate and send each of its series on its own, and leaving
+    // the flag set would make the dropdown disagree with the arithmetic.
+    metrics: mt.metrics.map((m) =>
+      m.id === metricId ? { ...m, bundleId, typePerSeries: undefined } : m,
+    ),
     bundles: mt.bundles
       .map((b) => {
         const without = b.metricIds.filter((id) => id !== metricId);
@@ -224,10 +229,19 @@ export function assignOwnBundle(
     const metric = mt.metrics.find((m) => m.id === metricId);
     if (!metric || metric.kind !== 'continuous') return mt;
 
-    // Already alone in one: nothing to do, and minting a second would leave the
-    // first behind with nothing in it.
+    // Already alone in one: nothing to mint, and a second would leave the
+    // first behind with nothing in it. The flag still has to go -- "a
+    // measurement type of its own" is the way back from one type per series,
+    // and this is the branch a row in its own type takes.
     const current = mt.bundles.find((b) => b.id === metric.bundleId);
-    if (current && current.metricIds.length === 1) return mt;
+    if (current && current.metricIds.length === 1) {
+      return {
+        ...mt,
+        metrics: mt.metrics.map((m) =>
+          m.id === metricId ? { ...m, typePerSeries: undefined } : m,
+        ),
+      };
+    }
 
     const bundle: Bundle = {
       id: nextId('b'),
@@ -237,13 +251,46 @@ export function assignOwnBundle(
     };
     return {
       ...mt,
-      metrics: mt.metrics.map((m) => (m.id === metricId ? { ...m, bundleId: bundle.id } : m)),
+      metrics: mt.metrics.map((m) =>
+        m.id === metricId ? { ...m, bundleId: bundle.id, typePerSeries: undefined } : m,
+      ),
       bundles: [
         ...mt.bundles
           .map((b) => ({ ...b, metricIds: b.metricIds.filter((id) => id !== metricId) }))
           .filter((b) => b.metricIds.length > 0),
         bundle,
       ],
+    };
+  });
+}
+
+/**
+ * Every series on this row travels in a measurement type of its own.
+ *
+ * The third answer to "where does this row send", and the one a count made
+ * necessary: ten tags is ten series, and whether that is one message or ten is
+ * a fact about the agent, not something the tool can infer. Chosen here, the
+ * row leaves any shared type -- it cannot be in one -- and its name becomes the
+ * stem the types are numbered from.
+ */
+export function assignTypePerSeries(
+  scenario: Scenario,
+  machineTypeId: string,
+  metricId: string,
+): Scenario {
+  return mapMachineType(scenario, machineTypeId, (mt) => {
+    const metric = mt.metrics.find((m) => m.id === metricId);
+    if (!metric || metric.kind !== 'continuous') return mt;
+    return {
+      ...mt,
+      metrics: mt.metrics.map((m) =>
+        m.id === metricId ? { ...m, bundleId: null, typePerSeries: true } : m,
+      ),
+      // Dropping out of a shared type can empty it, and a measurement type is
+      // its members.
+      bundles: mt.bundles
+        .map((b) => ({ ...b, metricIds: b.metricIds.filter((id) => id !== metricId) }))
+        .filter((b) => b.metricIds.length > 0),
     };
   });
 }
@@ -407,6 +454,15 @@ function retentionDays(raw: unknown): number | undefined {
   return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : undefined;
 }
 
+/**
+ * A tag count off a saved scenario. Absent, 1, and rubbish all mean one series,
+ * and the field then stays absent so an ordinary row does not grow one.
+ */
+function seriesCount(raw: unknown): number | undefined {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 2) return undefined;
+  return Math.floor(raw);
+}
+
 export function normalise(input: unknown): Scenario {
   const raw = (input ?? {}) as Partial<Scenario>;
   const fallback = blankScenario();
@@ -454,6 +510,16 @@ export function normalise(input: unknown): Scenario {
         cadence: migratedCadence(m?.cadence, kind) ?? defaultCadence(kind),
         semanticGroup: m?.semanticGroup ?? '',
         fragmentName: typeof m?.fragmentName === 'string' ? m.fragmentName : undefined,
+        // A scenario saved before rows could stand for more than one series
+        // has no field here, and one series is what it meant. Anything below
+        // one is dropped rather than stored: a row standing for no series is
+        // not a thing the table can draw, and a fractional tag count would
+        // multiply every figure it touches by a fraction.
+        seriesCount: seriesCount(m?.seriesCount),
+        // Absent is the ordinary row, which shares a measurement type. Stored
+        // only when true, so a scenario that never used it exports as it did
+        // before the flag existed.
+        typePerSeries: m?.typePerSeries === true ? true : undefined,
         retentionDays: retentionDays(m?.retentionDays),
         bundleId: m?.bundleId ?? null,
         resentOnTimer: Boolean(m?.resentOnTimer),
@@ -656,6 +722,24 @@ export function setBundleRetentionDays(
   return patchBundle(scenario, machineTypeId, bundleId, {
     retentionDays: typeof days === 'number' && Number.isFinite(days) && days >= 0 ? days : undefined,
   });
+}
+
+/**
+ * How many series one row stands for.
+ *
+ * The answer a customer has when they know their machine exposes 450 PLC tags
+ * on a 60 s scan and will not be naming them. One is stored as no field at
+ * all, so an ordinary row round-trips exactly as it did before rows could be
+ * counted, and an export stays readable.
+ */
+export function setSeriesCount(
+  scenario: Scenario,
+  machineTypeId: string,
+  metricId: string,
+  count: number,
+): Scenario {
+  const clean = Number.isFinite(count) && count >= 2 ? Math.floor(count) : undefined;
+  return patchMetric(scenario, machineTypeId, metricId, { seriesCount: clean });
 }
 
 /** Unit only, without the catalogue's name-driven side effects. */

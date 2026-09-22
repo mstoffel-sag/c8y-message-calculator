@@ -29,6 +29,7 @@ import {
   proposeBundles,
   resolveBundles,
   type MachineType,
+  type Scenario,
   machineTypeSummary,
   REFERENCE_DAYS,
 } from '../lib/engine/index.js';
@@ -354,6 +355,121 @@ describe('scenario normalisation', () => {
       computeScenario(fixed).months[0]?.storedByRetention.map((b) => b.retentionDays),
       [0, 90],
     );
+  });
+
+  test('a tag count survives a save and reload, and one stays absent', async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    // A dropped count would quote 450 tags as one series -- an under-count by
+    // a factor of 450 on the stored side, which is the one failure this tool
+    // cannot have.
+    const saved = {
+      name: 'PLC line',
+      settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },
+      periods: [{ index: 1, months: 12, machineCountOverrides: {}, commercial: {} }],
+      machineTypes: [{
+        id: 'mt', name: 'Line', machineCount: 10, onlinePct: 100, bundles: [],
+        metrics: [
+          {
+            id: 'tags', name: 'PLC tags', unit: '', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process',
+            seriesCount: 450,
+          },
+          {
+            id: 'temp', name: 'Supply air temp', unit: 'C', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process',
+          },
+        ],
+      }],
+    };
+    const fixed = normalise(saved);
+    assert.equal(fixed.machineTypes[0]?.metrics[0]?.seriesCount, 450);
+    // An ordinary row keeps no field at all, so it exports as it always did.
+    assert.equal(fixed.machineTypes[0]?.metrics[1]?.seriesCount, undefined);
+  });
+
+  test('one type per series survives a save, and the flag is gone when off', async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    const saved = {
+      machineTypes: [{
+        id: 'mt', name: 'Line', machineCount: 1, onlinePct: 100, bundles: [],
+        metrics: [
+          {
+            id: 'tags', name: 'PLC tags', unit: '', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process',
+            seriesCount: 10, typePerSeries: true,
+          },
+          {
+            id: 'temp', name: 'Supply air temp', unit: 'C', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process',
+            typePerSeries: false,
+          },
+        ],
+      }],
+    };
+    const metrics = normalise(saved).machineTypes[0]!.metrics;
+    assert.equal(metrics[0]?.typePerSeries, true);
+    // Only `true` is stored, so an ordinary row exports exactly as it did
+    // before the flag existed.
+    assert.equal(metrics[1]?.typePerSeries, undefined);
+  });
+
+  test('choosing a shared measurement type cancels one type per series', async () => {
+    const { assignBundle, assignOwnBundle, assignTypePerSeries } =
+      await import('../lib/scenario/edits.js');
+
+    let scenario: Scenario = {
+      ...blankScenario(),
+      machineTypes: [{
+        id: 'mt', name: 'Line', machineCount: 1, onlinePct: 100,
+        metrics: [
+          {
+            id: 'tags', name: 'PLC tags', unit: '', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process',
+            seriesCount: 10, bundleId: 'b',
+          },
+          {
+            id: 'temp', name: 'Supply air temp', unit: 'C', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process', bundleId: 'b',
+          },
+        ],
+        bundles: [{ id: 'b', fragmentName: 'acme_Line60s', intervalSeconds: 60, metricIds: ['tags', 'temp'] }],
+      }],
+    };
+
+    const tagRow = (s: Scenario) => s.machineTypes[0]!.metrics.find((m) => m.id === 'tags')!;
+
+    scenario = assignTypePerSeries(scenario, 'mt', 'tags');
+    assert.equal(tagRow(scenario).typePerSeries, true);
+    assert.equal(tagRow(scenario).bundleId, null, 'it cannot stay in a shared type');
+    assert.equal(tagRow(scenario).seriesCount, 10, 'the count is untouched');
+    // The type it left still exists, because the named reading is still in it.
+    assert.deepEqual(scenario.machineTypes[0]!.bundles.map((b) => b.metricIds), [['temp']]);
+
+    // Both ways back clear the flag -- otherwise the dropdown would say one
+    // thing and the arithmetic another.
+    assert.equal(tagRow(assignBundle(scenario, 'mt', 'tags', 'b')).typePerSeries, undefined);
+    assert.equal(tagRow(assignOwnBundle(scenario, 'mt', 'tags')).typePerSeries, undefined);
+  });
+
+  test('a scenario predating counted rows reads as one series a row', async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    for (const junk of [undefined, null, 0, 1, -5, 'many', 1.5]) {
+      const fixed = normalise({
+        machineTypes: [{
+          id: 'mt', name: 'Line', machineCount: 1, onlinePct: 100, bundles: [],
+          metrics: [{
+            id: 'm', name: 'Flow', unit: 'l/s', kind: 'continuous',
+            cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'flow',
+            seriesCount: junk,
+          }],
+        }],
+      });
+      assert.equal(
+        fixed.machineTypes[0]?.metrics[0]?.seriesCount,
+        undefined,
+        `${String(junk)} should mean one series and store nothing`,
+      );
+    }
   });
 
   test('a scenario with no rules anywhere keeps the field absent, not defaulted', async () => {

@@ -112,8 +112,14 @@ function Example({ example }: { example: PayloadExample }) {
       <code class="path">{example.restPath}</code>
       <pre>{example.restBody}</pre>
       <p style="margin:8px 0 0;font-size:12.5px;color:var(--ink-mute)">
-        <b style="color:var(--ink)">{t('payload.oneMessage')}</b>{' '}
-        {example.noteKeys.map((key) => t(key)).join(' ')}{' '}
+        {/* The bold opener is the point of the panel, so it has to hold when
+            a measurement type is sent more than once a tick. */}
+        <b style="color:var(--ink)">
+          {example.types > 1
+            ? t('payload.messages', { count: example.types })
+            : t('payload.oneMessage')}
+        </b>{' '}
+        {example.noteKeys.map((key) => t(key, example.noteParams)).join(' ')}{' '}
         <span style="font-family:var(--mono);font-size:11.5px">
           {t('payload.mqttTopic', { topic: example.mqttTopic })}
         </span>

@@ -7,7 +7,16 @@
  */
 
 import type { Key, Params } from '../i18n/index.js';
-import { looksLikeFlag, type Bundle, type Metric, type MachineType } from './types.js';
+import {
+  MAX_SERIES_PER_BUNDLE,
+  looksLikeFlag,
+  seriesCountOf,
+  seriesIn,
+  typesIn,
+  type Bundle,
+  type Metric,
+  type MachineType,
+} from './types.js';
 import { resolveBundles } from './compute.js';
 import { bundleFragmentName } from './bundling.js';
 
@@ -32,8 +41,17 @@ export interface PayloadExample {
   namespace: PayloadNamespace;
   /** The fragment or type name itself, for grouping and for the L7 check. */
   name: string;
-  /** How many messages one of these is worth: always 1. That is the point. */
+  /**
+   * Series inside one of these. Four named readings is four; a row standing
+   * for 450 PLC tags is 450.
+   */
   seriesCount: number;
+  /**
+   * Measurement types the design actually sends, where more series were asked
+   * for than the platform recommends putting in one measurement. 1 for
+   * everything else, and for every element that is not a measurement.
+   */
+  types: number;
   restPath: string;
   restBody: string;
   mqttTopic: string;
@@ -44,6 +62,12 @@ export interface PayloadExample {
    * key holding a joined string, so a translator sees each argument whole.
    */
   noteKeys: Key[];
+  /**
+   * Parameters for those notes -- one bag for the whole example rather than
+   * one per key, because the only note that takes any is the split note and a
+   * parameter no sentence mentions costs nothing.
+   */
+  noteParams?: Params;
 }
 
 /** A plausible series name from a human metric name: "Supply air temp" -> "supplyAirTemp". */
@@ -108,12 +132,36 @@ function exampleValue(metric: Metric, index: number): number {
   return Number((10 + index * 3.5).toFixed(1));
 }
 
+/**
+ * Series drawn out of a counted row before the example gives up naming them.
+ *
+ * The example has to stay valid JSON a developer can paste, so the tail cannot
+ * be an ellipsis inside the object. Three is enough to show the shape -- the
+ * numbering, the unit, that they all sit under one type -- and the note under
+ * the example says how many more there are and how they are split.
+ */
+const NAMED_FROM_COUNT = 3;
+
 function measurementBody(fragment: string, metrics: Metric[]): string {
   const series: Record<string, { value: number; unit?: string }> = {};
   metrics.forEach((metric, i) => {
     const entry: { value: number; unit?: string } = { value: exampleValue(metric, i) };
     if (metric.unit.trim()) entry.unit = metric.unit.trim();
-    series[seriesNameOf(metric.name)] = entry;
+    // A row sending each of its series separately puts exactly one in the
+    // message, because that is the whole point of it -- the other 449 are
+    // other messages, and the note says how many.
+    const count = metric.typePerSeries ? 1 : seriesCountOf(metric);
+    const base = seriesNameOf(metric.name);
+    if (count === 1) {
+      series[metric.typePerSeries ? `${base}1` : base] = entry;
+      return;
+    }
+    // A counted row has no names to show, so the example invents the only
+    // thing it can defend: the same name, numbered. A customer whose tags are
+    // called something else replaces them; what they came for is the shape.
+    for (let k = 1; k <= Math.min(count, NAMED_FROM_COUNT); k += 1) {
+      series[`${base}${k}`] = { ...entry, value: exampleValue(metric, i + k) };
+    }
   });
 
   return JSON.stringify(
@@ -139,17 +187,26 @@ function bundleExample(
   // unnamed bundle would otherwise be acme_Readings60s in the payload example
   // and acme_RooftopHvacUnit60s in the diagram, for the same measurement type.
   const fragment = bundleFragmentName(prefix, machineTypeName, bundle);
+  const series = seriesIn(members);
+  const types = typesIn(members);
   return {
     titleKey: 'payload.title.bundle',
-    titleParams: { count: members.length, seconds: bundle.intervalSeconds },
+    titleParams: { count: series, seconds: bundle.intervalSeconds },
     namespace: 'measurement fragment',
     name: fragment,
-    seriesCount: members.length,
+    seriesCount: series,
+    types,
     restPath: 'POST /measurement/measurements',
     restBody: measurementBody(fragment, members),
     mqttTopic: 'measurement/measurements/create',
     mqttBody: measurementBody(fragment, members),
-    noteKeys: ['payload.note.bundle', 'payload.note.smartrest'],
+    // The split note comes first where there is one: it changes what the
+    // developer builds, and the bundling note underneath still applies to each
+    // of the types it names.
+    noteKeys: types > 1
+      ? ['payload.note.split', 'payload.note.bundle', 'payload.note.smartrest']
+      : ['payload.note.bundle', 'payload.note.smartrest'],
+    noteParams: { count: series, types, max: MAX_SERIES_PER_BUNDLE },
   };
 }
 
@@ -161,19 +218,37 @@ function bundleExample(
  */
 function soloExample(metric: Metric, prefix: string): PayloadExample {
   const name = ownFragmentName(prefix, metric);
+  const series = seriesCountOf(metric);
+  const types = typesIn([metric]);
+  const perSeries = Boolean(metric.typePerSeries) && series > 1;
+  // One type per series means N types, so the example is one of them and the
+  // name it shows has to be one of theirs -- acme_PlcTags1, not acme_PlcTags,
+  // which is a type this design never sends.
+  const shown = perSeries ? `${name}1` : name;
   return {
-    titleKey: 'payload.title.alone',
+    titleKey: perSeries
+      ? 'payload.title.perSeries'
+      : series > 1
+        ? 'payload.title.counted'
+        : 'payload.title.alone',
     titleParams: {
+      count: series,
       seconds: metric.cadence.mode === 'interval' ? metric.cadence.seconds : '?',
     },
     namespace: 'measurement fragment',
-    name,
-    seriesCount: 1,
+    name: shown,
+    seriesCount: series,
+    types,
     restPath: 'POST /measurement/measurements',
-    restBody: measurementBody(name, [metric]),
+    restBody: measurementBody(shown, [metric]),
     mqttTopic: 'measurement/measurements/create',
-    mqttBody: measurementBody(name, [metric]),
-    noteKeys: ['payload.note.alone'],
+    mqttBody: measurementBody(shown, [metric]),
+    noteKeys: perSeries
+      ? ['payload.note.perSeries']
+      : types > 1
+        ? ['payload.note.split', 'payload.note.bundle']
+        : ['payload.note.alone'],
+    noteParams: { count: series, types, max: MAX_SERIES_PER_BUNDLE, name },
   };
 }
 
@@ -189,6 +264,7 @@ function eventExample(metric: Metric, prefix: string): PayloadExample {
     namespace: 'event type',
     name,
     seriesCount: 1,
+    types: 1,
     restPath: 'POST /event/events',
     restBody: body,
     mqttTopic: 'event/events/create',
@@ -217,6 +293,7 @@ function alarmExample(metric: Metric, prefix: string): PayloadExample {
     namespace: 'alarm type',
     name,
     seriesCount: 1,
+    types: 1,
     restPath: 'POST /alarm/alarms   then   PUT /alarm/alarms/<id>  { "status": "CLEARED" }',
     restBody: body,
     mqttTopic: 'alarm/alarms/create',
@@ -233,6 +310,7 @@ function inventoryExample(metric: Metric, prefix: string): PayloadExample {
     namespace: 'inventory fragment',
     name,
     seriesCount: 1,
+    types: 1,
     restPath: 'PUT /inventory/managedObjects/<deviceId>',
     restBody: body,
     mqttTopic: 'inventory/managedObjects/update',

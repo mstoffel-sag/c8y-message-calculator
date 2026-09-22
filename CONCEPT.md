@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 26 — the teaching prose is shorter, and speaks of creating and updating rather than of POST and PUT · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-16
+**Status:** draft for review, rev 30 — the commitment sits under the hand-off table, three figures and no captions · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-22
 
 ---
 
@@ -247,6 +247,66 @@ technically be one request, but keeping them apart keeps dashboards, retention r
 control clean. The tool proposes interval-based bundles, lets the customer split them by semantic
 group, and shows the volume cost of each split so the trade-off is explicit rather than moral.
 
+#### A row can stand for a count of series
+
+Plenty of customers cannot name their series and do not want to. A PLC exposes 450 tags on one scan;
+an OPC UA server publishes a node list nobody has read; the machine is somebody else's and the only
+number available is *how many*. Asked to add 450 rows they add none, and the estimate never gets made.
+
+So **a measurements row carries a count**. One row reading *PLC tags · 450 · every 60 s* means 450
+series sampled on that tick, and it bundles, stores, is named and is given a retention rule exactly
+like a row standing for one. A count of one is the ordinary row and stores no field at all, so the
+two live in the same table and a fleet can be described partly in named readings and partly in
+counts — which is what actually happens, because the two or three readings a customer cares about
+are the ones they can name.
+
+**450 series do not go in one measurement.** The platform recommends at most 100 (§11), and that
+ceiling is what turns a count into a number worth quoting:
+
+```
+types    = ceil(series / 100)                  // as few as the recommendation allows
+messages = ticks x types                       // per machine per month
+stored   = ticks x series                      // unchanged by how they are grouped
+```
+
+450 tags on a 60 s scan across 1,000 machines, in a 31-day month:
+
+| Design | Messages | Why it is not the answer |
+|---|---|---|
+| One series per message | 20,088,000,000 | The naive baseline. What a tag-per-request agent actually does |
+| **5 measurement types of 100** | **223,200,000** | The recommendation, and what the tool quotes |
+| One measurement of 450 series | 44,640,000 | Arithmetic's floor, and a document shape the platform asks you not to write |
+
+The bottom row is the reason the split is modelled rather than warned about. Quoting 44.6 M would be
+quoting a design nobody should build, and a warning saying so leaves the wrong number on the page
+next to it. The tool spreads the series and charges for them; **L6 then reports the split and what it
+cost**, because that is the part a customer can act on — fewer tags on this tick, or a slower tick
+for the ones that do not need it. Splitting them some other way changes nothing.
+
+**A count does not say the series share a message.** That was the first version's mistake. Ten tags
+is a fact about the machine; whether they arrive as one request or ten is a fact about the *agent*,
+and plenty of agents post one datapoint per request — a SmartREST static measurement template
+carries one series per row, and a tag-per-request gateway is the commonest thing on a shop floor.
+Assuming the bundle quoted those customers a design they have not built and are not going to.
+
+So a row says where it sends, and there are three answers, not two:
+
+| The row says | Measurement types | Messages a tick |
+|---|---|---|
+| it shares `acme_Climate` with whatever else is on this tick | the type it joined | it rides along free |
+| a measurement type of its own | `ceil(series / 100)` | the same |
+| **one measurement type per series** | `series` | **one each** |
+
+They are mutually exclusive — a row cannot both ride in `acme_Climate` and send each series
+separately — so the wizard asks in the **measurement type dropdown** rather than in a switch beside
+it, and the contradiction is unrepresentable rather than merely wrong. The third answer is offered
+only where it differs from the second, which is when the count is above one.
+
+The third answer makes the row its own naive baseline: it shows no bundling saving, because there
+is none to show. That is the honest reading of a fleet that posts one tag per request, and it is
+what turns the *Results* step's counterfactual from a rhetorical figure into the customer's actual
+migration: **L1 fires on it**, names the series, and puts the saving in messages a month.
+
 ### 4.3 Stability rule — the one that breaks databases
 
 > **A bundle's series set must be identical on every single send. Never send a partial bundle, never
@@ -490,6 +550,10 @@ MachineType
 
 Metric
   name, unit
+  seriesCount?                           // how many series this row stands for; absent = 1 (4.2)
+  typePerSeries?                         // each of them in a measurement type of its own (4.2)
+                                         // mutually exclusive with sharing a type, so it is asked
+                                         // in the measurement-type dropdown, not beside it
   kind:    'continuous' | 'occurrence' | 'condition' | 'inventory' | 'command'
            // 'state' was a sixth, sent on change; converted to an interval on load (§4.4)
   cadence: { mode: 'interval',  seconds }        // continuous
@@ -506,7 +570,9 @@ Bundle
   fragmentName, intervalSeconds, metricIds[]
   retentionDays?                         // the type's rule; absent = the scenario default
   // invariant: every member is kind 'continuous' with identical intervalSeconds
-  // invariant: metricIds.length <= 100   -- platform recommendation, §11
+  // NOT an invariant: the series in a type may exceed the platform's recommended
+  // 100 (§11) -- the engine spreads them over ceil(series / 100) types and counts
+  // each one, rather than refusing a count a customer gave it
 ```
 
 ### The arithmetic
@@ -518,7 +584,10 @@ SPM = DPM × 86400
 online = onlinePct / 100
 N = machineCount × online
 
-bundle      → N × SPM / intervalSeconds        → Measurements Created
+series      = Σ over the type's rows of seriesCount    // 1 a row unless counted (§4.2)
+types       = Σ over rows sending one type per series of seriesCount
+            + ceil(Σ the rest / 100)           // the platform recommendation, §11
+bundle      → N × SPM / intervalSeconds × types → Measurements Created
 occurrence  → N × perDay × DPM                 → Events Created
 condition   → N × perDay × DPM × 2             → Alarms Created + Alarms Updated
 inventory   → N × count                        → Inventories Updated   // quoted per month
@@ -536,7 +605,9 @@ period ODS  = Σ over the period's months of retained, at bytesPerValue   // GiB
 
 counters[9]        = each counter summed independently, for one calendar month
 messagesInMonth    = Σ counters
-storedValues       = Σ (sends × seriesCount)     // a count, not bytes -- §4.4
+storedValues       = Σ (ticks × series)          // a count, not bytes -- §4.4
+                                                // ticks, not messages: the split multiplies
+                                                // the requests and not what is read
 avgMessagesPerSec  = messagesInMonth / SPM     // averaged; no burst multiplier (§7)
 
 // evaluated across every calendar month in every period
@@ -568,7 +639,7 @@ every input visibly moves the number.
 | # | Key | Screen | What it asks, and what it teaches |
 |---|---|---|---|
 | 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
-| 2 | `series` | **Measurements** | One table, one row per **series**, and one question about each: how often it is read. The interactive explainer sits here. The tool groups series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). A status flag is a row like any other — the interval a customer gives it is the rate they intend to read it at, and L2 is what catches one left on the fleet's tick (§4.4). |
+| 2 | `series` | **Measurements** | One table, one row per **series** — or, where a customer has a tag count rather than a list, one row standing for a count of them (§4.2) — and one question about each: how often it is read. The interactive explainer sits here. The tool groups series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). A status flag is a row like any other — the interval a customer gives it is the rate they intend to read it at, and L2 is what catches one left on the fleet's tick (§4.4). |
 | 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. Events, alarms and commands each carry a **retention** column, since each row is a type of its own; inventory carries none, and says why (§4.6). |
 | 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs — the default retention and the bytes per value. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
 | 5 | `results` | **Results** | §7. |
@@ -623,6 +694,13 @@ none.
 Splitting is the deliberate act. This inverts the usual failure mode, where the good design is
 something you have to know to ask for.
 
+**A count is a row, not a mode.** The *How many* column sits between the series name and its unit,
+holds 1 on nearly every row, and is the whole of the feature: there is no separate screen for a
+fleet described in tag counts, no second table and no switch. A customer types 450 in one row, names
+two readings in the rows above it, and the three sit in one measurement type or in separate ones by
+the same dropdown as everything else. Where the count needs more than one measurement type, the row
+says so under the field and the payload example numbers the first three series to show the shape.
+
 The proposal is driven by **interval**, because that is what the Measurement API rewards — one
 timestamp per measurement means readings on the same tick can share a message and readings on
 different ticks never can. Semantics *refine* the proposal afterwards (L6), they do not drive it.
@@ -639,11 +717,29 @@ questions you would otherwise have to open it for: **what did I model here, and 
 volume is it.**
 
 ```
-▸ Rooftop HVAC unit  1,000 machines    4 time series, 2 states, 1 event, 1 alarm,               46 M
+Machines (every element)
+▸ Rooftop HVAC unit  1,000 machines    6 time series, 1 event, 1 alarm,                          46 M
                                        1 inventory entry, 1 command · every 1 min ·      MESSAGES / MONTH ·
                                        3 measurement types                              45,977 PER MACHINE
                                        Measurements 45.9 M · Events 31 k · Alarms 31 k
+
+Measurements (this step's element only)
+▸ Rooftop HVAC unit  1,000 machines    6 time series · every 1 min, every 72 min ·             45.9 M
+                                       3 measurement types                            MEASUREMENTS / MONTH ·
+                                                                                       45,880 PER MACHINE
 ```
+
+**The header answers the question the step is asking.** A step that edits one element summarises
+that element: **Measurements** counts measurements, and each panel on the elements step counts its
+own, exactly as they already did. Only **Machines**, which is about the whole fleet, adds all five
+up and shows the mix.
+
+That scoping is not cosmetic. A header totalling every element on a step that edits one is a figure
+that barely moves when you change what the step is for — switch a ten-series daily row from one
+measurement type to one per series and a correct ×10 on 31 messages disappears inside a 15,159 that
+is mostly alarms. The reader concludes the arithmetic is broken, and they are reading the number
+correctly: it was answering a different question. The figure now names its element (*Measurements /
+month*) so it cannot be read as the total again.
 
 One machine type stays open; the rest start folded, and after that it follows whatever the reader
 did. Three things this pins down:
@@ -658,8 +754,10 @@ did. Three things this pins down:
   one line in a summary.
 
 Figures are per 31-day month at the type's own count and online percentage — deliberately not the
-peak-month total in the header, because a summary has to compare machine types like with like. The
-same call produces the one-line description on **Machines**, so the two cannot drift.
+peak-month total in the header, because a summary has to compare machine types like with like. One
+call in `lib/wizard/machine-line.ts` produces every version of this line — scoped or not, in either
+app — so the two builds and the five places it appears cannot drift. It used to be two copies of six
+helpers, one per app, and they drifted the moment the header had to answer a narrower question.
 
 ### The commercial line items in more detail
 
@@ -722,10 +820,20 @@ Two quantities, deliberately both reported:
   summed across the term. This is what the fleet will actually consume.
 
 The second is always the smaller, because a ramping fleet spends most of the term below its peak and
-because February is short. **The gap is reported as its own figure**, and it matters commercially in
-one direction only: unused commitment is forfeited, so a commitment sized on peak × months is money
-the customer pays for and does not use. That is an argument to have before signature, which is why the
-tool puts a number on it rather than leaving it implicit.
+because February is short. **The gap is stated, and it matters commercially in one direction only:**
+unused commitment is forfeited, so a commitment sized on peak × months is money the customer pays for
+and does not use. That is an argument to have before signature, which is why the tool puts a number on
+it rather than leaving it implicit.
+
+It is stated in the paragraph rather than as a fourth figure beside the other three. A stat tile can
+say how big the gap is and cannot say why that matters, and "quoted but not expected" read as a fourth
+quantity to transfer rather than as an argument to have. The sentence carries the same number and the
+reason for it.
+
+**The panel sits directly under the hand-off table.** The table states one month per period and the
+period's length in `D21`; this is the same quantities carried across the term those two imply. With
+other panels in between, a reader who had typed twelve months and found only a peak month in the table
+had nowhere in view to see the term — which is the question the table reliably provokes.
 
 Rounding order is not cosmetic here. Messages are sold per 100,000 **per month**, so each month's
 part-block is paid for; rounding the term total up once at the end would under-count by up to one
@@ -784,12 +892,12 @@ asserted.
 
 | # | Rule | Severity |
 |---|---|---|
-| L1 | Two or more continuous metrics share an interval and semantic group but sit in different bundles | Suggestion — shows saving |
+| L1 | Series sharing an interval and semantic group are sent in more measurement types than they need — two rows in different bundles, or one row sending a type per series | Suggestion — shows saving, floored at the §11 recommendation rather than at one |
 | L2 | A series whose name reads as a status is sampled faster than every 15 min | Warning — paying for identical readings (§4.4) |
 | L3 | A non-measurement metric has been forced into a measurement type | **Error** — violates §4.3; reachable only by import |
 | L4 | Bundle interval below 1 s | Warning — offer edge-aggregation model |
 | L5 | Inventory updates exceed 1 per machine per minute | Warning — wrong element (§3) |
-| L6 | Bundle exceeds **100 series** — the platform recommendation — or mixes semantic groups | Warning — split the bundle |
+| L6 | A measurement type carries more than **100 series** — the platform recommendation — and is therefore sent as several, or it mixes semantic groups | Warning — reports the split and what it costs (§4.2) |
 | L7 | One fragment name, two different series sets — bundled or solo, since a lone series carries a fragment name the customer can type | **Error** — variable bundle |
 | L8 | Alarm rate implies repeatedly re-raising the same alarm type | Suggestion — use alarm lifecycle |
 | L9 | Command transitions unmodelled, or more than 4 per command | Warning — each update bills (§3) |
@@ -1051,7 +1159,7 @@ the invoice does, because it buys query latency, headroom and a database that st
 | **What is a month?** | **Calendar month.** | Removed the month-basis setting; the engine works in real month lengths and sizes on the longest month (§2, §9) |
 | **Do no-op `PUT`s count?** | **Yes. Every `PUT` counts.** | New guard-rail (§3) and lint rule L10 |
 | **Bytes per stored value?** | **100–400 B in MongoDB, unverified** (StorageCalculation.txt). | §4.6 reports the full range and its provenance, and writes the top of it into the ODS cell where a single number is required; §4.4 still rests on message count and transition timing, not on a storage saving, because a 4x spread cannot carry an argument |
-| **Maximum series per measurement?** | **Do not exceed 100.** | L6 now fires above 100, as a platform recommendation rather than our guess |
+| **Maximum series per measurement?** | **Do not exceed 100.** | The engine models the ceiling rather than warning about it: a type asked to carry more is sent as `ceil(series / 100)` types and counted that way, which is what makes a tag count quotable (§4.2). L6 reports the split and its cost |
 | **Do failed requests count?** | **No.** Only successful writes. | A retry loop costs network, not messages (§2). The no-op `PUT` rule stands — a *successful* write that changes nothing still counts |
 | **Reads?** | **Confirmed not counted.** | — |
 | **Who handles withdrawal against the commit?** | **An attached billing system.** | Removed billable units, utilisation, headroom, commit sizing and overage from the tool entirely (§2, §7) |

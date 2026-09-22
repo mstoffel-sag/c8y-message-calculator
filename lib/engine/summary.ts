@@ -12,12 +12,25 @@
  * comparison between machine types, which is what a summary is for.
  */
 
-import { type MachineType, type MetricKind, type Counters } from './types.js';
+import {
+  seriesIn,
+  typesIn,
+  type MachineType,
+  type MetricKind,
+  type Counters,
+} from './types.js';
 import { REFERENCE_DAYS } from './calendar.js';
 import { computeMachineTypeMonth, resolveBundles } from './compute.js';
 import { intervalsOf } from './bundling.js';
 
-/** How many datapoints of one kind the machine type carries. */
+/**
+ * How many datapoints of one kind the machine type carries.
+ *
+ * For 'continuous' this counts *series*, not rows: one row can stand for 450
+ * PLC tags, and a header reading "1 series" over an envelope carrying 450 of
+ * them would be the one line of this summary a reader could not believe.
+ * Every other kind is one row, one thing.
+ */
 export interface SummaryPart {
   kind: MetricKind;
   count: number;
@@ -84,7 +97,8 @@ export function machineTypeSummary(
 
   const parts: SummaryPart[] = [];
   for (const kind of KIND_ORDER) {
-    const count = machineType.metrics.filter((m) => m.kind === kind).length;
+    const rows = machineType.metrics.filter((m) => m.kind === kind);
+    const count = kind === 'continuous' ? seriesIn(rows) : rows.length;
     if (count > 0) parts.push({ kind, count });
   }
 
@@ -101,7 +115,11 @@ export function machineTypeSummary(
     datapoints: machineType.metrics.length,
     // Every measurement type is now either a bundle with members or a series
     // travelling alone; there is no third case since flags stopped being one.
-    measurementTypes: bundles.filter((b) => b.members.length > 0).length + loneContinuous.length,
+    // Counted after the split, so a 450-tag row reads as the 5 types it is
+    // actually sent in rather than the 1 the customer typed.
+    measurementTypes:
+      bundles.reduce((sum, b) => sum + typesIn(b.members), 0)
+      + loneContinuous.reduce((sum, m) => sum + typesIn([m]), 0),
     intervals: intervalsOf(machineType),
     parts,
     elements,

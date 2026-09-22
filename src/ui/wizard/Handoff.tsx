@@ -19,6 +19,8 @@ import {
   type Scenario,
   type ScenarioResult,
 } from '../../../lib/engine/index.js';
+import { useState } from 'preact/hooks';
+
 import { commercialBool, commercialNumber } from '../store.js';
 import { CopyButton } from '../parts.js';
 import { monthYear, n, nf1 } from '../format.js';
@@ -41,6 +43,28 @@ type Origin = 'calculated' | 'estimated' | 'stated' | 'none';
  * workbook wrote 64.82 into the same cell. A hand-off sheet that disagrees with
  * the file it hands off is worse than one that says nothing.
  */
+/**
+ * A line item nobody has filled in, in any period.
+ *
+ * Only the asked ones: `messages` is calculated and `ods` is estimated, so
+ * neither is ever empty for want of an answer. Zero across every period is the
+ * test, not zero in the one being looked at -- a row that is 0 in period 1 and
+ * 3 in period 2 is in use.
+ */
+function isUnused(scenario: Scenario, item: (typeof LINE_ITEMS)[number]): boolean {
+  if (item.source === 'calculated' || item.source === 'estimated') return false;
+  return scenario.periods.every((period) =>
+    item.source === 'choice'
+      ? !commercialBool(period, item.key)
+      : commercialNumber(period, item.key) === 0,
+  );
+}
+
+/** The length the customer gave this period, for the column header. */
+function monthsOf(scenario: Scenario, index: number): number {
+  return scenario.periods.find((p) => p.index === index)?.months ?? 0;
+}
+
 function valueFor(
   t: T,
   scenario: Scenario,
@@ -76,6 +100,10 @@ function valueFor(
 
 export function Handoff({ scenario, result }: Props) {
   const t = useT();
+  // Collapsed by default: on a typical estimate 13 of the 15 asked line items
+  // are dashes, and they bury the two that are not.
+  const [showUnused, setShowUnused] = useState(false);
+  const unused = LINE_ITEMS.filter((item) => isUnused(scenario, item));
   const tsvFor = (periodResult: PeriodResult): string => {
     const period = scenario.periods.find((p) => p.index === periodResult.index);
     const lines: string[] = [
@@ -109,7 +137,20 @@ export function Handoff({ scenario, result }: Props) {
               <th style="min-width:240px">{t('handoff.col.item')}</th>
               {result.periods.map((p) => (
                 <th class="num" key={p.index} style="min-width:130px">
-                  {t('contract.periodN', { index: p.index })}
+                  {/* The period's own length, beside its number. Every figure
+                      in the column is one month's worth, so a header naming
+                      only the month read as though the 12 months had been
+                      ignored -- they are D21, and the Configurator multiplies
+                      by them. */}
+                  {/* nowrap so the column sizes to this line rather than
+                      breaking it as "Period 1 · 12 / months" -- German is
+                      longer again, and a pixel width guessed for one language
+                      is wrong in the other. The month below may still wrap. */}
+                  <span style="white-space:nowrap">
+                    {t.plural('handoff.periodHeading', monthsOf(scenario, p.index), {
+                      label: t('contract.periodN', { index: p.index }),
+                    })}
+                  </span>
                   <div style="font-weight:400;text-transform:none;letter-spacing:0">
                     {t('handoff.periodPeak', {
                       month: monthYear(p.peak.year, p.peak.month),
@@ -137,14 +178,20 @@ export function Handoff({ scenario, result }: Props) {
               })}
             </tr>
 
-            {LINE_ITEMS.map((item) => (
+            {LINE_ITEMS.filter((item) => showUnused || !isUnused(scenario, item)).map((item) => (
               <>
                 <tr key={item.key} class={item.key === 'messages' ? 'total' : ''}>
                   <td>
                     {item.label}
                     <div class="hint" style="margin:0">
-                      {item.unit}
-                      {item.source === 'calculated' && t('handoff.calculated')}
+                      {/* Every other row states the unit its quantity is typed
+                          in. Messages cannot: the Configurator's unit for it is
+                          "per 100K per month", which is how the row is priced,
+                          and under a raw 46,009,000 that reads as the unit the
+                          figure is in. So this row says what its number is
+                          instead. The workbook keeps the Configurator's own
+                          wording, where the cell is blank and cannot mislead. */}
+                      {item.key === 'messages' ? t('handoff.messages.what') : item.unit}
                       {item.source === 'estimated' && t('handoff.estimated')}
                     </div>
                   </td>
@@ -189,6 +236,27 @@ export function Handoff({ scenario, result }: Props) {
                   ))}
               </>
             ))}
+
+            {/* The rows nobody filled in, counted rather than listed. Never
+                dropped: this table is a checklist of Configurator cells, and a
+                cell that is empty because nobody has decided yet still has to
+                be findable. The nine counters are never in here -- they are one
+                contiguous paste block, and a zero hidden out of D28:D36 is a
+                stale value left behind in the Configurator. */}
+            {unused.length > 0 && (
+              <tr>
+                <td class="hint" colSpan={1 + result.periods.length}>
+                  {t.plural('handoff.unused', unused.length)}{' '}
+                  <button
+                    class="ghost"
+                    style="padding:0 4px;text-decoration:underline"
+                    onClick={() => setShowUnused(!showUnused)}
+                  >
+                    {showUnused ? t('handoff.unused.hide') : t('handoff.unused.show')}
+                  </button>
+                </td>
+              </tr>
+            )}
 
             <tr>
               {/* What the two buttons do, said in the row that holds them. They

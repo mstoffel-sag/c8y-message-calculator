@@ -26,10 +26,15 @@
 
 import {
   DEFAULT_RETENTION_DAYS,
+  MAX_SERIES_PER_BUNDLE,
   derivedTypeName,
   fragmentNameFor,
   measurementView,
+  ownFragmentName,
   perMonthEquivalent,
+  seriesCountOf,
+  seriesIn,
+  typesIn,
   type MachineType,
   type Metric,
   type Scenario,
@@ -39,20 +44,22 @@ import {
   addDatapoint,
   assignBundle,
   assignOwnBundle,
+  assignTypePerSeries,
   patchBundle,
   removeMetric,
   setBundleRetentionDays,
   setCadence,
   patchUnit,
   setDatapointName,
+  setSeriesCount,
   setSeriesFragmentName,
   setMetricRetentionDays,
   setInterval as setMetricInterval,
 } from '../store.js';
-import { Choice, Duration, Every, Retention, Teach, Txt, Empty } from '../parts.js';
+import { Choice, Duration, Every, Num, Retention, Teach, Txt, Empty } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
-import { compact } from '../format.js';
+import { compact, n } from '../format.js';
 import { Prose, Rich, useT } from '../i18n.js';
 import { Explainer } from '../Explainer.js';
 import { MeasurementDiagram } from '../MeasurementDiagram.js';
@@ -82,6 +89,17 @@ const nameOptions = (seeds: typeof DATAPOINTS, prompt: string) => [
  * prevent.
  */
 const SERIES_SEEDS = [...DATAPOINTS, ...STATES];
+
+/**
+ * The measurement-type dropdown's third answer, which is not a bundle id.
+ *
+ * A sentinel rather than a second control: the three answers are mutually
+ * exclusive -- a row cannot both ride in `acme_Climate` and send each of its
+ * series separately -- so one dropdown makes the contradiction unrepresentable.
+ * Empty string already means "a measurement type of its own", so this needs a
+ * value no bundle id can collide with.
+ */
+const PER_SERIES = '\u0000per-series';
 
 export function StepTimeSeries({ scenario, onChange }: Props) {
   const t = useT();
@@ -150,12 +168,26 @@ function MachineBlock({
   const prefix = scenario.settings.fragmentPrefix;
   const defaultRetention = scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS;
   const view = measurementView(mt, prefix);
+  // What a measurement type actually carries. The dropdown and the naming hint
+  // both say it, and both used to count rows -- which stopped being the same
+  // number the moment a row could stand for 450 tags.
+  const seriesInBundle = (bundleId: string) =>
+    seriesIn(series.filter((m) => m.bundleId === bundleId));
+  const bundleTypes = (bundleId: string) =>
+    typesIn(series.filter((m) => m.bundleId === bundleId));
 
   return (
     <Machine
       machineType={mt}
       collapsed={collapse.isCollapsed(mt.id)}
       onToggle={(collapsed) => collapse.toggle(mt.id, collapsed)}
+      // Measurements only. This step edits series, so a header totalling the
+      // events, alarms, inventory writes and operations as well is a figure
+      // that barely moves when you change what the step is for -- and a reader
+      // who switches a 10-series daily row to one type per series, watches
+      // 15,159 become 15,438, and concludes the arithmetic is broken is
+      // reading it correctly. The number was answering another question.
+      only="continuous"
     >
       <h4>{t('series.heading')}</h4>
       {series.length === 0 ? (
@@ -166,27 +198,44 @@ function MachineBlock({
           <table class="dp">
             <thead>
               <tr>
-                <th style="min-width:190px">{t('series.col.series')}</th>
-                <th style="min-width:150px">{t('series.col.unit')}</th>
-                <th style="min-width:230px">{t('series.col.howOften')}</th>
+                {/* The other columns gave up 60 px between them to make room
+                    for the count, so the row is exactly as wide as it was. It
+                    was already the widest in the wizard: add to it and the
+                    retention column falls off the end, which is the column a
+                    reader is least likely to go looking for behind a
+                    horizontal scrollbar. */}
+                <th style="min-width:160px">{t('series.col.series')}</th>
+                {/* Narrow on purpose: it holds 1 on nearly every row, and the
+                    one row where it holds 450 is the one worth noticing. */}
+                <th style="min-width:70px">{t('series.col.count')}</th>
+                <th style="min-width:130px">{t('series.col.unit')}</th>
+                <th style="min-width:220px">{t('series.col.howOften')}</th>
                 <th style="min-width:250px">{t('series.col.type')}</th>
-                <th style="width:130px">{t('retention.col')}</th>
+                <th style="width:120px">{t('retention.col')}</th>
                 <th style="width:34px" />
               </tr>
             </thead>
             <tbody>
               {series.map((metric) => {
                 const seconds = metric.cadence.mode === 'interval' ? metric.cadence.seconds : 60;
+                const count = seriesCountOf(metric);
+                const perSeries = Boolean(metric.typePerSeries) && count > 1;
+                const types = typesIn([metric]);
                 const bundle = mt.bundles.find((b) => b.id === metric.bundleId);
-                const siblings = mt.bundles.filter((b) => b.intervalSeconds === seconds);
+                // A measurement type this row is alone in is not something it
+                // can be bundled *with* -- offering it under "Bundled" would
+                // make the heading a lie, and choosing it would be a no-op. Its
+                // answer is "a measurement type of its own", below, and its
+                // name is still editable in the field under the dropdown.
+                const soloBundle = bundle !== undefined && bundle.metricIds.length === 1;
+                const siblings = mt.bundles.filter(
+                  (b) => b.intervalSeconds === seconds && !(soloBundle && b.id === bundle?.id),
+                );
                 // The name belongs to the measurement type, not to the row, so only
                 // the first series in it gets the field. Four identical boxes for
                 // one value would invite an edit in row three and change row one.
                 const names = bundle !== undefined
                   && series.find((m) => m.bundleId === bundle.id)?.id === metric.id;
-                // Offered only where it would do something: a series that is
-                // already the only one in its measurement type has one.
-                const alone = bundle !== undefined && bundle.metricIds.length === 1;
                 return (
                   <tr key={metric.id}>
                     <td>
@@ -195,6 +244,14 @@ function MachineBlock({
                         options={nameOptions(SERIES_SEEDS, t('series.choose'))}
                         placeholder={t('series.namePlaceholder')}
                         onChange={(name) => onChange(setDatapointName(scenario, mt.id, metric.id, name))}
+                      />
+                    </td>
+                    <td>
+                      <Num
+                        value={count}
+                        min={1}
+                        title={t('series.countTitle')}
+                        onChange={(next) => onChange(setSeriesCount(scenario, mt.id, metric.id, next))}
                       />
                     </td>
                     <td>
@@ -220,7 +277,9 @@ function MachineBlock({
                           principle. */}
                       <>
                           <Choice
-                            value={metric.bundleId ?? ''}
+                            value={
+                              perSeries ? PER_SERIES : soloBundle ? '' : (metric.bundleId ?? '')
+                            }
                             allowOther={false}
                             options={[
                               ...siblings.map((b) => ({
@@ -229,20 +288,26 @@ function MachineBlock({
 
                                   name: b.fragmentName.trim() || t('series.typeUnnamed'),
 
-                                  series: t.plural('series.count', b.metricIds.length),
+                                  series: t.plural('series.count', seriesInBundle(b.id)),
 
                                 }),
                                 group: t('series.typesOnInterval'),
                               })),
-                              ...(alone
-                                ? []
-                                : [{ value: '', label: t('series.ownType'), group: t('series.onItsOwn') }]),
+                              { value: '', label: t('series.ownType'), group: t('series.onItsOwn') },
+                              // Only where it would mean something different:
+                              // for a single series, one type per series and a
+                              // type of its own are the same answer.
+                              ...(count > 1
+                                ? [{ value: PER_SERIES, label: t('series.typePerSeries'), group: t('series.onItsOwn') }]
+                                : []),
                             ]}
                             onChange={(id) =>
                               onChange(
-                                id
-                                  ? assignBundle(scenario, mt.id, metric.id, id)
-                                  : assignOwnBundle(scenario, mt.id, metric.id),
+                                id === PER_SERIES
+                                  ? assignTypePerSeries(scenario, mt.id, metric.id)
+                                  : id
+                                    ? assignBundle(scenario, mt.id, metric.id, id)
+                                    : assignOwnBundle(scenario, mt.id, metric.id),
                               )
                             }
                           />
@@ -250,7 +315,19 @@ function MachineBlock({
                             <Solo
                               metric={metric}
                               prefix={prefix}
-                              hint={t('series.solo.timed')}
+                              hint={
+                                perSeries
+                                  ? t('series.solo.perSeries', {
+                                      count: n(count),
+                                      name: ownFragmentName(prefix, metric),
+                                    })
+                                  : types > 1
+                                    ? t('series.solo.split', {
+                                        types: n(types),
+                                        max: n(MAX_SERIES_PER_BUNDLE),
+                                      })
+                                    : t('series.solo.timed')
+                              }
                               onChange={(name) => onChange(setSeriesFragmentName(scenario, mt.id, metric.id, name))}
                             />
                           ) : names ? (
@@ -266,9 +343,20 @@ function MachineBlock({
                                 }
                               />
                               <div class="hint" style="margin:3px 0 0">
-                                {bundle.metricIds.length > 1
-                                  ? t('series.oneMessageForAll', { count: bundle.metricIds.length })
-                                  : t('series.oneMessagePerSample')}
+                                {/* The split belongs to the measurement type,
+                                    not to the row that happens to carry the
+                                    count: a 450-tag row sharing a type with two
+                                    named readings splits on 452, not on 450. So
+                                    it is said here, where the type is named. */}
+                                {bundleTypes(bundle.id) > 1
+                                  ? t('series.messagesForAll', {
+                                      types: n(bundleTypes(bundle.id)),
+                                      count: n(seriesInBundle(bundle.id)),
+                                      max: n(MAX_SERIES_PER_BUNDLE),
+                                    })
+                                  : seriesInBundle(bundle.id) > 1
+                                    ? t('series.oneMessageForAll', { count: n(seriesInBundle(bundle.id)) })
+                                    : t('series.oneMessagePerSample')}
                               </div>
                             </div>
                           ) : (
@@ -315,6 +403,9 @@ function MachineBlock({
           </table>
         </div>
         <p class="hint" style="margin:8px 0 0">
+          <Rich k="series.countNote" p={{ max: String(MAX_SERIES_PER_BUNDLE) }} />
+        </p>
+        <p class="hint" style="margin:6px 0 0">
           <Rich k="series.namingNote" />
         </p>
         <p class="hint" style="margin:6px 0 0">

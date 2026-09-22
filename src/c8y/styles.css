@@ -116,6 +116,9 @@
 .mc-scroll { overflow-x: auto; }
 .mc-grid { display: grid; gap: calc(var(--u) * 2); }
 .mc-two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+/* Three stats rather than four: auto-fit still wraps them on a narrow screen,
+   and the wider track keeps a 63.1 bn from breaking across two lines. */
+.mc-three { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .mc-four { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 
 /* --------------------------------------------------------- typography */

@@ -25,6 +25,7 @@ import {
   expandMonths,
   fragmentNameFor,
   lintScenario,
+  machineTypeSummary,
   measurementView,
   proposalApplied,
   proposeBundles,
@@ -37,6 +38,7 @@ import {
   type MachineType,
   type Scenario,
 } from '../lib/engine/index.js';
+import { en } from '../lib/i18n/index.js';
 import {
   blankMachineType,
   blankScenario,
@@ -530,6 +532,242 @@ describe('bundle membership', () => {
       31,
     );
     assert.equal(r.counters.measurementsCreated, 44_640);
+  });
+});
+
+describe('a row can stand for many series', () => {
+  /** One machine type, one row, `count` tags on a 60 s scan. */
+  function tags(count: number, extra: MachineType['metrics'] = []): MachineType {
+    return {
+      id: 'mt', name: 'PLC line', machineCount: 1_000, onlinePct: 100,
+      metrics: [
+        {
+          id: 'tags', name: 'PLC tags', unit: '', kind: 'continuous',
+          cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process',
+          seriesCount: count, bundleId: 'b',
+        },
+        ...extra,
+      ],
+      bundles: [{
+        id: 'b', fragmentName: 'acme_Plc60s', intervalSeconds: 60,
+        metricIds: ['tags', ...extra.map((m) => m.id)],
+      }],
+    };
+  }
+
+  /** The same row, sending each of its series in a measurement of its own. */
+  function perSeriesTags(count: number): MachineType {
+    const mt = tags(count);
+    return {
+      ...mt,
+      metrics: mt.metrics.map((m) =>
+        m.id === 'tags' ? { ...m, typePerSeries: true, bundleId: null } : m,
+      ),
+      bundles: [],
+    };
+  }
+
+  // 1,000 machines x 2,678,400 s / 60 s. The tick rate, before anything is
+  // asked about how many requests a tick takes.
+  const TICKS = 44_640_000;
+
+  test('the tags decide what is stored; the measurement types decide the messages', () => {
+    const month = computeMachineTypeMonth(tags(450), 1_000, 31);
+    // 450 series will not go in one measurement, so the design sends five.
+    assert.equal(month.counters.measurementsCreated, TICKS * 5);
+    // Every tag is still read once a tick, whatever it travels in.
+    assert.equal(month.storedValues, TICKS * 450);
+  });
+
+  test('the naive baseline is every tag in a message of its own', () => {
+    const month = computeMachineTypeMonth(tags(450), 1_000, 31);
+    assert.equal(month.naiveTotal, TICKS * 450);
+    // Which is the whole argument for the row: 450 tags modelled as one row
+    // cost 5 messages a tick, and 450 if nobody bundles them.
+    assert.equal(month.naiveTotal / month.total, 90);
+  });
+
+  test('a count of one is the ordinary row, unchanged', () => {
+    const month = computeMachineTypeMonth(tags(1), 1_000, 31);
+    assert.equal(month.counters.measurementsCreated, TICKS);
+    assert.equal(month.storedValues, TICKS);
+  });
+
+  test('a counted row and named rows share a measurement type', () => {
+    // The point of putting the count on the row rather than in a section of
+    // its own: 450 unnamed tags and two named readings on the same tick are
+    // one design, and the split is decided on the total.
+    const month = computeMachineTypeMonth(
+      tags(450, [
+        {
+          id: 'temp', name: 'Supply air temp', unit: 'C', kind: 'continuous',
+          cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process', bundleId: 'b',
+        },
+        {
+          id: 'press', name: 'Header pressure', unit: 'bar', kind: 'continuous',
+          cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process', bundleId: 'b',
+        },
+      ]),
+      1_000,
+      31,
+    );
+    assert.equal(month.storedValues, TICKS * 452);
+    // 452 still needs five types, so the two named readings ride along free.
+    assert.equal(month.counters.measurementsCreated, TICKS * 5);
+  });
+
+  test('L6 reports the split rather than asking for one', () => {
+    const findings = lintScenario({ ...blankScenario(), machineTypes: [tags(450)] });
+    const l6 = must(findings.find((f) => f.rule === 'L6'), 'expected L6');
+    assert.equal(l6.titleParams?.count, 450);
+    assert.equal(l6.titleParams?.types, 5);
+    // What the split costs above the one message a tick the arithmetic alone
+    // would allow -- positive, because this is volume the design adds.
+    assert.equal(l6.messageDelta, TICKS * 4);
+  });
+
+  test('the payload example shows the shape and says how many are not in it', () => {
+    const [example] = payloadsFor(tags(450), 'acme');
+    const shown = must(example, 'no payload example');
+    assert.equal(shown.seriesCount, 450);
+    assert.equal(shown.types, 5);
+    // Valid JSON a developer can paste: the tail is in the note, never an
+    // ellipsis inside the object.
+    const body = JSON.parse(shown.restBody);
+    assert.deepEqual(Object.keys(body.acme_Plc60s), ['plcTags1', 'plcTags2', 'plcTags3']);
+    assert.ok(shown.noteKeys.includes('payload.note.split'));
+    assert.equal(shown.noteParams?.types, 5);
+  });
+
+  test('the diagram draws one row and says what it stands for', () => {
+    const view = measurementView(tags(450), 'acme');
+    const group = must(view.groups[0], 'no group');
+    assert.equal(group.members.length, 1, 'one row, not 450');
+    assert.equal(group.members[0]?.seriesCount, 450);
+    assert.equal(group.seriesCount, 450);
+    assert.equal(group.types, 5);
+    // The envelope is five messages a tick, and the readings in it are 450.
+    assert.equal(group.messagesPerMonth, group.ticksPerMonth * 5);
+    assert.equal(view.storedPerMonth, group.ticksPerMonth * 450);
+  });
+
+  test('the summary counts series and the types they really travel in', () => {
+    const summary = machineTypeSummary(tags(450));
+    assert.equal(summary.parts.find((p) => p.kind === 'continuous')?.count, 450);
+    assert.equal(summary.measurementTypes, 5);
+  });
+  test('each series can be given a message of its own', () => {
+    // A count says how many series there are; it does not say they share a
+    // message. Ten tags posted one per request is ten messages a tick.
+    const month = computeMachineTypeMonth(perSeriesTags(10), 1_000, 31);
+    assert.equal(month.counters.measurementsCreated, TICKS * 10);
+    // What is read has not changed -- only how many requests carry it.
+    assert.equal(month.storedValues, TICKS * 10);
+    // Which makes the row its own naive baseline, and that is the honest
+    // answer: there is no bundling saving left to claim.
+    assert.equal(month.naiveTotal, month.total);
+  });
+
+  test('sharing a type and one-per-series add up rather than override', () => {
+    // Reachable by import, not by the wizard -- the dropdown makes the two
+    // mutually exclusive. The engine still has to answer: this row's ten
+    // series each get a type, and the two named readings pool into one.
+    const base = tags(10, [
+      {
+        id: 'temp', name: 'Supply air temp', unit: 'C', kind: 'continuous',
+        cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process', bundleId: 'b',
+      },
+      {
+        id: 'press', name: 'Header pressure', unit: 'bar', kind: 'continuous',
+        cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process', bundleId: 'b',
+      },
+    ]);
+    const mt = {
+      ...base,
+      metrics: base.metrics.map((m) => (m.id === 'tags' ? { ...m, typePerSeries: true } : m)),
+    };
+
+    const month = computeMachineTypeMonth(mt, 1_000, 31);
+    assert.equal(month.counters.measurementsCreated, TICKS * 11, '10 of their own, plus 1 shared');
+    assert.equal(month.storedValues, TICKS * 12);
+  });
+
+  test('one type per series is the same answer as its own type, for one series', () => {
+    assert.equal(
+      computeMachineTypeMonth(perSeriesTags(1), 1_000, 31).counters.measurementsCreated,
+      TICKS,
+      'the wizard hides the option here, and the engine agrees it changes nothing',
+    );
+  });
+
+  test('L1 names the series, not the row, when one row is the whole finding', () => {
+    const findings = lintScenario({ ...blankScenario(), machineTypes: [perSeriesTags(450)] });
+    const l1 = must(findings.find((f) => f.rule === 'L1'), 'expected L1');
+    // The sentence's subject is the series. It used to be the row names, which
+    // was right only while L1 needed two rows to fire -- one row sending a
+    // measurement type per series trips it too, and a single name rendered as
+    // "PLC tags are read on the same tick".
+    assert.equal(l1.detailParams?.count, 450, 'the series, not the one row');
+    assert.equal(l1.detailParams?.names, 'PLC tags');
+    assert.doesNotMatch(en[l1.detailKey], /are read on the same tick/);
+    // This row has a semantic group, so the title may quote it.
+    assert.equal(l1.titleKey, 'lint.L1.title');
+
+    // Strip the group and there is none to quote: the title must not report
+    // one called "(none)", which is the key they were grouped under and not a
+    // group anybody named.
+    const ungrouped = perSeriesTags(450);
+    const bare = {
+      ...ungrouped,
+      metrics: ungrouped.metrics.map((m) => ({ ...m, semanticGroup: '' })),
+    };
+    const l1bare = must(
+      lintScenario({ ...blankScenario(), machineTypes: [bare] }).find((f) => f.rule === 'L1'),
+      'expected L1 without a group too',
+    );
+    assert.equal(l1bare.titleKey, 'lint.L1.titleNoGroup');
+    assert.doesNotMatch(en[l1bare.titleKey], /\{semantic\}/);
+  });
+
+  test('L1 quantifies the bundling a per-series row is giving up', () => {
+    const l1 = must(
+      lintScenario({ ...blankScenario(), machineTypes: [perSeriesTags(450)] }).find((f) => f.rule === 'L1'),
+      'expected L1',
+    );
+    // 450 types now, 5 if they shared a timestamp -- not 1, because the
+    // platform recommendation is the floor.
+    assert.equal(l1.titleParams?.containers, 450);
+    assert.equal(l1.detailParams?.target, 5);
+    assert.equal(l1.detailKey, 'lint.L1.detailCapped');
+    assert.equal(l1.messageDelta, -445 * TICKS);
+  });
+
+  test('the payload example for a per-series row is one series in one message', () => {
+    const base = perSeriesTags(10);
+    const mt = {
+      ...base,
+      metrics: base.metrics.map((m) => (m.id === 'tags' ? { ...m, fragmentName: 'acme_PlcTag' } : m)),
+    };
+
+    const example = must(payloadsFor(mt, 'acme')[0], 'no payload example');
+    assert.equal(example.types, 10);
+    assert.equal(example.name, 'acme_PlcTag1', 'one of the ten, not the stem');
+    const body = JSON.parse(example.restBody);
+    assert.equal(body.type, 'acme_PlcTag1');
+    assert.deepEqual(Object.keys(body.acme_PlcTag1), ['plcTags1'], 'one series in the message');
+    assert.ok(example.noteKeys.includes('payload.note.perSeries'));
+  });
+
+  test('the diagram draws one envelope per series, and calls none of them shared', () => {
+    const group = must(measurementView(perSeriesTags(10), 'acme').groups[0], 'no group');
+    assert.equal(group.types, 10);
+    assert.equal(group.seriesCount, 10);
+    assert.equal(group.shared, false, 'nothing shares an envelope with anything');
+    assert.equal(group.messagesPerMonth, group.ticksPerMonth * 10);
+  });
+
+  test('the summary counts the types a per-series row really sends', () => {
+    assert.equal(machineTypeSummary(perSeriesTags(10)).measurementTypes, 10);
   });
 });
 

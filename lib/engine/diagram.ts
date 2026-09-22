@@ -12,7 +12,7 @@
  * operations each cost one message on their own and have nothing to group.
  */
 
-import type { MachineType, Metric } from './types.js';
+import { seriesCountOf, seriesIn, typesIn, type MachineType, type Metric } from './types.js';
 import { resolveBundles } from './compute.js';
 import { REFERENCE_DAYS, SECONDS_PER_DAY } from './calendar.js';
 import { ownFragmentName, seriesNameOf } from './payload.js';
@@ -24,6 +24,12 @@ export interface ViewMember {
   metricId: string;
   name: string;
   unit: string;
+  /**
+   * How many series this row stands for -- 1 for a named reading, 450 for a
+   * row that says "PLC tags". Drawn on the row, because a single sensor pill
+   * standing for 450 readings is a picture that lies.
+   */
+  seriesCount: number;
 }
 
 export interface ViewGroup {
@@ -43,8 +49,17 @@ export interface ViewGroup {
   members: ViewMember[];
   /** Members beyond the display cap, summarised rather than drawn. */
   hiddenMembers: number;
-  /** Every member, including any not drawn. */
+  /** Every series in the envelope, including any row not drawn. */
   seriesCount: number;
+  /**
+   * Measurement types these series actually travel in: one, unless there are
+   * more series than the platform recommends putting in a measurement, in
+   * which case as few as the recommendation allows. Drawn as a badge on the
+   * envelope, because the envelope is then not one message but this many.
+   */
+  types: number;
+  /** Sends per month of one of those types -- the tick rate. */
+  ticksPerMonth: number;
   messagesPerMonth: number;
 }
 
@@ -55,7 +70,7 @@ export interface MeasurementView {
   messagesPerMonth: number;
   /** Readings stored per month -- unchanged by how they are grouped. */
   storedPerMonth: number;
-  /** Every reading in its own measurement, states sampled on the fastest tick. */
+  /** Every series in a measurement of its own -- the counterfactual. */
   naiveMessagesPerMonth: number;
 }
 
@@ -71,6 +86,7 @@ function member(metric: Metric): ViewMember {
     metricId: metric.id,
     name: metric.name.trim() || seriesNameOf(metric.name),
     unit: metric.unit.trim(),
+    seriesCount: seriesCountOf(metric),
   };
 }
 
@@ -91,32 +107,47 @@ export function measurementView(
 
   for (const { bundle, members } of bundles) {
     if (members.length === 0) continue;
+    const ticks = REFERENCE_SECONDS / Math.max(bundle.intervalSeconds, 1e-9);
+    const series = seriesIn(members);
+    const types = typesIn(members);
     groups.push({
       id: bundle.id,
       fragmentName: bundleFragmentName(prefix, machineType.name, bundle),
       intervalSeconds: bundle.intervalSeconds,
-      shared: members.length > 1,
+      // Shared is about the picture: one envelope, more than one thing in it.
+      // A single row standing for 450 tags shares its envelope with 449
+      // readings nobody named, which is exactly what the wide box is for --
+      // unless each of them is sent on its own, in which case there are as
+      // many envelopes as readings and nothing is shared at all.
+      shared: series > types,
       timed: true,
       members: members.map(member),
       hiddenMembers: 0,
-      seriesCount: members.length,
-      messagesPerMonth: REFERENCE_SECONDS / Math.max(bundle.intervalSeconds, 1e-9),
+      seriesCount: series,
+      types,
+      ticksPerMonth: ticks,
+      messagesPerMonth: ticks * types,
     });
   }
 
   // Interval readings sitting alone: one message per sample, all to themselves.
   for (const metric of loneContinuous) {
     const seconds = metric.cadence.mode === 'interval' ? metric.cadence.seconds : 60;
+    const ticks = REFERENCE_SECONDS / Math.max(seconds, 1e-9);
+    const series = seriesCountOf(metric);
+    const types = typesIn([metric]);
     groups.push({
       id: metric.id,
       fragmentName: ownFragmentName(prefix, metric),
       intervalSeconds: seconds,
-      shared: false,
+      shared: series > types,
       timed: true,
       members: [member(metric)],
       hiddenMembers: 0,
-      seriesCount: 1,
-      messagesPerMonth: REFERENCE_SECONDS / Math.max(seconds, 1e-9),
+      seriesCount: series,
+      types,
+      ticksPerMonth: ticks,
+      messagesPerMonth: ticks * types,
     });
   }
 
@@ -126,8 +157,11 @@ export function measurementView(
     groups: capped,
     rowCount: capped.reduce((sum, g) => sum + g.members.length + (g.hiddenMembers > 0 ? 1 : 0), 0),
     messagesPerMonth: groups.reduce((sum, g) => sum + g.messagesPerMonth, 0),
-    storedPerMonth: groups.reduce((sum, g) => sum + g.messagesPerMonth * g.seriesCount, 0),
-    naiveMessagesPerMonth: naive(machineType, groups),
+    // Every series is read once a tick whatever it travels in, so this is the
+    // tick rate times the series -- not the message count, which the split
+    // multiplies and storage does not.
+    storedPerMonth: groups.reduce((sum, g) => sum + g.ticksPerMonth * g.seriesCount, 0),
+    naiveMessagesPerMonth: naive(groups),
   };
 }
 
@@ -162,20 +196,9 @@ function capRows(groups: ViewGroup[], maxMembers: number, maxRows: number): View
   return capped;
 }
 
-/** Every reading alone, states sampled on the fastest interval in use. */
-function naive(machineType: MachineType, groups: ViewGroup[]): number {
-  let fastest = Number.POSITIVE_INFINITY;
-  for (const group of groups) {
-    if (!group.timed) continue;
-    fastest = Math.min(fastest, REFERENCE_SECONDS / group.messagesPerMonth);
-  }
-  const stateInterval = Number.isFinite(fastest) ? fastest : 60;
-
+/** Every reading in a measurement of its own -- the counterfactual, section 5. */
+function naive(groups: ViewGroup[]): number {
   let total = 0;
-  for (const group of groups) {
-    total += group.timed
-      ? group.messagesPerMonth * group.seriesCount
-      : (REFERENCE_SECONDS / stateInterval) * group.seriesCount;
-  }
+  for (const group of groups) total += group.ticksPerMonth * group.seriesCount;
   return total;
 }

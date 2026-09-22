@@ -15,6 +15,7 @@ import { MeasurementDiagramComponent } from '../diagram/measurement-diagram.comp
 import { LocaleService } from '../i18n/locale.service.js';
 import { RichComponent } from '../i18n/rich.component.js';
 import { TPipe } from '../i18n/t.pipe.js';
+import { CommitmentComponent } from '../results/commitment.component.js';
 import { HandoffComponent } from '../results/handoff.component.js';
 import { PayloadsComponent } from '../results/payloads.component.js';
 import { ResultsPanelsComponent } from '../results/results-panels.component.js';
@@ -26,6 +27,7 @@ import { ScenarioStore } from '../scenario.store.js';
   imports: [
     CoreModule,
     EmptyComponent,
+    CommitmentComponent,
     HandoffComponent,
     MeasurementDiagramComponent,
     PayloadsComponent,
@@ -73,6 +75,12 @@ import { ScenarioStore } from '../scenario.store.js';
       </div>
 
       <c8y-mc-handoff />
+
+      <!-- Directly under the table: the table is one month per period and its
+           D21 is the period's length; this is the same quantities across the
+           term those two imply. Further down the page the two read as
+           unrelated. -->
+      <c8y-mc-commitment />
 
       <!-- The design the numbers came from, machine type by machine type.
            Somebody checking the estimate needs to see the shape that produced

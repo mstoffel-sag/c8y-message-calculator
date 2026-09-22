@@ -13,7 +13,7 @@
  * splits them afterwards (L6).
  */
 
-import type { Bundle, MachineType, Metric } from './types.js';
+import { typesIn, type Bundle, type MachineType, type Metric } from './types.js';
 import { resolveBundles } from './compute.js';
 import { SECONDS_PER_DAY } from './calendar.js';
 
@@ -125,8 +125,12 @@ export function proposeBundles(machineType: MachineType, prefix: string): Bundle
         fragmentName:
           existing?.fragmentName.trim() || fragmentNameFor(prefix, machineType.name, intervalSeconds),
         metrics,
-        messagesApart: sends * metrics.length,
-        messagesTogether: sends,
+        // Rows, not series: a row standing for 450 tags is 5 measurement types
+        // on its own and would still be 5 if it were the only row here, so
+        // counting its series as separate messages would credit the proposal
+        // with a saving it does not make.
+        messagesApart: sends * metrics.reduce((sum, m) => sum + typesIn([m]), 0),
+        messagesTogether: sends * typesIn(metrics),
       };
     });
 }

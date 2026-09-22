@@ -19,76 +19,19 @@ import {
   type MachineType,
   type MachineTypeSummary,
   type MetricKind,
-  type SummaryElement,
 } from '../../../lib/engine/index.js';
-import { compact, interval as fmtInterval, n } from '../../../lib/format/index.js';
-import type { Key, PluralBase, T } from '../../../lib/i18n/index.js';
+import { machineLine } from '../../../lib/wizard/machine-line.js';
+import { compact, n } from '../../../lib/format/index.js';
+import type { Key, T } from '../../../lib/i18n/index.js';
 import { CollapseService } from './collapse.service.js';
 import { LocaleService } from './i18n/locale.service.js';
 
 /**
- * The catalogue key for each kind's noun. A flag is a series like any other,
- * which is why there is no entry for one: it is named as a series, because that
- * is now all it is.
+ * The composition line, kept exported because the fleet step prints the same
+ * sentence under each machine type and the two must not drift.
  */
-const KIND_KEY: Record<MetricKind, PluralBase> = {
-  continuous: 'kind.continuous',
-  occurrence: 'kind.occurrence',
-  condition: 'kind.condition',
-  inventory: 'kind.inventory',
-  command: 'kind.command',
-};
-
-const ELEMENT_KEY: Record<SummaryElement['element'], Key> = {
-  Measurements: 'element.measurements',
-  Events: 'element.events',
-  Alarms: 'element.alarms',
-  Inventory: 'element.inventory',
-  Operations: 'element.operations',
-};
-
-/** Which platform element a kind's messages land in. */
-const ELEMENT_FOR_KIND: Record<MetricKind, SummaryElement['element']> = {
-  continuous: 'Measurements',
-  occurrence: 'Events',
-  condition: 'Alarms',
-  inventory: 'Inventory',
-  command: 'Operations',
-};
-
-function plural(t: T, kind: MetricKind, count: number): string {
-  return `${n(count)} ${t.plural(KIND_KEY[kind], count)}`;
-}
-
-/**
- * "every 60 s" / "every 60 s, every 15 min" / "4 intervals".
- *
- * Past three, naming them all is longer than the rest of the summary and says
- * less: the count is the thing that matters, because each interval is a
- * separate measurement that cannot be merged with the others.
- */
-function intervalPhrase(t: T, intervals: number[]): string | null {
-  if (intervals.length === 0) return null;
-  if (intervals.length > 3) return t('machine.intervals', { count: intervals.length });
-  return intervals.map(fmtInterval).join(', ');
-}
-
-/**
- * The composition line: the parts, the rhythm, then the measurement design.
- *
- * In that order on purpose. "10 datapoints in 3 measurement types" would be a
- * lie -- only the series are measurements; the event, alarm, inventory entry and
- * command are not in a measurement at all. Listing the parts first and the
- * measurement count last claims nothing about what contains what.
- */
-export function machineStructure(t: T, s: MachineTypeSummary): string {
-  const bits = [s.parts.map(p => plural(t, p.kind, p.count)).join(', ')];
-  const rhythm = intervalPhrase(t, s.intervals);
-  if (rhythm) bits.push(rhythm);
-  if (s.measurementTypes > 0) {
-    bits.push(`${n(s.measurementTypes)} ${t.plural('measurementType', s.measurementTypes)}`);
-  }
-  return bits.filter(Boolean).join(' · ');
+export function machineStructure(t: T, s: MachineTypeSummary, only?: MetricKind): string {
+  return machineLine(t, s, only).structure;
 }
 
 @Component({
@@ -109,30 +52,25 @@ export function machineStructure(t: T, s: MachineTypeSummary): string {
           }
         </span>
 
-        @if (only()) {
-          @if (metrics() === 0) {
-            <span class="mc-mt-empty">{{ label('machine.none') }}</span>
-          } @else {
-            <span class="mc-mt-text"><span>{{ kindLine() }}</span></span>
-            <span class="mc-mt-fig">
-              <b>{{ figure() }}</b>
-              <span>{{ label('machine.messagesPerMonth') }}</span>
-            </span>
-          }
-        } @else if (!summary().hasContent) {
-          <span class="mc-mt-empty">{{ label('machine.nothingModelled') }}</span>
+        @if (line().empty) {
+          <span class="mc-mt-empty">{{ emptyLabel() }}</span>
         } @else {
           <span class="mc-mt-text">
-            <span>{{ structure() }}</span>
-            <span class="mc-mt-mix">{{ mix() }}</span>
+            <span>{{ line().structure }}</span>
+            @if (line().mix) {
+              <span class="mc-mt-mix">{{ line().mix }}</span>
+            }
           </span>
           <span class="mc-mt-fig">
             <b>{{ figure() }}</b>
             <span>
-              {{ label('machine.messagesPerMonth') }}
-              <!-- Per machine is a small number by construction, so it is worth
-                   in full: "45,977 per machine" says something "46 k" does not. -->
-              &middot; {{ perMachineLabel() }}
+              {{ figureLabel() }}
+              @if (line().perMachine !== undefined) {
+                <!-- Per machine is a small number by construction, so it is
+                     worth in full: "45,977 per machine" says something "46 k"
+                     does not. -->
+                &middot; {{ perMachineLabel() }}
+              }
             </span>
           </span>
         }
@@ -156,33 +94,22 @@ export class MachineComponent {
   readonly summary = computed(() => machineTypeSummary(this.machineType()));
   readonly collapsed = computed(() => this.collapse.isCollapsed(this.machineType().id));
 
-  readonly metrics = computed(() => {
-    const only = this.only();
-    const metrics = this.machineType().metrics;
-    return only === undefined ? metrics.length : metrics.filter(m => m.kind === only).length;
-  });
+  readonly line = computed(() => machineLine(this.locales.t(), this.summary(), this.only()));
 
-  readonly structure = computed(() => machineStructure(this.locales.t(), this.summary()));
+  readonly figure = computed(() => compact(this.line().messages));
 
-  /** The message mix, by platform element rather than by counter. */
-  readonly mix = computed(() => {
+  /** Which element the figure counts, where it counts one rather than all five. */
+  readonly figureLabel = computed(() => {
     const t = this.locales.t();
-    return this.summary()
-      .elements.map(e => `${t(ELEMENT_KEY[e.element])} ${compact(e.messages)}`)
-      .join(' · ');
+    const element = this.line().element;
+    return element
+      ? t('machine.elementPerMonth', { element: t(element) })
+      : t('machine.messagesPerMonth');
   });
 
-  readonly kindLine = computed(() => {
-    const only = this.only();
-    return only ? plural(this.locales.t(), only, this.metrics()) : '';
-  });
-
-  readonly figure = computed(() => {
-    const only = this.only();
-    if (!only) return compact(this.summary().total);
-    const element = ELEMENT_FOR_KIND[only];
-    return compact(this.summary().elements.find(e => e.element === element)?.messages ?? 0);
-  });
+  readonly emptyLabel = computed(() =>
+    this.locales.t()(this.only() === undefined ? 'machine.nothingModelled' : 'machine.none'),
+  );
 
   readonly machinesLabel = computed(() =>
     this.locales.t()('machine.machines', { count: n(this.machineType().machineCount) }),
@@ -193,7 +120,7 @@ export class MachineComponent {
   );
 
   readonly perMachineLabel = computed(() =>
-    this.locales.t()('machine.perMachine', { count: n(this.summary().perMachine) }),
+    this.locales.t()('machine.perMachine', { count: n(this.line().perMachine ?? 0) }),
   );
 
   label(key: Key): string {

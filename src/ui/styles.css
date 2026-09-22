@@ -494,6 +494,9 @@ code.frag {
 
 .grid { display: grid; gap: calc(var(--u) * 2); }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+/* Three stats rather than four: auto-fit still wraps them on a narrow screen,
+   and the wider track keeps a 63.1 bn from breaking across two lines. */
+.grid.three { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .grid.four { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 
 .stat {

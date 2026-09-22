@@ -14,11 +14,7 @@
 
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
-import {
-  DEFAULT_RETENTION_DAYS,
-  commitmentFor,
-  type MonthResult,
-} from '../../../../lib/engine/index.js';
+import { DEFAULT_RETENTION_DAYS, type MonthResult } from '../../../../lib/engine/index.js';
 import {
   compact,
   gib,
@@ -127,30 +123,6 @@ import { FindingsComponent } from './findings.component.js';
                    carried. -->
               <p class="mc-muted"><c8y-mc-rich k="storage.documentsToo" [p]="s.documentsParams" /></p>
             </div>
-          </div>
-        </div>
-      </div>
-    }
-
-    @if (commitment(); as c) {
-      <div class="mc-panel">
-        <header>
-          <h2>{{ 'commitment.heading' | t }}</h2>
-          <span class="mc-sub-label">{{ c.sub }}</span>
-        </header>
-        <div class="mc-body">
-          <div class="mc-grid mc-four m-b-16">
-            @for (stat of c.stats; track stat.key) {
-              <div class="mc-stat">
-                <span>{{ stat.label }}</span>
-                <b>{{ stat.value }}</b>
-                <small>{{ stat.sub }}</small>
-              </div>
-            }
-          </div>
-          <div class="mc-grid mc-two">
-            <div><p class="mc-note"><c8y-mc-rich k="commitment.oneShort" /></p></div>
-            <div><p class="mc-muted"><c8y-mc-rich k="commitment.peakOverstates" [p]="c.overstateParams" /></p></div>
           </div>
         </div>
       </div>
@@ -406,59 +378,6 @@ export class ResultsPanelsComponent {
       documentsParams: {
         share: otherShare < 0.01 ? t('storage.under1pct') : pct(otherShare),
       },
-    };
-  });
-
-  /**
-   * The commit-to-consume commitment, in the only terms this tool has:
-   * quantities. The headroom line is the point of the section -- unused
-   * commitment is forfeited at expiry, so the gap is worth seeing before
-   * signature rather than after.
-   */
-  readonly commitment = computed(() => {
-    const t = this.locales.t();
-    const c = commitmentFor(this.store.scenario(), this.store.result());
-    if (c.termMonths === 0 || c.termUnitsQuoted === 0) return null;
-    const gap = c.termUnitsQuoted - c.termUnitsActual;
-
-    return {
-      sub: t('commitment.sub', { months: c.termMonths }),
-      stats: [
-        {
-          key: 'messages',
-          label: t('commitment.stat.messages'),
-          value: compact(c.termMessages),
-          sub: t('commitment.stat.messages.sub'),
-        },
-        {
-          key: 'quoted',
-          label: t('commitment.stat.quoted'),
-          value: compact(c.termUnitsQuoted),
-          sub: t('commitment.stat.quoted.sub', {
-            breakdown: c.unitsPerMonth
-              .map((units, i) =>
-                t('commitment.stat.quoted.term', {
-                  units: n(units),
-                  months: n(c.months[i] ?? 0),
-                }),
-              )
-              .join(' + '),
-          }),
-        },
-        {
-          key: 'actual',
-          label: t('commitment.stat.actual'),
-          value: compact(c.termUnitsActual),
-          sub: t('commitment.stat.actual.sub'),
-        },
-        {
-          key: 'gap',
-          label: t('commitment.stat.gap'),
-          value: compact(gap),
-          sub: t('commitment.stat.gap.sub', { pct: pct(c.headroom) }),
-        },
-      ],
-      overstateParams: { gap: compact(gap), quoted: compact(c.termUnitsQuoted) },
     };
   });
 

@@ -9,7 +9,7 @@ import {
 } from '../../../lib/engine/index.js';
 import { buildXlsx } from '../../../lib/xlsx/writer.js';
 import { Handoff } from './Handoff.js';
-import { Results } from '../Results.js';
+import { Commitment, Results } from '../Results.js';
 import { Payloads } from '../Payloads.js';
 import { MeasurementDiagram } from '../MeasurementDiagram.js';
 import { Empty } from '../parts.js';
@@ -33,6 +33,10 @@ export function StepResults({
     <>
       <DownloadWorkbook scenario={scenario} result={result} />
       <Handoff scenario={scenario} result={result} />
+      {/* Directly under the table: the table is one month per period, and this
+          is the same quantities over the term the table's D21 gives the length
+          of. Anywhere further down and the two were read as unrelated. */}
+      <Commitment scenario={scenario} result={result} />
       <Design scenario={scenario} />
       <Results scenario={scenario} result={result} />
       {/* The payloads are for whoever writes the device code, not for the

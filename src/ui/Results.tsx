@@ -133,8 +133,6 @@ export function Results({ scenario, result }: { scenario: Scenario; result: Scen
 
       <Storage result={result} />
 
-      <Commitment scenario={scenario} result={result} />
-
       <div class="grid two">
         <ByMachineType peak={peak} />
         <Ramp periods={result.periods} />
@@ -457,7 +455,7 @@ function Storage({ result }: { result: ScenarioResult }) {
  * and it is also more than the fleet will send. Unused commitment is forfeited at
  * expiry, so the gap is worth seeing before signature rather than after.
  */
-function Commitment({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
+export function Commitment({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
   const t = useT();
   const c = commitmentFor(scenario, result);
   if (c.termMonths === 0 || c.termUnitsQuoted === 0) return null;
@@ -470,37 +468,22 @@ function Commitment({ scenario, result }: { scenario: Scenario; result: Scenario
         <span class="sub">{t('commitment.sub', { months: c.termMonths })}</span>
       </header>
       <div class="body">
-        <div class="grid four" style="margin-bottom:18px">
+        {/* Three figures, no captions under them. The captions restated the
+            labels they sat under, and the fourth stat -- quoted minus expected
+            -- is made properly in the paragraph below, which has room to say
+            why the gap matters rather than only how big it is. */}
+        <div class="grid three" style="margin-bottom:18px">
           <div class="stat">
             <span>{t('commitment.stat.messages')}</span>
             <b>{compact(c.termMessages)}</b>
-            <small>{t('commitment.stat.messages.sub')}</small>
           </div>
           <div class="stat">
             <span>{t('commitment.stat.quoted')}</span>
             <b>{compact(c.termUnitsQuoted)}</b>
-            <small>
-              {t('commitment.stat.quoted.sub', {
-                breakdown: c.unitsPerMonth
-                  .map((u, i) =>
-                    t('commitment.stat.quoted.term', {
-                      units: n(u),
-                      months: n(c.months[i] ?? 0),
-                    }),
-                  )
-                  .join(' + '),
-              })}
-            </small>
           </div>
           <div class="stat">
             <span>{t('commitment.stat.actual')}</span>
             <b>{compact(c.termUnitsActual)}</b>
-            <small>{t('commitment.stat.actual.sub')}</small>
-          </div>
-          <div class="stat">
-            <span>{t('commitment.stat.gap')}</span>
-            <b>{compact(gap)}</b>
-            <small>{t('commitment.stat.gap.sub', { pct: pct(c.headroom) })}</small>
           </div>
         </div>
 
