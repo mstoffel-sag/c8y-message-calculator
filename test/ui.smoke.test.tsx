@@ -62,7 +62,7 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(html, /placeholder="Name the protocol"/);
   });
 
-  test('series: teaches bundling and shows the proposal', () => {
+  test('series: teaches bundling and names the measurement types', () => {
     const html = render(<StepTimeSeries {...props} />);
     assert.match(html, /one timestamp/i);
     assert.match(html, /acme_Climate/);
@@ -149,12 +149,20 @@ describe('the wizard renders', () => {
     const html = render(<StepTimeSeries scenario={split} onChange={noop} />);
     // Named after the series, and editable in its row the moment it exists --
     // it used to take an interval change before any type was created at all.
-    assert.match(html, /acme_Pressure · 1 series/);
     assert.match(html, /<input type="text" value="acme_Pressure"/);
-    // The offer is gone from the row that took it, and still open to the three
-    // still sharing acme_Climate plus the two statuses, which are ordinary
-    // series now and so are offered the choice like everything else.
-    assert.equal((html.match(/A measurement type of its own/g) ?? []).length, 5);
+    // The new type is offered to the three rows that could actually join it --
+    // the others still on the 60 s tick -- and not to the row that is already
+    // alone in it, which cannot share a measurement type with itself and would
+    // make "Bundled -- shares a message" a lie. The two 72-minute statuses
+    // never see it: a measurement carries one timestamp.
+    assert.equal((html.match(/acme_Pressure · 1 series/g) ?? []).length, 3);
+    // And the heading only appears where there is something to be bundled
+    // with, which is those four rows on the 60 s tick.
+    assert.equal((html.match(/Bundled — shares a message/g) ?? []).length, 4);
+    // So every continuous row carries the offer, including the one that took
+    // it -- there it is the answer the dropdown is showing, which is how a
+    // reader sees at a glance which rows are bundled and which are not.
+    assert.equal((html.match(/A measurement type of its own/g) ?? []).length, 6);
   });
 
   test('series: lets the measurement type be renamed in the table', () => {
@@ -239,7 +247,11 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(render(<StepDiscrete {...props} />), /Quoted/);
   });
 
-  test('series: offers to bundle when nothing is bundled yet', () => {
+  test('series: no bundling panel, whether or not anything is bundled', () => {
+    // Grouping by interval happens on add, and lint L1 quantifies what is left
+    // to gain. A panel that offered a third account of the same thing is gone,
+    // along with the Apply button that was the only way to reach applyProposal
+    // from the wizard.
     const hvac = presetByKey('hvac')!;
     const loose = {
       ...blankScenario(),
@@ -251,9 +263,12 @@ describe('the wizard renders', () => {
         },
       ],
     };
-    const html = render(<StepTimeSeries scenario={loose} onChange={noop} />);
-    assert.match(html, /Suggestion/, 'four 60 s readings in four measurements should be flagged');
-    assert.match(html, /Apply/);
+    for (const scenario of [props.scenario, loose]) {
+      const html = render(<StepTimeSeries scenario={scenario} onChange={noop} />);
+      assert.doesNotMatch(html, /Suggestion/);
+      assert.doesNotMatch(html, /Bundled into/);
+      assert.doesNotMatch(html, />Apply</);
+    }
   });
 
   test('discrete: explains events, alarms and inventory', () => {
@@ -266,9 +281,12 @@ describe('the wizard renders', () => {
   });
 
   test('discrete: states the real cost of a command', () => {
+    // The claim, not the sentence: the step has to say that a command is
+    // several messages and name the statuses that make it so. The wording has
+    // been shortened once already -- assert what it must convey.
     const html = render(<StepDiscrete {...props} />);
     assert.match(html, /PENDING/);
-    assert.match(html, /three or four messages/i);
+    assert.match(html, /four messages per command/i);
   });
 
   test('contract: lists every asked line item with its cell', () => {
@@ -359,6 +377,13 @@ describe('a freshly added series', () => {
   });
 });
 
+/** Every counter label, in Configurator order. */
+const COUNTER_LABELS_ALL = [
+  'Measurements Created', 'Events Created', 'Events Updated',
+  'Alarms Created', 'Alarms Updated', 'Inventories Created',
+  'Inventories Updated', 'Operations Created', 'Operations Updated',
+];
+
 describe('the hand-off row explains its own buttons', () => {
   const scenario = conceptSection9Scenario();
   const result = computeScenario(scenario);
@@ -372,6 +397,59 @@ describe('the hand-off row explains its own buttons', () => {
     // which Excel does not accept.
     assert.match(html, /<code>D28:D36<\/code>/);
     assert.doesNotMatch(html, /D28:36/);
+  });
+
+  test('line items nobody filled in collapse, and the nine counters never do', () => {
+    const html = render(<Handoff scenario={scenario} result={result} />);
+    // 13 of the 15 asked line items are dashes on this estimate, and they
+    // buried the two that are not.
+    assert.match(html, /13 line items not in use/);
+    assert.doesNotMatch(html, /Streaming Analytics/, 'an unused add-on is collapsed');
+    assert.doesNotMatch(html, /VPN Services/);
+    // What is in use stays, and so does everything that is never "unused":
+    // Messages is calculated, the storage line is estimated.
+    assert.match(html, /Public\/Shared Cloud/);
+    assert.match(html, /Messages/);
+    assert.match(html, /Operational Data Store/);
+    // The nine counters are one contiguous paste block. A zero hidden out of
+    // D28:D36 is a stale value left behind in the Configurator, so they stay
+    // whole even when one of them is zero -- Events Updated is, here.
+    for (const label of COUNTER_LABELS_ALL) assert.ok(html.includes(label), label);
+    assert.match(html, /Events Updated/);
+  });
+
+  test('the column header carries the period length, not just the quoted month', () => {
+    const html = render(<Handoff scenario={scenario} result={result} />);
+    // A reader who configured 12 months and saw only "January 2027 · 31 days"
+    // concluded the length had been ignored. It has not: every figure in the
+    // column is one month's worth, and D21 carries the 12 the Configurator
+    // multiplies by.
+    assert.match(html, /Period 1 · 12 months/);
+    assert.match(html, /quoted at January 2027 · 31 days/);
+    // All twelve months are computed -- the column quotes the fullest one.
+    assert.equal(result.periods[0]!.months.length, 12);
+    assert.equal(result.periods[0]!.peak.days, 31);
+  });
+
+  test('the Messages row says what its number is, not how it is priced', () => {
+    const html = render(<Handoff scenario={scenario} result={result} />);
+    // D27 shows the raw count -- the sum of the nine counters underneath it.
+    assert.match(html, /45,978,000/);
+    assert.match(html, /the nine counters below, added together · the Configurator computes it/);
+    // It used to carry the Configurator's own unit, "per 100K per month",
+    // which says how the row is PRICED. Sitting under a raw 45,978,000 it read
+    // as the unit the figure was in, so the row looked wrong by a factor of
+    // 100,000. The blocks of 100,000 are the Quote sheet's business.
+    assert.doesNotMatch(html, /per 100K per month/);
+    // Nor may it read as summed over the PERIOD. Every row here is one
+    // calendar month -- this period's peak -- and the period total is
+    // 541,344,000, nearly twelve times the figure shown.
+    assert.doesNotMatch(html, /sum of the nine counters/);
+    assert.doesNotMatch(html, /541,344,000/);
+    // And the figure really is the nine counters added up, so a reader can
+    // check it against the rows below rather than taking it on trust.
+    const counters = [45_880_000, 31_000, 0, 15_500, 15_500, 1_000, 31_000, 1_000, 3_000];
+    assert.equal(counters.reduce((a, b) => a + b, 0), 45_978_000);
   });
 
   test('the storage line shows the figure the workbook writes, not a dash', () => {
@@ -663,15 +741,25 @@ describe('machine types fold away', () => {
     assert.equal(openCount(html), 1);
   });
 
-  test('the folded header carries the summary, not just the name', () => {
+  test('the folded header on Measurements counts measurements and nothing else', () => {
     const html = render(<StepTimeSeries scenario={two} onChange={noop} />);
+    assert.match(html, /6 time series · every 1 min, every 72 min · 3 measurement types/);
+    // 45,880,000 of the machine type's 45,977,000 -- the events, alarms,
+    // inventory writes and operations are not this step's business and are not
+    // in its figure. A total here is a number that barely moves when you change
+    // what the step is for, which reads as broken arithmetic.
+    assert.match(html, /<b>45\.9 M<\/b>/, 'the measurements, not the total');
+    assert.match(html, /Measurements \/ month · 45,880 per machine/, 'and it says which');
+    assert.doesNotMatch(html, /46 M/, 'the all-element total does not appear');
+    assert.doesNotMatch(html, /1 event, 1 alarm/, 'nor the parts that are not series');
+    assert.doesNotMatch(html, /Events 31 k/, 'nor the element mix');
+  });
+
+  test('the fleet step still summarises the whole machine type', () => {
+    // Scoping is per step, not a new global: the step that shows every element
+    // still has to add them up, or the fleet overview would under-report.
+    const html = render(<StepFleet scenario={two} onChange={noop} />);
     assert.match(html, /6 time series, 1 event, 1 alarm, 1 inventory entry, 1 command/);
-    assert.match(html, /3 measurement types/, 'the two statuses are types of their own');
-    assert.match(html, /every 1 min, every 72 min/, 'both ticks the machine uses');
-    assert.match(html, /Measurements 45\.9 M/, 'the message mix by element');
-    // compact() trims a trailing zero, so 45,977,000 is "46 M".
-    assert.match(html, /<b>46 M<\/b>/, 'the number the summary exists for');
-    assert.match(html, /messages \/ month/);
   });
 
   test('a summary inside one element panel is about that element only', () => {
@@ -686,7 +774,10 @@ describe('machine types fold away', () => {
       machineTypes: [{ ...presetByKey('hvac')!, metrics: [], bundles: [] }],
     };
     const html = render(<StepTimeSeries scenario={bare} onChange={noop} />);
-    assert.match(html, /nothing modelled yet/);
+    // "none" rather than "nothing modelled yet": the header is scoped to
+    // series here, and a machine type with alarms but no series has certainly
+    // had something modelled on it.
+    assert.match(html, /<span class="mt-sum-empty">none<\/span>/);
   });
 })
 

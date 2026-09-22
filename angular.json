@@ -23,7 +23,7 @@
             "buildOptimizer": false,
             "styles": ["@c8y/style/main.scss", "src/c8y/styles.css"],
             "scripts": [],
-            "assets": [],
+            "assets": [{ "glob": "**/*", "input": "src/c8y/assets", "output": "assets" }],
             "allowedCommonJsDependencies": [
               "regenerator-runtime/runtime",
               "@cordobo/qrcode",

@@ -277,12 +277,16 @@ function designSheet(scenario: Scenario): Sheet {
       // anyone asks of a finished estimate is how the data gets in.
       text(3, 'Talks', 'heading'),
       text(4, 'Reading', 'heading'),
-      text(5, 'Unit', 'heading'),
-      text(6, 'Kind', 'heading'),
-      text(7, 'How often', 'heading'),
-      text(8, 'Travels in', 'heading'),
-      text(9, 'Shared', 'heading'),
-      text(10, 'Msg / machine / month', 'heading'),
+      // How many series the row stands for: 1 for a named reading, 450 for a
+      // row that says "PLC tags". The device team reads this sheet to build
+      // the payload, and the count is what tells them how wide it is.
+      text(5, 'Series', 'heading'),
+      text(6, 'Unit', 'heading'),
+      text(7, 'Kind', 'heading'),
+      text(8, 'How often', 'heading'),
+      text(9, 'Travels in', 'heading'),
+      text(10, 'Shared', 'heading'),
+      text(11, 'Msg / machine / month', 'heading'),
     ]),
   ];
 
@@ -302,16 +306,23 @@ function designSheet(scenario: Scenario): Sheet {
             k === 0 ? num(2, mt.machineCount) : text(2, ''),
             text(3, k === 0 ? mt.protocol?.trim() || '' : ''),
             text(4, m.name),
-            text(5, m.unit),
-            text(6, metric?.kind ?? ''),
-            text(7, group.intervalSeconds === undefined
+            num(5, m.seriesCount),
+            text(6, m.unit),
+            text(7, metric?.kind ?? ''),
+            text(8, group.intervalSeconds === undefined
               ? 'on change'
               : `every ${formatDuration(group.intervalSeconds)}`),
-            text(8, group.fragmentName),
-            text(9, group.shared ? 'shared' : 'alone'),
+            // Where more series were asked for than fit the platform's
+            // recommendation, the name is the family rather than one type: the
+            // design sends the number in brackets, and the device team needs
+            // to see that before they build one.
+            text(9, group.types > 1
+              ? `${group.fragmentName} (x${group.types})`
+              : group.fragmentName),
+            text(10, group.shared ? 'shared' : 'alone'),
             // The message cost belongs to the measurement, not to each reading
             // in it -- so it is stated once, against the first row.
-            k === 0 ? num(10, group.messagesPerMonth) : text(10, ''),
+            k === 0 ? num(11, group.messagesPerMonth) : text(11, ''),
           ]),
         );
       });
@@ -326,12 +337,13 @@ function designSheet(scenario: Scenario): Sheet {
           text(2, ''),
           text(3, ''),
           text(4, metric.name),
-          text(5, metric.unit),
-          text(6, metric.kind),
-          text(7, formatRatePeriod(metric.cadence)),
-          text(8, ELEMENT_OF[metric.kind] ?? ''),
-          text(9, 'alone'),
-          text(10, ''),
+          num(5, 1),
+          text(6, metric.unit),
+          text(7, metric.kind),
+          text(8, formatRatePeriod(metric.cadence)),
+          text(9, ELEMENT_OF[metric.kind] ?? ''),
+          text(10, 'alone'),
+          text(11, ''),
         ]),
       );
     }
@@ -350,7 +362,7 @@ function designSheet(scenario: Scenario): Sheet {
 
   return {
     name: 'Design',
-    columnWidths: [22, 10, 22, 26, 8, 12, 18, 26, 9, 21],
+    columnWidths: [22, 10, 22, 26, 8, 8, 12, 18, 26, 9, 21],
     freezeRows: 4,
     rows,
   };

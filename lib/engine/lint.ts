@@ -7,19 +7,23 @@
  */
 
 import {
+  MAX_SERIES_PER_BUNDLE,
   looksLikeFlag,
+  seriesIn,
+  typesFor,
+  typesIn,
+  type Bundle,
   type Finding,
   type MachineType,
   type Metric,
   type Scenario,
 } from './types.js';
+import { bundleFragmentName } from './bundling.js';
 import { resolveBundles } from './compute.js';
 import { REFERENCE_DAYS, SECONDS_PER_DAY } from './calendar.js';
 import { commandsInMonth } from './cadence.js';
 import { ownFragmentName } from './payload.js';
 
-/** The platform recommendation, CONCEPT.md section 11. */
-export const MAX_SERIES_PER_BUNDLE = 100;
 const REFERENCE_SECONDS = REFERENCE_DAYS * SECONDS_PER_DAY;
 /**
  * Faster than this, and a status is being polled rather than reported.
@@ -32,6 +36,11 @@ const STATUS_TICK_SECONDS = 15 * 60;
 /** Above this many raises per machine per day, an alarm is being re-raised. */
 const ALARM_RERAISE_PER_DAY = 24;
 const MAX_SENSIBLE_TRANSITIONS = 4;
+/**
+ * The grouping key for series nobody gave a semantic group. It is a key, not a
+ * name -- L1 picks a title that does not quote it.
+ */
+const NO_SEMANTIC = '(none)';
 
 function online(machineType: MachineType): number {
   return machineType.machineCount * (machineType.onlinePct / 100);
@@ -43,17 +52,20 @@ function effectiveInterval(metric: Metric, bundleInterval: number | undefined): 
   return metric.cadence.mode === 'interval' ? metric.cadence.seconds : undefined;
 }
 
-function lintMachineType(machineType: MachineType): Finding[] {
+function lintMachineType(machineType: MachineType, prefix: string): Finding[] {
   const findings: Finding[] = [];
   const { bundles } = resolveBundles(machineType);
   const n = online(machineType);
+  // A finding that says "acme_" because nobody has typed a name yet is a
+  // finding nobody can act on. Same resolution as the diagram and the payloads.
+  const nameOf = (bundle: Bundle) => bundleFragmentName(prefix, machineType.name, bundle);
 
   const bundleOf = new Map<string, { id: string; fragmentName: string; interval: number }>();
   for (const { bundle, members } of bundles) {
     for (const member of members) {
       bundleOf.set(member.id, {
         id: bundle.id,
-        fragmentName: bundle.fragmentName,
+        fragmentName: nameOf(bundle),
         interval: bundle.intervalSeconds,
       });
     }
@@ -65,7 +77,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
     if (metric.kind !== 'continuous') continue;
     const interval = effectiveInterval(metric, bundleOf.get(metric.id)?.interval);
     if (interval === undefined) continue;
-    const semantic = metric.semanticGroup.trim().toLowerCase() || '(none)';
+    const semantic = metric.semanticGroup.trim().toLowerCase() || NO_SEMANTIC;
     const key = `${interval}|${semantic}`;
     let group = groups.get(key);
     if (!group) {
@@ -79,29 +91,54 @@ function lintMachineType(machineType: MachineType): Finding[] {
   }
 
   for (const group of groups.values()) {
-    const containerCount = group.containers.size;
-    if (containerCount < 2) continue;
     const metrics = [...group.containers.values()].flat();
-    // Collapsing k measurements into 1 removes (k-1) sends per interval.
-    const sendsPerContainer = (n * REFERENCE_SECONDS) / group.interval;
+    // Measurement types these series are sent in now, and the fewest they
+    // could be sent in. Counting containers was the same question only while a
+    // container was always one type: a row that sends each of its series
+    // separately is one container and hundreds of types, and a hundred series
+    // pooled together are one container and two types. So both ends are asked
+    // of the same function, and the rule fires on the gap between them.
+    const currentTypes = [...group.containers.values()].reduce(
+      (sum, members) => sum + typesIn(members),
+      0,
+    );
+    // The floor pools everything and splits only where the platform
+    // recommendation forces it -- deliberately NOT typesIn, which honours the
+    // one-type-per-series flag and would therefore report a row as already
+    // optimal at the very moment it is the thing worth advising about.
+    const fewestTypes = typesFor(seriesIn(metrics));
+    if (currentTypes <= fewestTypes) continue;
+    const sendsPerType = (n * REFERENCE_SECONDS) / group.interval;
+    // '(none)' is the key these were grouped under, not a group anybody named,
+    // so the sentence must not quote it as one.
+    const named = group.semantic !== NO_SEMANTIC;
     findings.push({
       rule: 'L1',
       severity: 'suggestion',
-      titleKey: 'lint.L1.title',
+      titleKey: named ? 'lint.L1.title' : 'lint.L1.titleNoGroup',
       titleParams: {
-        count: metrics.length,
+        count: seriesIn(metrics),
         interval: group.interval,
         semantic: group.semantic,
-        containers: containerCount,
+        containers: currentTypes,
       },
-      detailKey: 'lint.L1.detail',
+      // The advice is "one message instead of nine" until the platform's
+      // 100-series recommendation makes the floor higher than one, and then it
+      // has to say so rather than promising a measurement nobody should send.
+      detailKey: fewestTypes === 1 ? 'lint.L1.detail' : 'lint.L1.detailCapped',
       detailParams: {
+        // The series are the sentence's subject; the row names are a list at
+        // the end of it. One row standing for 1,000 series is still 1,000
+        // series, and "Reading are read on the same tick" is not English.
+        count: seriesIn(metrics),
         names: metrics.map((m) => m.name).join(', '),
-        containers: containerCount,
+        containers: currentTypes,
+        target: fewestTypes,
+        max: MAX_SERIES_PER_BUNDLE,
       },
       machineTypeId: machineType.id,
       metricIds: metrics.map((m) => m.id),
-      messageDelta: -(containerCount - 1) * sendsPerContainer,
+      messageDelta: -(currentTypes - fewestTypes) * sendsPerType,
     });
   }
 
@@ -121,6 +158,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
         titleParams: {
           name: metric.name,
           kind: metric.kind,
+          // Already resolved: this one comes out of bundleOf, not the bundle.
           fragment: bundle.fragmentName,
         },
         detailKey: 'lint.L3.detail',
@@ -173,7 +211,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
         rule: 'L4',
         severity: 'warning',
         titleKey: 'lint.L4.title',
-        titleParams: { fragment: bundle.fragmentName },
+        titleParams: { fragment: nameOf(bundle) },
         detailKey: 'lint.L4.detail',
         // Grouped digits, but not localised: the engine has no locale, and the
         // UI cannot reformat a number once it is inside a sentence. A figure
@@ -188,16 +226,27 @@ function lintMachineType(machineType: MachineType): Finding[] {
       });
     }
 
-    if (members.length > MAX_SERIES_PER_BUNDLE) {
+    // The tool does not leave a type over the recommendation and ask for it to
+    // be split -- it models the split, because a 450-series measurement is not
+    // a design anybody should be quoted on. What is left to report is what the
+    // split costs, which is the figure a customer can act on: fewer tags, or a
+    // slower scan.
+    const series = seriesIn(members);
+    const types = typesFor(series);
+    if (series > MAX_SERIES_PER_BUNDLE) {
+      const ticks = (n * REFERENCE_SECONDS) / Math.max(bundle.intervalSeconds, 1e-9);
       findings.push({
         rule: 'L6',
         severity: 'warning',
         titleKey: 'lint.L6.size.title',
-        titleParams: { fragment: bundle.fragmentName, count: members.length },
+        titleParams: { fragment: nameOf(bundle), count: series, types },
         detailKey: 'lint.L6.size.detail',
-        detailParams: { max: MAX_SERIES_PER_BUNDLE },
+        detailParams: { max: MAX_SERIES_PER_BUNDLE, types, count: series },
         machineTypeId: machineType.id,
         bundleId: bundle.id,
+        // What the split costs against the one message a tick the arithmetic
+        // alone would allow. Positive: this is volume the design adds.
+        messageDelta: (types - 1) * ticks,
       });
     }
 
@@ -213,7 +262,7 @@ function lintMachineType(machineType: MachineType): Finding[] {
         rule: 'L6',
         severity: 'warning',
         titleKey: 'lint.L6.mixed.title',
-        titleParams: { fragment: bundle.fragmentName, count: semantics.size },
+        titleParams: { fragment: nameOf(bundle), count: semantics.size },
         detailKey: 'lint.L6.mixed.detail',
         detailParams: { semantics: [...semantics].join(', '), units: units.size },
         machineTypeId: machineType.id,
@@ -330,7 +379,11 @@ function lintFragmentNames(scenario: Scenario): Finding[] {
         .map((m) => m.name.trim().toLowerCase())
         .sort()
         .join('|');
-      note(bundle.fragmentName.trim(), { machineType, signature, bundleId: bundle.id });
+      note(bundleFragmentName(scenario.settings.fragmentPrefix, machineType.name, bundle), {
+        machineType,
+        signature,
+        bundleId: bundle.id,
+      });
     }
     for (const metric of loneContinuous) {
       note(ownFragmentName(scenario.settings.fragmentPrefix, metric).trim(), {
@@ -370,7 +423,7 @@ const SEVERITY_ORDER: Record<Finding['severity'], number> = {
 
 export function lintScenario(scenario: Scenario): Finding[] {
   const findings = [
-    ...scenario.machineTypes.flatMap(lintMachineType),
+    ...scenario.machineTypes.flatMap(mt => lintMachineType(mt, scenario.settings.fragmentPrefix)),
     ...lintFragmentNames(scenario),
   ];
   return findings.sort(

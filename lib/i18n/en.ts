@@ -113,7 +113,7 @@ export const en = {
 
   /* ----------------------------------------------------- fleet */
   'fleet.teach.title': 'Start with the machines, not the data',
-  'fleet.teach.body': 'A **machine type** is a group of machines that behave the same way — same sensors, same firmware, same reporting. Every machine of a type produces identical traffic, so the whole estimate scales from the count.\n\nSplit into separate types only where the *data* differs. Two hundred pumps in Hamburg and two hundred in Lisbon are one type; a pump and a gateway are two.',
+  'fleet.teach.body': 'A **machine type** is a group of machines that behave the same way — same sensors, same firmware, same reporting. Every machine of a type produces identical traffic, so the estimate scales from the count.\n\nSplit into separate types only where the *data* differs. Two hundred pumps in Hamburg and two hundred in Lisbon are one type; a pump and a gateway are two.',
   'fleet.empty': 'Add a machine type below to begin.',
   'fleet.col.type': 'Machine type',
   'fleet.col.talks': 'Talks',
@@ -143,12 +143,16 @@ export const en = {
   'machine.none': 'none',
   'machine.nothingModelled': 'nothing modelled yet',
   'machine.messagesPerMonth': 'messages / month',
+  // Used where the header counts one element rather than all five, so the
+  // figure says which. "messages / month" alone was read as the whole machine
+  // type on a step that only edits part of it.
+  'machine.elementPerMonth': '{element} / month',
   'machine.perMachine': '{count} per machine',
   'machine.intervals': '{count} intervals',
 
   /* --------------------------------- events, alarms, inventory */
   'discrete.teach.title': 'Four different things, and the difference matters',
-  'discrete.teach.body': 'Everything so far was a number over time. What is left is everything else that travels between a machine and Cumulocity: three places to put what the machine reports, and one for what gets sent back to it. Picking the wrong one is not just a modelling nicety — it changes what you can do with the data afterwards, and it changes what you pay.\n\nThe one-line test: **an event is something that happened**, **an alarm is something that is wrong**, **inventory is something that is true about the machine right now**, and **a command is something you want the machine to do**.',
+  'discrete.teach.body': 'Everything so far was a number over time. What is left is everything else that travels between a machine and Cumulocity: three places for what the machine reports, one for what is sent back to it. The wrong choice changes what you can do with the data afterwards, and what you pay.\n\nThe one-line test: **an event is something that happened**, **an alarm is something that is wrong**, **inventory is something that is true right now**, and **a command is something you want the machine to do**.',
   'discrete.none': 'None.',
   'discrete.occurrence.heading': 'Events',
   'discrete.occurrence.element': 'Event',
@@ -156,21 +160,21 @@ export const en = {
   'discrete.occurrence.rate': 'Per machine / day',
   'discrete.occurrence.placeholder': 'Door opened',
   'discrete.occurrence.add': '+ Event',
-  'discrete.occurrence.teach': 'An event is a **non-numeric** thing that happened, with a timestamp: a door opened, a trip started, a service was performed, a login occurred. One `POST`, one message.\n\n**Do not put numbers in events.** A value buried in an event body cannot be aggregated, plotted or queried the way a series can. If it is a number you will want to chart, it is a series — go back a step.',
+  'discrete.occurrence.teach': 'An event is a **non-numeric** thing that happened, with a timestamp: a door opened, a trip started, a service was performed. Creating one is one message.\n\n**Do not put numbers in events.** A value buried in an event body cannot be aggregated or plotted the way a series can. If it is a number you will want to chart, it is a series.',
   'discrete.condition.heading': 'Alarms',
   'discrete.condition.element': 'Alarm',
   'discrete.condition.question': 'Something is wrong and somebody has to act on it.',
   'discrete.condition.rate': 'Raises / machine / day',
   'discrete.condition.placeholder': 'Filter blocked',
   'discrete.condition.add': '+ Alarm',
-  'discrete.condition.teach': 'An alarm is a **state with a lifecycle**, not a notification. It is raised, it stays active while the condition persists, and it is cleared when the condition ends.\n\n**That is two messages per incident, not one:** the raise counts as Alarms Created and the clear counts as Alarms Updated. The tool counts both automatically.\n\nRaising an alarm type that is *already active* does not create a second alarm — Cumulocity updates the existing one, which still counts. So a device re-raising the same alarm every minute while a fault persists bills every minute and tells an operator nothing new. If what you mean is “this happened again”, that is an event.',
+  'discrete.condition.teach': 'An alarm is a **state with a lifecycle**, not a notification. It is raised, it stays active while the condition persists, and it is cleared when the condition ends.\n\n**That is two messages per incident:** the raise counts as Alarms Created, the clear as Alarms Updated. The tool counts both.\n\nRaising an alarm type that is *already active* does not create a second alarm — Cumulocity updates the existing one, which still counts. A device re-raising the same alarm every minute bills every minute and tells an operator nothing new. If you mean “this happened again”, that is an event.',
   'discrete.inventory.heading': 'Inventory — what the machine is, right now',
   'discrete.inventory.element': 'Inventory',
   'discrete.inventory.question': 'Something that is simply true about the machine, rather than a reading over time.',
   'discrete.inventory.rate': 'Changes',
   'discrete.inventory.placeholder': 'Firmware version',
   'discrete.inventory.add': '+ Inventory entry',
-  'discrete.inventory.teach': 'The managed object is where a machine’s **current state of being** lives: firmware version, serial number, configuration, location, which asset it belongs to. Writing one is a `PUT`, and a `PUT` counts exactly like a `POST`.\n\n**Inventory is not a time series store.** Writing a changing value here bills every time, overwrites what was there, and leaves nothing to chart. If it changes and the history matters, it is a series.\n\n**The expensive habit:** the platform does not compare payloads, so a successful write that changes nothing still counts. Firmware that re-sends its whole managed object at every boot, or on a heartbeat, pays for every one of those writes and stores no new information. Tick the box below if that is what your devices do — it is the most common invisible line in a real tenant, and it is entirely fixable in device code.',
+  'discrete.inventory.teach': 'The managed object holds a machine’s **current state**: firmware version, serial number, configuration, location. Updating one counts exactly like creating a measurement.\n\n**Inventory is not a time series store.** Writing a changing value here bills every time, overwrites what was there and leaves nothing to chart. If the history matters, it is a series.\n\n**The expensive habit:** the platform does not compare payloads, so an update that changes nothing still counts. Firmware that re-sends its whole managed object at every boot pays for every one of those writes. Tick the box below if your devices do that — it is the most common invisible line in a real tenant, and it is fixable in device code.',
   'discrete.inventory.registrationNote': 'Registering a machine for the first time is **Inventories Created**, counted once per machine from your rollout numbers. You do not enter it here.',
   'discrete.inventory.timerColumn': 'Sent on a timer?',
   'discrete.inventory.timerLabel': 're-sent even when unchanged',
@@ -221,8 +225,8 @@ export const en = {
   /* -------------------------------------------------- commands */
   'commands.heading': 'Commands',
   'commands.element': 'Operation',
-  'commands.teach.title': 'This one runs outbound, and it costs more than it looks',
-  'commands.teach.body': 'Everything above is the machine talking to Cumulocity. An **operation** goes the other way: a firmware update, a configuration push, a reboot, a setpoint change.\n\n**One command is not one message.** Creating the operation counts, and then every status the device reports back counts as well — `PENDING`, `EXECUTING`, `SUCCESSFUL` is three more. A single command is realistically **three or four messages**, which is why an estimate that models a firmware campaign as one message per machine is out by a factor of four.\n\nIf your device reports fine-grained progress through the operation status, count those too. That pattern gets expensive quickly, and progress usually belongs in an event.',
+  'commands.teach.title': 'One command is more than one message',
+  'commands.teach.body': 'Everything above is the machine talking to Cumulocity. An **operation** goes the other way: a firmware update, a configuration push, a reboot, a setpoint change.\n\nCreating the operation counts, and every status the device reports back counts too — `PENDING`, `EXECUTING`, `SUCCESSFUL` is three more. Count four messages per command, not one.\n\nIf your devices report fine-grained progress through the operation status, count those as well. Progress usually belongs in an event.',
   'commands.add': '+ Command',
   'commands.none': 'None. If Cumulocity never sends anything to these machines, that is a legitimate answer — but firmware updates count, and almost every fleet has those.',
   'commands.col.command': 'Command',
@@ -239,7 +243,7 @@ export const en = {
   'contract.ramp.heading': 'Periods and the ramp',
   'contract.ramp.sub': 'Months → D21 · machines per period',
   'contract.teach.title': 'Billing runs on real calendar months',
-  'contract.teach.body': 'February is 28 days and January is 31 — an **11 % swing** in messages for a fleet doing exactly the same thing. The tool works in real month lengths rather than averaging them away, and reports a range with the peak month named. A single number would be wrong eleven months out of twelve.\n\n**Registration is derived from the ramp.** Each period contributes *Inventories Created* only for the machines it *adds*, once, in its first month. A period that adds nobody registers nobody — putting onboarding into the monthly rate overstates every later period.',
+  'contract.teach.body': 'February is 28 days and January is 31 — an **11 % swing** for a fleet doing exactly the same thing. The tool works in real month lengths and names the peak month. A single number would be wrong eleven months out of twelve.\n\n**Registration follows the ramp.** Each period contributes *Inventories Created* only for the machines it *adds*, once, in its first month. Putting onboarding into the monthly rate overstates every later period.',
   'contract.rampStarts': 'Ramp starts',
   'contract.year': 'Year',
   'contract.retention': 'Data kept, default',
@@ -261,7 +265,7 @@ export const en = {
   'deployment.heading': 'Deployment & add-ons',
   'deployment.sub': 'One column per period → Configurator rows 23–26',
   'deployment.teach.title': 'The parts of the quote the fleet cannot tell you',
-  'deployment.teach.body': 'Message volume comes out of the machines. Everything in this section does not: how many deployments, which add-ons, how many tenants. Somebody has to state them, so the wizard asks rather than guessing.\n\nCumulocity is **commit-to-consume**. A customer commits to a spend amount, not to quantities — there is no bill of materials, usage is metered daily and drawn down against the commitment. So nothing here is an order; it is the shape of the estimate.\n\n**This tool shows no prices.** It collects the quantities and tells you which cell each one belongs in. What they cost is the Sales Configurator’s job.',
+  'deployment.teach.body': 'Message volume comes out of the machines. Nothing in this section does: how many deployments, which add-ons, how many tenants. Somebody has to state them, so the wizard asks.\n\nCumulocity is **commit-to-consume**: a customer commits to a spend amount, not to quantities. So nothing here is an order; it is the shape of the estimate.\n\n**This tool shows no prices.** It collects the quantities and names the cell each one belongs in.',
   'deployment.col.item': 'Line item',
   'deployment.col.unit': 'Unit',
   'deployment.copyAcross': 'Copy period 1 across all periods',
@@ -277,7 +281,7 @@ export const en = {
   'series.count.other': '{count} series',
   'series.empty': 'Add a machine type first — a series belongs to a machine.',
   'series.teach.title': 'One measurement, one timestamp, one message',
-  'series.teach.body': 'A measurement carries **one timestamp** and any number of series underneath it. One `POST` is **one message** whether it carries one series or forty. So the question that decides your volume is not how much data you send — it is **how many requests you spread it across**.\n\nThat makes the sampling interval the natural grouping: everything sampled on the same tick shares a timestamp, so it can share a measurement. Readings on *different* intervals can never share one, however related they are.\n\n**A flag or a status is a series too** — and the interval you give it is the interval you are paying for. A compressor on/off left on the fleet’s one-minute tick costs 44,640 readings a machine every month to learn something that moves a couple of dozen times a day. Ask how often it actually changes and sample it there: twenty times a day is one reading every 72 minutes, and the same knowledge costs 620.\n\n**So tell the tool the interval and it will design the measurement type.** Every series you add drops into the measurement type for its interval automatically, under a suggested name. Both halves of that are yours to change in the *Measurement type* column: rename the fragment your devices actually send, or move one series into a measurement type of its own.',
+  'series.teach.body': 'A measurement carries **one timestamp** and any number of series under it. Creating one is **one message**, whether it carries one series or forty. So what decides your volume is not how much data you send — it is how many requests you spread it across.\n\nThe sampling interval does the grouping: everything read on the same tick can share a measurement. Readings on *different* intervals never can.\n\n**A flag is a series too**, and the interval you give it is the interval you pay for. Ask how often it actually changes, and read it there.\n\nTell the tool the interval and it designs the measurement type. Rename it, or move a series into one of its own, in the *Measurement type* column.',
   'series.choose': 'Choose a series…',
   'series.heading': 'Series — what this machine measures',
   'series.none': 'None yet. A series is one named value over time: a temperature, a pressure, a motor current, a compressor on/off. Sampled on a timer or sent when it moves — either way it travels in a measurement.',
@@ -285,6 +289,8 @@ export const en = {
   'series.col.unit': 'Unit',
   'series.col.howOften': 'How often',
   'series.col.type': 'Measurement type',
+  'series.col.count': 'How many',
+  'series.countTitle': 'How many series this row stands for. Leave it at 1 for a reading you have named. Type the tag count when a machine exposes hundreds you are not going to list one by one — the volume is the same either way, and a count is an answer you already have.',
   'retention.col': 'Kept for',
   'retention.title': 'Days the tenant’s retention rule keeps this type. Leave it empty to use the scenario’s default, set on the Contract step. It changes no message count — only how much is still in the database when the month closes, which is what storage is billed on.',
   'retention.inherited': 'scenario default',
@@ -296,31 +302,34 @@ export const en = {
   'series.unitPlaceholder': 'Unit',
   'series.samplesPerMonth': '{count} samples / machine / month',
   'series.solo.timed': 'one message per sample, on its own',
+  'series.solo.split': '{types} messages per sample, on its own — over {max} series',
   'series.typeOption': '{name} · {series}',
   'series.typeUnnamed': 'unnamed',
-  'series.typesOnInterval': 'Measurement types on this interval',
-  'series.onItsOwn': 'On its own',
+  // The two headings lead with what the choice does to the message count,
+  // because that is the question a reader brings to this column -- "bundled or
+  // not". The group is still only the types on this row's interval, since a
+  // measurement carries one timestamp; the heading says the consequence and the
+  // option names say which type.
+  'series.typesOnInterval': 'Bundled — shares a message',
+  'series.onItsOwn': 'Its own message',
   'series.ownType': 'A measurement type of its own',
+  'series.typePerSeries': 'A measurement type per series',
+  'series.solo.perSeries': '{count} messages per sample — one measurement type each, {name}1 to {name}{count}',
   'series.oneMessageForAll': 'one message for all {count} series in it',
+  'series.messagesForAll': '{types} messages for all {count} series in it — over {max} per type',
   'series.oneMessagePerSample': 'one message per sample',
   'series.sameMessage': 'in that same message',
+  'series.countNote': 'A row can stand for **more than one series**. A machine exposing 450 PLC tags on one scan is one row reading *450*, not 450 rows — it bundles, stores and counts identically. What 450 series cannot do is travel in one measurement: the platform recommends at most **{max} per measurement type**, so a counted row is sent as as many types as that needs, and each of them is a message on every tick.',
   'series.namingNote': 'A measurement type is the fragment your device sends. Pick something a dashboard builder will recognise — and then **do not change the series inside it**: a fragment whose shape varies from one message to the next is what degrades write and query performance.',
   'series.add': '+ Series',
   'series.whatItSends': 'What one of these machines sends',
-  'series.bundled.one': 'Bundled into {count} measurement type, one per interval',
-  'series.bundled.other': 'Bundled into {count} measurement types, one per interval',
-  'series.suggestion.one': 'Suggestion: {count} measurement type, one per interval',
-  'series.suggestion.other': 'Suggestion: {count} measurement types, one per interval',
-  'series.proposalLine': '{series} → {messages} messages/machine/month',
-  'series.insteadOf': 'instead of {count}',
-  'series.messagesPerMonthShort': 'messages / month',
-  'series.apply': 'Apply',
 
   /* ------------------------------------------ payload examples */
   'payload.heading': 'Payloads to hand the device team',
   'payload.sub': 'Every name this design needs, and the JSON for each',
   'payload.copy': 'Copy',
   'payload.oneMessage': '1 message.',
+  'payload.messages': '{count} messages.',
   'payload.mqttTopic': 'MQTT topic: {topic}',
   'payload.ns.measurement': 'measurement fragment',
   'payload.ns.measurement.plural': 'measurement fragments',
@@ -336,13 +345,17 @@ export const en = {
   'payload.blurb.inventory': 'Fragments on the managed object. Separate again from measurement fragments, even where the name looks alike.',
   'payload.title.bundle': '{series} every {seconds} s',
   'payload.title.alone': 'its own measurement, every {seconds} s',
+  'payload.title.counted': '{count} series in measurements of their own, every {seconds} s',
+  'payload.title.perSeries': 'one of {count} measurement types, every {seconds} s',
   'payload.title.raiseAndClear': '{name} — raise and clear',
-  'payload.note.bundle': 'One POST, one timestamp, one message — regardless of how many series it carries. Send exactly this series set every time: a fragment whose shape varies from message to message is what degrades write and query performance.',
+  'payload.note.bundle': 'One message, one timestamp — regardless of how many series it carries. Send exactly this series set every time: a fragment whose shape varies from message to message is what degrades write and query performance.',
   'payload.note.smartrest': 'Over MQTT, the JSON above goes to the topic shown. The SmartREST static measurement template carries one series per row, so bundling several series into one measurement needs a custom SmartREST 2.0 template that renders this whole fragment in a single request.',
+  'payload.note.perSeries': 'One series, one measurement, one message — and {count} of these go out on every tick, named {name}1 to {name}{count}. This is the shape the tool measures its baseline against: the same readings on one timestamp would be {types} messages a tick instead of {count}. Send it this way only if the device genuinely cannot batch the series into one request.',
+  'payload.note.split': '{count} series do not travel in one measurement — the platform recommends at most {max}. This design sends {types} measurement types of this shape on every tick, so a tick costs {types} messages rather than one. Name the types after what the tags belong to, and number or name the series inside each.',
   'payload.note.alone': 'This reading travels alone, so it costs one message per sample on its own. If anything else is sampled on the same tick, they belong in one measurement.',
   'payload.note.event': 'Events hold non-numeric data. A number buried in an event body cannot be aggregated or plotted the way a series can.',
   'payload.note.alarm': 'Two messages per incident: the raise creates and the clear updates, and both count. Raising an alarm type that is already active updates the existing alarm rather than creating a duplicate — which still counts.',
-  'payload.note.inventory': 'Send this when it changes, not on a timer. The platform does not diff the payload, so a successful PUT that changes nothing still counts.',
+  'payload.note.inventory': 'Send this when it changes, not on a timer. The platform does not compare payloads, so an update that changes nothing still counts.',
 
   /* --------------------- the results step: workbook and design */
   'results.empty': 'Nothing to compute yet — go back and describe a machine.',
@@ -438,14 +451,8 @@ export const en = {
   'commitment.heading': 'The commitment',
   'commitment.sub': '{months} months · every quantity a commit-to-consume total is built from',
   'commitment.stat.messages': 'Messages over the term',
-  'commitment.stat.messages.sub': 'every month at its own volume',
   'commitment.stat.quoted': 'Billable units, as quoted',
-  'commitment.stat.quoted.sub': 'each period’s peak month × its length · {breakdown}',
-  'commitment.stat.quoted.term': '{units}/mo × {months}',
   'commitment.stat.actual': 'Billable units, month by month',
-  'commitment.stat.actual.sub': 'what the fleet is expected to consume',
-  'commitment.stat.gap': 'Quoted but not expected',
-  'commitment.stat.gap.sub': '{pct} of the commitment',
   'commitment.oneShort': '**The tool stops one multiplication short.** A commitment is billable units times a rate, and the rate is not in here — the Quote sheet of the workbook carries the multiplication as a live formula over an empty price column, so the commitment appears the moment somebody types their rates and never before.',
   'commitment.peakOverstates': '**Quoting the peak is right, and it over-states.** A period is quoted at one month’s quantity, and the peak is the honest month to pick — but the months add up to {gap} fewer billable units than {quoted}, because the fleet ramps and not every month has 31 days. Unused commitment is forfeited at expiry, not carried forward, so that gap is worth settling before signature.',
 
@@ -453,13 +460,40 @@ export const en = {
   'handoff.heading': 'Hand-off to the Sales Configurator',
   'handoff.sub': 'Peak calendar month of each period',
   'handoff.col.item': 'Line item',
-  'handoff.periodPeak': '{month} · {days} days',
+  // The column header carries the period's own length, because the figures
+  // under it are per month and a reader who typed "12 months" and saw only
+  // "31 days" reasonably concluded the length had been ignored. It has not:
+  // the length is D21, and the Configurator multiplies by it.
+  'handoff.periodHeading.one': '{label} · {count} month',
+  'handoff.periodHeading.other': '{label} · {count} months',
+  // "quoted at", not just the month: it says the month is the basis the
+  // quantities are stated at rather than the span they cover.
+  'handoff.periodPeak': 'quoted at {month} · {days} days',
   'handoff.periodLength': 'Period length',
   'handoff.months': 'months',
-  'handoff.calculated': ' · calculated',
+  // Replaces the Configurator's own unit on the Messages row. That unit reads
+  // "per 100K per month", which describes how the row is PRICED, and sitting
+  // under a raw 46,009,000 it was read as the unit the figure was in -- so the
+  // row appeared to be out by a factor of 100,000. The blocks of 100,000 are
+  // the Quote sheet's business; this row states what its number is.
+  //
+  // "sum of" was the first attempt and read as summed over the PERIOD -- every
+  // row here is one calendar month, the period's peak, and 45,978,000 against
+  // a 12-month period total of 541,344,000 is a difference worth not being
+  // vague about. "Added together" names the nine rows underneath as what is
+  // being added, which is the only axis this figure sums along.
+  'handoff.messages.what': 'the nine counters below, added together · the Configurator computes it',
   'handoff.estimated': ' · estimated, overridable',
   'handoff.estimateTitle': 'the tool’s estimate; state a figure in the deployment panel to override it',
   'handoff.lengthLabel': 'Period {index} length in months',
+  // The deployment and add-on rows nobody filled in. 13 of the 15 are dashes on
+  // a typical estimate, and they bury the two that are not. Collapsed, never
+  // dropped: the table is a checklist of Configurator cells, so a row that is
+  // empty because nobody has decided yet still has to be findable.
+  'handoff.unused.one': '{count} line item not in use',
+  'handoff.unused.other': '{count} line items not in use',
+  'handoff.unused.show': 'Show',
+  'handoff.unused.hide': 'Hide',
   'handoff.counters': 'Counters',
   'handoff.counters.explain': '**Counters** copies the nine numbers above as a single column, in Configurator order. Select that period’s counter block — `{range}` in period 1, and {stride} rows lower for each period after — and paste once.',
   'handoff.counters.title': 'Nine counters for period {index}, ready to paste at {cell}',
@@ -468,22 +502,35 @@ export const en = {
   'handoff.all.title': 'Every cell, value and label for period {index}',
 
   /* --------------------------------- the guidance rules L1-L10 */
-  'lint.L1.title': '{count} readings share {interval} s and “{semantic}” but travel in {containers} measurements',
-  'lint.L1.detail': '{names} are sampled on the same tick and mean the same kind of thing, so they can share one measurement and one timestamp. That is one POST instead of {containers}, for identical information.',
+  'lint.L1.title': '{count} series share {interval} s and “{semantic}” but travel in {containers} measurements',
+  // No semantic group on any of them, so there is none to name. Quoting the
+  // placeholder read as “share 1 s and “(none)””, which claims a shared group
+  // called none rather than no group at all.
+  'lint.L1.titleNoGroup': '{count} series share {interval} s but travel in {containers} measurements',
+  // The shared tick is the claim; whether they also share a semantic group is
+  // the title's business, and repeating it here overclaimed for series nobody
+  // put in a group at all.
+  //
+  // The series are the subject, not the row names. "{names} are read…" was
+  // right only while L1 needed two rows to fire; one row sending a measurement
+  // type per series now trips it too, and a single name read as "Reading are
+  // read on the same tick".
+  'lint.L1.detail': '{count} series on the same tick, spread across {containers} measurements: {names}. They can share one timestamp — one message instead of {containers}, for identical information.',
+  'lint.L1.detailCapped': '{count} series on the same tick, spread across {containers} measurements: {names}. They can share a timestamp — {target} messages instead of {containers}, for identical information. {target} rather than one only because the platform recommends at most {max} series in a measurement.',
   'lint.L3.title': '“{name}” is a {kind} metric inside interval bundle {fragment}',
   'lint.L3.detail': 'Only continuous readings belong in an interval bundle. Anything sent on change makes the bundle send a different set of series from one message to the next, and a fragment whose shape varies is what degrades write and query performance. Give it its own measurement.',
   'lint.L2.title': '“{name}” reads like a status, sampled every {interval} s',
   'lint.L2.detail': 'A two-state value on a fast tick pays for every identical reading: **{sends} messages per machine per month** to learn something that may change a handful of times a day. Set its interval to how often it actually moves — a flag that changes twenty times a day is one reading every 72 minutes, and the message count falls in the same proportion.',
   'lint.L4.title': 'Bundle {fragment} is sampled faster than once a second',
   'lint.L4.detail': 'At {interval} s this is {messages} messages a month from {machines} machines. Sub-second sampling almost always belongs on an edge gateway that aggregates and forwards a summary; a gateway sending one message a second instead of sixty carries the same signal for a sixtieth of the volume.',
-  'lint.L6.size.title': 'Bundle {fragment} carries {count} series',
-  'lint.L6.size.detail': 'The platform recommendation is no more than {max} series in one measurement. Split it along semantic lines — the split costs one extra message per interval and buys a payload that dashboards and queries can work with.',
+  'lint.L6.size.title': '{fragment} carries {count} series, so it is sent as {types} measurement types',
+  'lint.L6.size.detail': 'The platform recommends no more than {max} series in one measurement, so the estimate spreads these over {types} types and charges {types} messages per sample rather than one. Splitting them differently changes nothing; what moves the number is fewer series on this tick, or a slower tick for the ones that do not need it.',
   'lint.L6.mixed.title': 'Bundle {fragment} mixes {count} unrelated groups of readings',
   'lint.L6.mixed.detail': 'It holds {semantics} together across {units} units. Bundling purely for volume produces fragments that make no sense to whoever builds the dashboard. Sharing a tick is necessary but not sufficient — the series should also belong together.',
   'lint.L5.title': '“{name}” updates the managed object more than once a minute',
-  'lint.L5.detail': 'Inventory is not a time series store. Each PUT bills, overwrites the previous value and leaves nothing to chart. If it changes this often and the history matters, it is a measurement or an event.',
+  'lint.L5.detail': 'Inventory is not a time series store. Each update bills, overwrites the previous value and leaves nothing to chart. If it changes this often and the history matters, it is a measurement or an event.',
   'lint.L10.title': '“{name}” is re-sent on a timer or at every boot',
-  'lint.L10.detail': 'The platform does not diff the payload, so a successful PUT that changes nothing still counts. Re-sending the full managed object on a heartbeat bills every time while storing no new information. Sending it only when it changes removes the whole line. (A rejected write, by contrast, does not count at all — failures are free.)',
+  'lint.L10.detail': 'The platform does not compare payloads, so an update that changes nothing still counts. Re-sending the full managed object on a heartbeat bills every time and stores no new information. Sending it only when it changes removes the whole line. (A rejected write does not count at all — failures are free.)',
   'lint.L8.title': '“{name}” raises {count} alarms per machine per day',
   'lint.L8.detail': 'At that rate the same alarm type is being raised while it is still active. Cumulocity updates the existing alarm rather than creating a duplicate — which still bills, as Alarms Updated. If the point is “something happened” this is an event; if it is “something is wrong”, raise once and let the lifecycle carry it.',
   'lint.L9.none.title': '“{name}” is modelled with no status transitions',
@@ -514,6 +561,8 @@ export const en = {
   'diagram.compact': '{cadence} · {messages} msg',
   'diagram.oneTimestamp.one': '{cadence} · one timestamp · {count} reading',
   'diagram.oneTimestamp.other': '{cadence} · one timestamp · {count} readings',
+  'diagram.splitTimestamp': '{cadence} · {count} readings in {types} measurements',
+  'diagram.times': '× {count}',
   'diagram.msgPerMonth': 'msg / month',
   'diagram.legend.shared': 'shared — readings on the same tick, one message',
   'diagram.legend.alone': 'alone — one message all to itself',

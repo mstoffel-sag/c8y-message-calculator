@@ -19,22 +19,25 @@ import { CoreModule } from '@c8y/ngx-components';
 
 import {
   DEFAULT_RETENTION_DAYS,
+  MAX_SERIES_PER_BUNDLE,
   derivedTypeName,
   fragmentNameFor,
   measurementView,
-  proposalApplied,
-  proposeBundles,
+  ownFragmentName,
+  seriesCountOf,
+  seriesIn,
+  typesIn,
   type Bundle,
   type MachineType,
   type Metric,
 } from '../../../../lib/engine/index.js';
-import { compact, interval as fmtInterval } from '../../../../lib/format/index.js';
+import { compact, n } from '../../../../lib/format/index.js';
 import { DATAPOINTS, STATES, UNITS, type Choice } from '../../../../lib/presets/catalog.js';
 import {
   addDatapoint,
-  applyBundleProposal,
   assignBundle,
   assignOwnBundle,
+  assignTypePerSeries,
   patchBundle,
   patchUnit,
   removeMetric,
@@ -42,11 +45,12 @@ import {
   setDatapointName,
   setInterval as setMetricInterval,
   setMetricRetentionDays,
+  setSeriesCount,
   setSeriesFragmentName,
 } from '../../../../lib/scenario/edits.js';
 import { ChoiceComponent } from '../controls/choice.component.js';
 import { DurationComponent } from '../controls/duration.component.js';
-import { RetentionComponent, TxtComponent } from '../controls/fields.component.js';
+import { NumComponent, RetentionComponent, TxtComponent } from '../controls/fields.component.js';
 import { LocaleService } from '../i18n/locale.service.js';
 import { RichComponent } from '../i18n/rich.component.js';
 import { TPipe } from '../i18n/t.pipe.js';
@@ -66,9 +70,29 @@ const SERIES_SEEDS = [...DATAPOINTS, ...STATES];
 /** Seconds in a 31-day month, for the "samples per month" hint. */
 const PEAK_MONTH_SECONDS = 2_678_400;
 
+/**
+ * The measurement-type dropdown's third answer, which is not a bundle id.
+ *
+ * A sentinel rather than a second control: the three answers are mutually
+ * exclusive -- a row cannot both ride in `acme_Climate` and send each of its
+ * series separately -- so one dropdown makes the contradiction unrepresentable.
+ * Empty string already means "a measurement type of its own", so this needs a
+ * value no bundle id can collide with.
+ */
+const PER_SERIES = '\u0000per-series';
+
 interface Row {
   metric: Metric;
   seconds: number;
+  /** The dropdown's current answer: a bundle id, '' or PER_SERIES. */
+  typeChoice: string;
+  /** How many series this row stands for; 1 on nearly every row. */
+  count: number;
+  /**
+   * Measurement types those series travel in. Above 1 the row says so, because
+   * the split is why its message count is not the one the customer expected.
+   */
+  types: number;
   bundle: Bundle | undefined;
   /** This row owns the measurement type's name. */
   names: boolean;
@@ -87,6 +111,7 @@ interface Row {
     DurationComponent,
     MachineComponent,
     MeasurementDiagramComponent,
+    NumComponent,
     RetentionComponent,
     RichComponent,
     TPipe,
@@ -94,7 +119,10 @@ interface Row {
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <c8y-mc-machine [machineType]="machineType()">
+    <!-- Measurements only: this step edits series, so a header totalling every
+         element is a figure that barely moves when you change what the step is
+         for. See machine-line.ts. -->
+    <c8y-mc-machine [machineType]="machineType()" only="continuous">
       <h4>{{ 'series.heading' | t }}</h4>
 
       @if (rows().length === 0) {
@@ -104,11 +132,18 @@ interface Row {
           <table class="table mc-table mc-dp">
             <thead>
               <tr>
-                <th style="min-width:190px">{{ 'series.col.series' | t }}</th>
-                <th style="min-width:150px">{{ 'series.col.unit' | t }}</th>
-                <th style="min-width:230px">{{ 'series.col.howOften' | t }}</th>
+                <!-- The other columns gave up 60 px between them to make room
+                     for the count, so the row is exactly as wide as it was: it
+                     was already the widest in the wizard, and the retention
+                     column falls off the end of anything wider. -->
+                <th style="min-width:160px">{{ 'series.col.series' | t }}</th>
+                <!-- Narrow on purpose: it holds 1 on nearly every row, and the
+                     one row where it holds 450 is the one worth noticing. -->
+                <th style="min-width:70px">{{ 'series.col.count' | t }}</th>
+                <th style="min-width:130px">{{ 'series.col.unit' | t }}</th>
+                <th style="min-width:220px">{{ 'series.col.howOften' | t }}</th>
                 <th style="min-width:250px">{{ 'series.col.type' | t }}</th>
-                <th style="width:130px">{{ 'retention.col' | t }}</th>
+                <th style="width:120px">{{ 'retention.col' | t }}</th>
                 <th style="width:34px"></th>
               </tr>
             </thead>
@@ -121,6 +156,14 @@ interface Row {
                       [options]="nameOptions()"
                       [placeholder]="'series.namePlaceholder' | t"
                       (valueChange)="rename(row.metric.id, $event)"
+                    />
+                  </td>
+                  <td>
+                    <c8y-mc-num
+                      [value]="row.count"
+                      [min]="1"
+                      [title]="'series.countTitle' | t"
+                      (valueChange)="recount(row.metric.id, $event)"
                     />
                   </td>
                   <td>
@@ -144,7 +187,7 @@ interface Row {
                          rhythm, anything sharing a tick can share a message, so
                          nothing is excluded from a bundle on principle. -->
                     <c8y-mc-choice
-                      [value]="row.metric.bundleId ?? ''"
+                      [value]="row.typeChoice"
                       [allowOther]="false"
                       [options]="row.typeOptions"
                       (valueChange)="assign(row.metric.id, $event)"
@@ -209,7 +252,8 @@ interface Row {
             </tbody>
           </table>
         </div>
-        <p class="mc-hint m-t-8"><c8y-mc-rich k="series.namingNote" /></p>
+        <p class="mc-hint m-t-8"><c8y-mc-rich k="series.countNote" [p]="countParams" /></p>
+        <p class="mc-hint m-t-4"><c8y-mc-rich k="series.namingNote" /></p>
         <p class="mc-hint m-t-4"><c8y-mc-rich k="series.retentionNote" [p]="retentionParams()" /></p>
       }
 
@@ -225,31 +269,6 @@ interface Row {
         <c8y-mc-measurement-diagram [view]="view()" />
       }
 
-      @if (proposals().shown.length > 0) {
-        <div class="mc-proposal" [class.mc-ok]="proposals().applied">
-          <div>
-            <b>{{ proposals().title }}</b>
-            <div class="mc-hint m-t-4">
-              @for (line of proposals().lines; track line.key) {
-                <div><code>{{ line.fragmentName }}</code> &middot; {{ line.interval }} &middot; {{ line.text }}</div>
-              }
-            </div>
-          </div>
-          <div class="text-right mc-nowrap">
-            @if (proposals().saving > 0) {
-              <div class="mc-delta mc-saves m-b-4">
-                &minus;{{ proposals().savingLabel }}
-                <div class="mc-hint">{{ 'series.messagesPerMonthShort' | t }}</div>
-              </div>
-            }
-            @if (!proposals().applied) {
-              <button type="button" class="btn btn-primary btn-sm" (click)="applyProposal()">
-                {{ 'series.apply' | t }}
-              </button>
-            }
-          </div>
-        </div>
-      }
     </c8y-mc-machine>
   `,
 })
@@ -287,22 +306,41 @@ export class SeriesMachineComponent {
     // Everything this machine measures. One kind now, so one filter.
     const series = mt.metrics.filter(m => m.kind === 'continuous');
 
+    // What a measurement type actually carries. The dropdown and the naming
+    // hint both say it, and both used to count rows -- which stopped being the
+    // same number the moment a row could stand for 450 tags.
+    const seriesInBundle = (bundleId: string) =>
+      seriesIn(series.filter(m => m.bundleId === bundleId));
+    const bundleTypes = (bundleId: string) =>
+      typesIn(series.filter(m => m.bundleId === bundleId));
+
     return series.map(metric => {
       const seconds = metric.cadence.mode === 'interval' ? metric.cadence.seconds : 60;
+      const count = seriesCountOf(metric);
+      const perSeries = Boolean(metric.typePerSeries) && count > 1;
+      const types = typesIn([metric]);
       const bundle = mt.bundles.find(b => b.id === metric.bundleId);
-      const siblings = mt.bundles.filter(b => b.intervalSeconds === seconds);
+      // A measurement type this row is alone in is not something it can be
+      // bundled *with* -- offering it under "Bundled" would make the heading a
+      // lie, and choosing it would be a no-op. Its answer is "a measurement
+      // type of its own", below, and its name is still editable in the field
+      // under the dropdown.
+      const soloBundle = bundle !== undefined && bundle.metricIds.length === 1;
+      const siblings = mt.bundles.filter(
+        b => b.intervalSeconds === seconds && !(soloBundle && b.id === bundle?.id),
+      );
       // The name belongs to the measurement type, not to the row, so only the
       // first series in it gets the field. Four identical boxes for one value
       // would invite an edit in row three and change row one.
       const names =
         bundle !== undefined && series.find(m => m.bundleId === bundle.id)?.id === metric.id;
-      // Offered only where it would do something: a series that is already the
-      // only one in its measurement type has one.
-      const alone = bundle !== undefined && bundle.metricIds.length === 1;
 
       return {
         metric,
         seconds,
+        count,
+        types,
+        typeChoice: perSeries ? PER_SERIES : soloBundle ? '' : (metric.bundleId ?? ''),
         bundle,
         names,
         typeOptions: [
@@ -310,13 +348,16 @@ export class SeriesMachineComponent {
             value: b.id,
             label: t('series.typeOption', {
               name: b.fragmentName.trim() || t('series.typeUnnamed'),
-              series: t.plural('series.count', b.metricIds.length),
+              series: t.plural('series.count', seriesInBundle(b.id)),
             }),
             group: t('series.typesOnInterval'),
           })),
-          ...(alone
-            ? []
-            : [{ value: '', label: t('series.ownType'), group: t('series.onItsOwn') }]),
+          { value: '', label: t('series.ownType'), group: t('series.onItsOwn') },
+          // Only where it would mean something different: for a single series,
+          // one type per series and a type of its own are the same answer.
+          ...(count > 1
+            ? [{ value: PER_SERIES, label: t('series.typePerSeries'), group: t('series.onItsOwn') }]
+            : []),
         ],
         samplesHint: t('series.samplesPerMonth', {
           count: compact(PEAK_MONTH_SECONDS / seconds),
@@ -324,12 +365,29 @@ export class SeriesMachineComponent {
         typePlaceholder: bundle
           ? fragmentNameFor(this.prefix(), mt.name, bundle.intervalSeconds)
           : derivedTypeName(this.prefix(), metric.name),
+        // The split belongs to the measurement type, not to the row that
+        // happens to carry the count: a 450-tag row sharing a type with two
+        // named readings splits on 452, not on 450. So it is said here, under
+        // the type, rather than under the count.
         belowType: !bundle
-          ? t('series.solo.timed')
+          ? perSeries
+            ? t('series.solo.perSeries', {
+                count: n(count),
+                name: ownFragmentName(this.prefix(), metric),
+              })
+            : types > 1
+              ? t('series.solo.split', { types: n(types), max: n(MAX_SERIES_PER_BUNDLE) })
+              : t('series.solo.timed')
           : names
-            ? bundle.metricIds.length > 1
-              ? t('series.oneMessageForAll', { count: bundle.metricIds.length })
-              : t('series.oneMessagePerSample')
+            ? bundleTypes(bundle.id) > 1
+              ? t('series.messagesForAll', {
+                  types: n(bundleTypes(bundle.id)),
+                  count: n(seriesInBundle(bundle.id)),
+                  max: n(MAX_SERIES_PER_BUNDLE),
+                })
+              : seriesInBundle(bundle.id) > 1
+                ? t('series.oneMessageForAll', { count: n(seriesInBundle(bundle.id)) })
+                : t('series.oneMessagePerSample')
             : t('series.sameMessage'),
       };
     });
@@ -337,46 +395,12 @@ export class SeriesMachineComponent {
 
   readonly retentionParams = computed(() => ({ days: String(this.defaultRetention()) }));
 
-  /**
-   * Only the groupings still on offer: a fleet can be half-grouped, and
-   * counting a saving already banked into the "apply this" figure overstates it
-   * by whatever is already bundled.
-   */
-  readonly proposals = computed(() => {
-    const t = this.locales.t();
-    const mt = this.machineType();
-    const all = proposeBundles(mt, this.prefix());
-    const pending = all.filter(p => !proposalApplied(mt, p));
-    const applied = pending.length === 0;
-    const shown = applied ? all : pending;
+  /** Static: the platform's recommendation does not depend on the session. */
+  protected readonly countParams = { max: String(MAX_SERIES_PER_BUNDLE) };
 
-    const apart = shown.reduce((sum, p) => sum + p.messagesApart, 0);
-    const together = shown.reduce((sum, p) => sum + p.messagesTogether, 0);
-    const saving = (apart - together) * mt.machineCount * (mt.onlinePct / 100);
-
-    return {
-      shown: all.length > 0 ? shown : [],
-      applied,
-      saving,
-      savingLabel: compact(saving),
-      title: applied
-        ? t.plural('series.bundled', shown.length)
-        : t.plural('series.suggestion', shown.length),
-      lines: shown.map(p => ({
-        key: p.intervalSeconds,
-        fragmentName: p.fragmentName,
-        interval: fmtInterval(p.intervalSeconds),
-        text:
-          t('series.proposalLine', {
-            series: t.plural('series.count', p.metrics.length),
-            messages: compact(p.messagesTogether),
-          }) +
-          (p.metrics.length > 1
-            ? ` ${t('series.insteadOf', { count: compact(p.messagesApart) })}`
-            : ''),
-      })),
-    };
-  });
+  recount(metricId: string, count: number): void {
+    this.edit(s => setSeriesCount(s, this.machineType().id, metricId, count));
+  }
 
   rename(metricId: string, name: string): void {
     this.edit(s => setDatapointName(s, this.machineType().id, metricId, name));
@@ -392,9 +416,11 @@ export class SeriesMachineComponent {
 
   assign(metricId: string, bundleId: string): void {
     this.edit(s =>
-      bundleId
-        ? assignBundle(s, this.machineType().id, metricId, bundleId)
-        : assignOwnBundle(s, this.machineType().id, metricId),
+      bundleId === PER_SERIES
+        ? assignTypePerSeries(s, this.machineType().id, metricId)
+        : bundleId
+          ? assignBundle(s, this.machineType().id, metricId, bundleId)
+          : assignOwnBundle(s, this.machineType().id, metricId),
     );
   }
 
@@ -420,10 +446,6 @@ export class SeriesMachineComponent {
 
   addSeries(): void {
     this.edit(s => addDatapoint(s, this.machineType().id, 'continuous'));
-  }
-
-  applyProposal(): void {
-    this.edit(s => applyBundleProposal(s, this.machineType().id));
   }
 
   private edit(fn: Parameters<ScenarioStore['patch']>[0]): void {

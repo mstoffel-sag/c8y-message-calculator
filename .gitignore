@@ -6,6 +6,11 @@ dist-c8y/
 .angular/
 .DS_Store
 
+# Tenant credentials. `@c8y/devkit:deploy` reads url/user/password from here
+# (dotenv, C8Y_-prefixed), which is the convenient way to deploy and exactly
+# the file that must never reach a remote.
+.env
+
 # The Sales Configurator workbook is the internal price list. It is the
 # reference this tool maps onto, never something the tool ships or publishes:
 # the app, the generated workbook and the docs carry volumes only. Keep it out

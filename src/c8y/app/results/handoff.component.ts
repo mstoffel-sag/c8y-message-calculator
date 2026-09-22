@@ -6,7 +6,7 @@
  * the cell references below are exact for each period rather than "row 28-ish".
  */
 
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import {
   COUNTER_BASE_ROWS,
@@ -92,7 +92,10 @@ function valueFor(
               <th style="min-width:240px">{{ 'handoff.col.item' | t }}</th>
               @for (column of columns(); track column.index) {
                 <th class="text-right" style="min-width:130px">
-                  {{ column.label }}
+                  <!-- nowrap so the column sizes to this line rather than
+                       breaking it as "Period 1 · 12 / months"; German is longer
+                       again. The month below may still wrap. -->
+                  <span style="white-space:nowrap">{{ column.label }}</span>
                   <div class="mc-col-sub">{{ column.peak }}</div>
                 </th>
               }
@@ -112,7 +115,7 @@ function valueFor(
               }
             </tr>
 
-            @for (row of rows(); track row.key) {
+            @for (row of visibleRows(); track row.key) {
               <tr [class.mc-total]="row.isMessages">
                 <td>
                   {{ row.label }}
@@ -140,6 +143,23 @@ function valueFor(
                   </tr>
                 }
               }
+            }
+
+            <!-- The rows nobody filled in, counted rather than listed. Never
+                 dropped: this table is a checklist of Configurator cells, and a
+                 cell empty because nobody has decided yet still has to be
+                 findable. The nine counters are never in here -- they are one
+                 contiguous paste block, and a zero hidden out of D28:D36 is a
+                 stale value left behind in the Configurator. -->
+            @if (unusedCount() > 0) {
+              <tr>
+                <td class="mc-hint" [attr.colspan]="1 + columns().length">
+                  {{ unusedLabel() }}
+                  <button type="button" class="btn btn-link btn-sm" (click)="showUnused.set(!showUnused())">
+                    {{ (showUnused() ? 'handoff.unused.hide' : 'handoff.unused.show') | t }}
+                  </button>
+                </td>
+              </tr>
             }
 
             <tr>
@@ -173,11 +193,60 @@ export class HandoffComponent {
   private readonly store = inject(ScenarioStore);
   private readonly locales = inject(LocaleService);
 
+  /**
+   * Collapsed by default: on a typical estimate 13 of the 15 asked line items
+   * are dashes, and they bury the two that are not.
+   */
+  readonly showUnused = signal(false);
+
+  /**
+   * A line item nobody has filled in, in any period.
+   *
+   * Only the asked ones: `messages` is calculated and `ods` estimated, so
+   * neither is ever empty for want of an answer. Zero across every period is
+   * the test, not zero in the one being looked at -- a row that is 0 in period
+   * 1 and 3 in period 2 is in use.
+   */
+  private readonly unused = computed(() => {
+    const scenario = this.store.scenario();
+    return new Set(
+      LINE_ITEMS.filter(
+        item =>
+          item.source !== 'calculated' &&
+          item.source !== 'estimated' &&
+          scenario.periods.every(period =>
+            item.source === 'choice'
+              ? !commercialBool(period, item.key)
+              : commercialNumber(period, item.key) === 0,
+          ),
+      ).map(item => item.key),
+    );
+  });
+
+  readonly unusedCount = computed(() => this.unused().size);
+
+  readonly unusedLabel = computed(() =>
+    this.locales.t().plural('handoff.unused', this.unusedCount()),
+  );
+
+  readonly visibleRows = computed(() =>
+    this.showUnused() ? this.rows() : this.rows().filter(row => !this.unused().has(row.key)),
+  );
+
   readonly columns = computed(() => {
     const t = this.locales.t();
+    const scenario = this.store.scenario();
     return this.store.result().periods.map(period => ({
       index: period.index,
-      label: t('contract.periodN', { index: period.index }),
+      // The period's own length, beside its number. Every figure in the column
+      // is one month's worth, so a header naming only the month read as though
+      // the 12 months had been ignored -- they are D21, and the Configurator
+      // multiplies by them.
+      label: t.plural(
+        'handoff.periodHeading',
+        scenario.periods.find(p => p.index === period.index)?.months ?? 0,
+        { label: t('contract.periodN', { index: period.index }) },
+      ),
       peak: t('handoff.periodPeak', {
         month: monthYear(period.peak.year, period.peak.month),
         days: period.peak.days,
@@ -210,9 +279,12 @@ export class HandoffComponent {
       key: item.key,
       isMessages: item.key === 'messages',
       label: item.label,
+      // Every other row states the unit its quantity is typed in. Messages
+      // cannot: the Configurator's unit for it is "per 100K per month", which
+      // is how the row is priced, and under a raw 46,009,000 that reads as the
+      // unit the figure is in. So this row says what its number is instead.
       unit:
-        item.unit +
-        (item.source === 'calculated' ? t('handoff.calculated') : '') +
+        (item.key === 'messages' ? t('handoff.messages.what') : item.unit) +
         (item.source === 'estimated' ? t('handoff.estimated') : ''),
       cells: result.periods.map(period => {
         const { text, origin } = valueFor(t, scenario, result, period, item.key);

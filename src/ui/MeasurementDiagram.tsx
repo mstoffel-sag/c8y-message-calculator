@@ -78,6 +78,11 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
               <text x={DG.labelX + 27} y={rowCentre(from + k) + 4} class="dg-label">
                 {truncate(m.name || t('diagram.unnamed'), 22)}
                 {m.unit && <tspan class="dg-unit"> {truncate(m.unit, 8)}</tspan>}
+                {/* A pill standing for 450 readings has to say so, or the
+                    picture claims the envelope holds one. */}
+                {m.seriesCount > 1 && (
+                  <tspan class="dg-unit"> {t('diagram.times', { count: n(m.seriesCount) })}</tspan>
+                )}
               </text>
             </g>
           )),
@@ -142,9 +147,15 @@ export function MeasurementDiagram({ view }: { view: MeasurementView }) {
                     {truncate(group.fragmentName, 26)}
                   </text>
                   <text x={DG.boxX + 16} y={top + 39} class="dg-rate">
-                    {t.plural('diagram.oneTimestamp', group.seriesCount, {
-                      cadence: cadenceOf(t, group.intervalSeconds),
-                    })}
+                    {group.types > 1
+                      ? t('diagram.splitTimestamp', {
+                          cadence: cadenceOf(t, group.intervalSeconds),
+                          count: n(group.seriesCount),
+                          types: n(group.types),
+                        })
+                      : t.plural('diagram.oneTimestamp', group.seriesCount, {
+                          cadence: cadenceOf(t, group.intervalSeconds),
+                        })}
                   </text>
                   <text x={DG.boxX + DG.boxW - 12} y={top + 26} class="dg-count" text-anchor="end">
                     {compact(group.messagesPerMonth)}

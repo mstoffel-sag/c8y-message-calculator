@@ -36,6 +36,8 @@ interface Reading {
   y: number;
   name: string;
   unit: string;
+  /** '× 450' where the row stands for more than one series, else ''. */
+  times: string;
 }
 
 interface Envelope {
@@ -87,6 +89,11 @@ function cadenceOf(t: T, seconds: number | undefined): string {
                 {{ reading.name }}
                 @if (reading.unit) {
                   <tspan class="dg-unit"> {{ reading.unit }}</tspan>
+                }
+                <!-- A pill standing for 450 readings has to say so, or the
+                     picture claims the envelope holds one. -->
+                @if (reading.times) {
+                  <tspan class="dg-unit"> {{ reading.times }}</tspan>
                 }
               </text>
             </g>
@@ -168,6 +175,7 @@ export class MeasurementDiagramComponent {
         y: rowCentre(from + k),
         name: truncate(member.name || t('diagram.unnamed'), 22),
         unit: member.unit ? truncate(member.unit, 8) : '',
+        times: member.seriesCount > 1 ? t('diagram.times', { count: n(member.seriesCount) }) : '',
       })),
     );
   });
@@ -210,7 +218,14 @@ export class MeasurementDiagramComponent {
           cadence,
           messages: compact(group.messagesPerMonth),
         }),
-        timestampLine: t.plural('diagram.oneTimestamp', group.seriesCount, { cadence }),
+        timestampLine:
+          group.types > 1
+            ? t('diagram.splitTimestamp', {
+                cadence,
+                count: n(group.seriesCount),
+                types: n(group.types),
+              })
+            : t.plural('diagram.oneTimestamp', group.seriesCount, { cadence }),
         messages: compact(group.messagesPerMonth),
       };
     });

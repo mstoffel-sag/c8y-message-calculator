@@ -19,7 +19,10 @@ import {
   type Scenario,
   type ScenarioResult,
   addCounters,
+  seriesCountOf,
+  seriesIn,
   totalOf,
+  typesIn,
   zeroCounters,
 } from './types.js';
 import { type CalendarMonth, SECONDS_PER_DAY, expandMonths, secondsInMonth } from './calendar.js';
@@ -149,29 +152,43 @@ export function computeMachineTypeMonth(
   for (const { bundle, members } of bundles) {
     if (members.length === 0) continue;
     const interval = Math.max(bundle.intervalSeconds, 1e-9);
-    const sends = (n * spm) / interval;
-    counters.measurementsCreated += sends;
-    storedValues += sends * members.length;
+    // Ticks, not messages: what happens on the tick is that every series in
+    // this type is read once. How many requests that takes is the next line.
+    const ticks = (n * spm) / interval;
+    const series = seriesIn(members);
+    // A row can stand for 450 tags, and 450 series will not go in one
+    // measurement -- the platform recommends at most a hundred. So the type is
+    // spread over as few as the recommendation allows, and each of them is a
+    // request on every tick. A row that sends each of its series separately
+    // contributes one type per series instead. One series in one type is the
+    // ordinary case and comes out of this as one.
+    const types = typesIn(members);
+    counters.measurementsCreated += ticks * types;
+    storedValues += ticks * series;
     // The rule belongs to the measurement type, so every series in the bundle
     // ages out on the bundle's window whatever else it has been given.
     bucketInto(
       retention,
       retentionFor(bundle.retentionDays, defaultRetentionDays),
-      sends * members.length,
+      ticks * series,
     );
 
     // Naive: every series its own measurement at the same cadence.
-    naive.measurementsCreated += sends * members.length;
+    naive.measurementsCreated += ticks * series;
   }
 
   // --- continuous readings in no bundle: their own measurement either way.
   for (const metric of loneContinuous) {
     if (metric.cadence.mode !== 'interval') continue;
-    const sends = (n * spm) / Math.max(metric.cadence.seconds, 1e-9);
-    counters.measurementsCreated += sends;
-    storedValues += sends;
-    bucketInto(retention, retentionFor(metric.retentionDays, defaultRetentionDays), sends);
-    naive.measurementsCreated += sends;
+    const ticks = (n * spm) / Math.max(metric.cadence.seconds, 1e-9);
+    // Same split as a bundle: a row standing for 450 tags costs the same
+    // whether or not anything else shares its measurement type -- and the same
+    // again if it sends each of those 450 separately, which is 450 types.
+    const series = seriesCountOf(metric);
+    counters.measurementsCreated += ticks * typesIn([metric]);
+    storedValues += ticks * series;
+    bucketInto(retention, retentionFor(metric.retentionDays, defaultRetentionDays), ticks * series);
+    naive.measurementsCreated += ticks * series;
   }
 
   for (const metric of machineType.metrics) {

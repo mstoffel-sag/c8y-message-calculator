@@ -116,6 +116,9 @@
 .mc-scroll { overflow-x: auto; }
 .mc-grid { display: grid; gap: calc(var(--u) * 2); }
 .mc-two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+/* Three stats rather than four: auto-fit still wraps them on a narrow screen,
+   and the wider track keeps a 63.1 bn from breaking across two lines. */
+.mc-three { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .mc-four { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 
 /* --------------------------------------------------------- typography */
@@ -280,20 +283,7 @@
 .mc-metrics { padding: 0 calc(var(--u) * 1.5) calc(var(--u) * 1.5); }
 .mc-metrics h4 { margin: var(--u) 0; font-size: 13px; }
 
-/* ------------------------------------------------------ bundle proposal */
-
-.mc-proposal {
-  display: flex;
-  gap: calc(var(--u) * 2);
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-top: calc(var(--u) * 2);
-  padding: calc(var(--u) * 1.5);
-  border: 1px solid var(--accent-line);
-  background: var(--accent-soft);
-  border-radius: var(--radius);
-}
-.mc-proposal.mc-ok { border-color: var(--line); background: var(--panel-2); }
+/* ---------------------------------------------------------- saved/cost marks */
 
 .mc-delta { font: 600 15px var(--mono); }
 .mc-delta.mc-saves { color: var(--good); }
@@ -410,7 +400,22 @@
   padding: calc(var(--u) * 1.5);
   margin: 4px 0 calc(var(--u) * 2);
 }
-.mc-diagram svg { display: block; width: 100%; height: auto; }
+.mc-diagram svg {
+  display: block;
+  /*
+   * Capped at the geometry's own width rather than stretched to the column.
+   *
+   * The viewBox is 648 units for the explainer and 700 for the configuration
+   * diagram, and every font size inside them is chosen in those units. Left at
+   * width:100% the whole picture scales with the content area, so on a wide
+   * screen a 14px label renders at 28px and the diagram shouts. Capping at the
+   * intrinsic width means it shrinks on a narrow screen and never grows past
+   * the size it was drawn at.
+   */
+  width: 100%;
+  max-width: 700px;
+  height: auto;
+}
 
 .dg-cap {
   font: 600 10px var(--sans);

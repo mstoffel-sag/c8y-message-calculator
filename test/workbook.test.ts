@@ -354,7 +354,7 @@ describe('the workbook content', () => {
 
     // The message cost belongs to the measurement, so it is stated once.
     const costs = design.rows
-      .map((r) => r.cells.find((c) => c.col === 10)?.value)
+      .map((r) => r.cells.find((c) => c.col === 11)?.value)
       .filter((v): v is number => typeof v === 'number');
     assert.equal(costs.filter((c) => c === 44_640).length, 1, 'the bundle is counted once, not four times');
   });

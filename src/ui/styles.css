@@ -494,6 +494,9 @@ code.frag {
 
 .grid { display: grid; gap: calc(var(--u) * 2); }
 .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+/* Three stats rather than four: auto-fit still wraps them on a narrow screen,
+   and the wider track keeps a 63.1 bn from breaking across two lines. */
+.grid.three { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .grid.four { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 
 .stat {
@@ -601,17 +604,6 @@ table.dp tr:not(:last-child) td { border-bottom: 1px solid var(--line-soft); }
 .check { display: inline-flex; gap: 6px; align-items: center; font-size: var(--c8y-font-size-small); color: var(--ink-mute); cursor: pointer; }
 .check input { width: auto; min-height: 0; accent-color: var(--brand); }
 
-.proposal {
-  display: flex; gap: calc(var(--u) * 2); align-items: flex-start;
-  background: var(--accent-soft);
-  border-left: var(--c8y-alert-border-width) solid var(--brand);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  padding: calc(var(--u) * 1.5) calc(var(--u) * 2); margin: calc(var(--u) * 2) 0 0;
-}
-.proposal > div:first-child { flex: 1; }
-.proposal.ok { background: var(--panel-2); border-left-color: var(--line); }
-.proposal .hint code { background: transparent; color: var(--accent); padding: 0; }
-.proposal .delta { font: 600 var(--c8y-font-size-large) var(--mono); }
 
 .delta.saves { color: var(--good); }
 .delta.costs { color: var(--warn); }
@@ -686,7 +678,22 @@ label.locale select:hover { color: var(--ink); }
   background: var(--panel); border: 1px solid var(--line-soft);
   border-radius: var(--radius); padding: calc(var(--u) * 1.5); margin: 4px 0 calc(var(--u) * 2);
 }
-.diagram svg { display: block; width: 100%; height: auto; }
+.diagram svg {
+  display: block;
+  /*
+   * Capped at the geometry's own width rather than stretched to the column.
+   *
+   * The viewBox is 648 units for the explainer and 700 for the configuration
+   * diagram, and every font size inside them is chosen in those units. Left at
+   * width:100% the whole picture scales with the content area, so on a wide
+   * screen a 14px label renders at 28px and the diagram shouts. Capping at the
+   * intrinsic width means it shrinks on a narrow screen and never grows past
+   * the size it was drawn at.
+   */
+  width: 100%;
+  max-width: 700px;
+  height: auto;
+}
 
 .dg-cap {
   font: 600 10px var(--sans); fill: var(--ink-faint);

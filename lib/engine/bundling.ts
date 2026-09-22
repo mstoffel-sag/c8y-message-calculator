@@ -13,7 +13,7 @@
  * splits them afterwards (L6).
  */
 
-import type { MachineType, Metric } from './types.js';
+import { typesIn, type Bundle, type MachineType, type Metric } from './types.js';
 import { resolveBundles } from './compute.js';
 import { SECONDS_PER_DAY } from './calendar.js';
 
@@ -49,6 +49,27 @@ function pascal(text: string): string {
 export function fragmentNameFor(prefix: string, machineTypeName: string, seconds: number): string {
   const clean = prefix.replace(/[^\p{L}\p{N}]+/gu, '') || 'acme';
   return `${clean}_${pascal(machineTypeName)}${intervalSlug(seconds)}`;
+}
+
+/**
+ * What a measurement type is called.
+ *
+ * Every bundle the wizard makes is named as it is made, so the stored name is
+ * almost always the answer. The fallback is for the ones that arrive without
+ * one: a hand-edited import, or a scenario saved by a build that did not set
+ * it. Before this existed each reader had its own fallback and they disagreed
+ * -- the payload example said `acme_Readings60s` where the diagram said
+ * `acme_RooftopHvacUnit60s`, for the same measurement type.
+ *
+ * Every reader goes through here, so the diagram, the payload examples, the
+ * workbook and the findings cannot disagree about what a type is called.
+ */
+export function bundleFragmentName(
+  prefix: string,
+  machineTypeName: string,
+  bundle: Pick<Bundle, 'fragmentName' | 'intervalSeconds'>,
+): string {
+  return bundle.fragmentName.trim() || fragmentNameFor(prefix, machineTypeName, bundle.intervalSeconds);
 }
 
 export interface BundleProposal {
@@ -91,12 +112,25 @@ export function proposeBundles(machineType: MachineType, prefix: string): Bundle
     .filter(([, metrics]) => metrics.length > 1)
     .map(([intervalSeconds, metrics]) => {
       const sends = monthSeconds / intervalSeconds;
+      // The name of the measurement type these series would end up in -- which
+      // is the one that already exists at this interval, if there is one.
+      // applyProposal reuses that bundle rather than minting a second, so
+      // promising a derived name here made the panel describe a type nobody
+      // was going to create: it kept saying acme_RooftopHvacUnit60s after the
+      // series had been put in acme_Climate, and went on saying it in the
+      // "already bundled" state, where it is the only name on screen.
+      const existing = machineType.bundles.find((b) => b.intervalSeconds === intervalSeconds);
       return {
         intervalSeconds,
-        fragmentName: fragmentNameFor(prefix, machineType.name, intervalSeconds),
+        fragmentName:
+          existing?.fragmentName.trim() || fragmentNameFor(prefix, machineType.name, intervalSeconds),
         metrics,
-        messagesApart: sends * metrics.length,
-        messagesTogether: sends,
+        // Rows, not series: a row standing for 450 tags is 5 measurement types
+        // on its own and would still be 5 if it were the only row here, so
+        // counting its series as separate messages would credit the proposal
+        // with a saving it does not make.
+        messagesApart: sends * metrics.reduce((sum, m) => sum + typesIn([m]), 0),
+        messagesTogether: sends * typesIn(metrics),
       };
     });
 }

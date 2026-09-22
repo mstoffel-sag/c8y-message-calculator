@@ -85,7 +85,10 @@ const NS_KEY: Record<PayloadNamespace, { one: Key; many: Key; blurb: Key }> = {
                       <code class="mc-path">{{ example.restPath }}</code>
                       <pre>{{ example.restBody }}</pre>
                       <p class="mc-payload-note">
-                        <b>{{ 'payload.oneMessage' | t }}</b>
+                        <!-- The bold opener is the point of the panel, so it
+                             has to hold when a measurement type is sent more
+                             than once a tick. -->
+                        <b>{{ example.cost }}</b>
                         {{ example.notes }}
                         <span class="mc-mono">{{ example.topic }}</span>
                       </p>
@@ -135,10 +138,14 @@ export class PayloadsComponent {
               key: `${machineType.id}-${group.ns}-${i}`,
               name: example.name,
               title: example.titleKey ? t(example.titleKey, example.titleParams) : example.title,
+              cost:
+                example.types > 1
+                  ? t('payload.messages', { count: example.types })
+                  : t('payload.oneMessage'),
               restPath: example.restPath,
               restBody: example.restBody,
               body: () => example.restBody,
-              notes: example.noteKeys.map(key => t(key)).join(' '),
+              notes: example.noteKeys.map(key => t(key, example.noteParams)).join(' '),
               topic: t('payload.mqttTopic', { topic: example.mqttTopic }),
             })),
           })),

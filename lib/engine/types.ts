@@ -88,6 +88,45 @@ export interface Metric {
    */
   fragmentName?: string;
   /**
+   * How many series this row stands for.
+   *
+   * Absent or 1 is the ordinary case: one row, one named series. A larger
+   * number is the row a customer reaches for when they know their machine has
+   * 450 PLC tags on a 60 s scan and have no intention of naming them -- a
+   * count they can answer in seconds, where the alternative is 450 rows they
+   * will never fill in.
+   *
+   * It changes no formula, only a multiplier: the messages come from how many
+   * measurement types the tags travel in (`typesFor`), and the tag count is
+   * what decides that, what is stored, and what the naive baseline would have
+   * cost. So a counted row bundles, splits, is named and is given a retention
+   * rule exactly like a row standing for one series, and the two sit in the
+   * same table.
+   */
+  seriesCount?: number;
+  /**
+   * Each of this row's series travels in a measurement type of its own.
+   *
+   * A count says how many series there are; it does not say they share a
+   * message. Plenty of agents post one datapoint per request -- a SmartREST
+   * static template carries one series per row, and a tag-per-request gateway
+   * is the commonest thing there is -- so a customer who says "ten tags" and
+   * means "ten messages" has to be able to say so, or the tool quotes them a
+   * design they have not built.
+   *
+   * Set, the row costs `seriesCount` measurements a tick instead of one. That
+   * is its own naive baseline, so the row shows no saving against it -- which
+   * is the honest answer, and the number the *Results* step then argues with.
+   *
+   * Mutually exclusive with sharing a measurement type, which is why the
+   * wizard asks for it in the measurement-type dropdown rather than beside it:
+   * a row cannot both ride in `acme_Climate` and send each series separately.
+   * The engine copes with an imported scenario that claims both -- this row's
+   * series each get a type and the rest of the bundle pools as usual -- rather
+   * than silently picking one.
+   */
+  typePerSeries?: boolean;
+  /**
    * Days the tenant's retention rule keeps this measurement type, when the
    * series travels alone -- an on-change flag, or a continuous series in no
    * bundle. Ignored while `bundleId` is set, for the same reason
@@ -278,6 +317,64 @@ const FLAG_NAME = /\bon\s*\/\s*off\b|\bopen\s*\/\s*closed\b|status|\bstate\b|\bm
 
 export function looksLikeFlag(metric: Metric): boolean {
   return metric.unit.trim() === '' && FLAG_NAME.test(metric.name);
+}
+
+/**
+ * The platform's recommended ceiling on series in one measurement type.
+ * CONCEPT.md section 11.
+ *
+ * It lives here rather than in lint.ts because it stopped being only a lint
+ * threshold: the engine models the split it implies, so compute, the diagram
+ * and the guidance report all have to agree on the same number.
+ */
+export const MAX_SERIES_PER_BUNDLE = 100;
+
+/** How many series one row stands for. Absent, 0 and rubbish all mean one. */
+export function seriesCountOf(metric: Metric): number {
+  const raw = metric.seriesCount;
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 1) return 1;
+  return Math.floor(raw);
+}
+
+/** The series a set of rows stands for -- what a measurement type carries. */
+export function seriesIn(metrics: Metric[]): number {
+  let total = 0;
+  for (const metric of metrics) total += seriesCountOf(metric);
+  return total;
+}
+
+/**
+ * How many measurement types a given number of series actually travels in.
+ *
+ * A measurement type carrying more than the platform recommends is not a
+ * design the tool is willing to quote: 450 tags in one measurement would be
+ * the cheapest possible answer and the one nobody should build. So the series
+ * are spread over as few types as the recommendation allows, and the extra
+ * sends are counted. This is the floor a real fleet can hit, not the floor
+ * arithmetic allows -- and it is why L6 now reports a split rather than asking
+ * for one.
+ */
+export function typesFor(series: number): number {
+  return Math.max(1, Math.ceil(series / MAX_SERIES_PER_BUNDLE));
+}
+
+/**
+ * Measurement types a set of rows really travels in.
+ *
+ * Two kinds of row, added up rather than chosen between: one that sends each
+ * of its series separately contributes one type per series, and everything
+ * else pools into as few types as the platform recommendation allows. A
+ * measurement type with nothing in it is no types at all, which is what makes
+ * this safe to call on an empty list.
+ */
+export function typesIn(metrics: Metric[]): number {
+  let pooled = 0;
+  let own = 0;
+  for (const metric of metrics) {
+    if (metric.typePerSeries) own += seriesCountOf(metric);
+    else pooled += seriesCountOf(metric);
+  }
+  return own + (pooled > 0 ? typesFor(pooled) : 0);
 }
 
 export function addCounters(into: Counters, from: Counters): Counters {
