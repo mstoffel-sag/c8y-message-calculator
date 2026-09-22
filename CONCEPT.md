@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 30 — the commitment sits under the hand-off table, three figures and no captions · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-22
+**Status:** draft for review, rev 31 — the measurement-type selector says what a choice costs, and the prose around it is a third shorter · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-22
 
 ---
 
@@ -294,13 +294,20 @@ So a row says where it sends, and there are three answers, not two:
 | The row says | Measurement types | Messages a tick |
 |---|---|---|
 | it shares `acme_Climate` with whatever else is on this tick | the type it joined | it rides along free |
-| a measurement type of its own | `ceil(series / 100)` | the same |
-| **one measurement type per series** | `series` | **one each** |
+| *One measurement for all series* | `ceil(series / 100)` | the same |
+| ***One measurement per series*** | `series` | **one each** |
 
 They are mutually exclusive — a row cannot both ride in `acme_Climate` and send each series
 separately — so the wizard asks in the **measurement type dropdown** rather than in a switch beside
 it, and the contradiction is unrepresentable rather than merely wrong. The third answer is offered
 only where it differs from the second, which is when the count is above one.
+
+The options are named for what they cost, not for what they are: *One measurement for all series*
+and *One measurement per series*, under the headings *Shares a message* and *On its own*. They used
+to be named after the model — "a measurement type of its own" — which stated the mechanism and left
+the consequence to be worked out. One caveat the label cannot carry: above the 100-series
+recommendation "all series" is the intent rather than the count, and the line under the field says
+what it really costs.
 
 The third answer makes the row its own naive baseline: it shows no bundling saving, because there
 is none to show. That is the honest reading of a fleet that posts one tag per request, and it is
@@ -551,7 +558,7 @@ MachineType
 Metric
   name, unit
   seriesCount?                           // how many series this row stands for; absent = 1 (4.2)
-  typePerSeries?                         // each of them in a measurement type of its own (4.2)
+  typePerSeries?                         // one measurement per series rather than one for all (4.2)
                                          // mutually exclusive with sharing a type, so it is asked
                                          // in the measurement-type dropdown, not beside it
   kind:    'continuous' | 'occurrence' | 'condition' | 'inventory' | 'command'
@@ -684,7 +691,7 @@ the payload examples and the workbook cannot disagree about what a device sends.
 the suggested name, which is what the placeholder in it shows. The measurement type's name is
 editable in the row that first uses it, once per type rather than once per series: the name belongs
 to the group, and four identical boxes for one value would invite an edit in row three that silently
-rewrites row one. Choosing *a measurement type of its own* creates that type on the spot, named after
+rewrites row one. Choosing *One measurement for all series* creates that type on the spot, named after
 the series and editable immediately — a series never travels in a measurement type that does not
 exist, and a type left with no series in it is dropped, because a measurement type is its members.
 

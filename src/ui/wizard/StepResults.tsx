@@ -31,12 +31,12 @@ export function StepResults({
   }
   return (
     <>
-      <DownloadWorkbook scenario={scenario} result={result} />
+      {/* The table first, then the term it is quoted over, then the file that
+          carries both away. The download led the page and was the one thing on
+          it nobody could act on until they had read the rest. */}
       <Handoff scenario={scenario} result={result} />
-      {/* Directly under the table: the table is one month per period, and this
-          is the same quantities over the term the table's D21 gives the length
-          of. Anywhere further down and the two were read as unrelated. */}
       <Commitment scenario={scenario} result={result} />
+      <DownloadWorkbook scenario={scenario} result={result} />
       <Design scenario={scenario} />
       <Results scenario={scenario} result={result} />
       {/* The payloads are for whoever writes the device code, not for the

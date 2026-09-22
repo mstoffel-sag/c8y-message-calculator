@@ -326,7 +326,7 @@ function MachineBlock({
                                         types: n(types),
                                         max: n(MAX_SERIES_PER_BUNDLE),
                                       })
-                                    : t('series.solo.timed')
+                                    : t('series.oneMessagePerSample')
                               }
                               onChange={(name) => onChange(setSeriesFragmentName(scenario, mt.id, metric.id, name))}
                             />
