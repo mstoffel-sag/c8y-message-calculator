@@ -40,6 +40,17 @@ import { ScenarioStore } from '../scenario.store.js';
     @if (machineTypes().length === 0) {
       <c8y-mc-empty>{{ 'results.empty' | t }}</c8y-mc-empty>
     } @else {
+      <!-- The table first, then the term it is quoted over, then the file that
+           carries both away. The download led the page and was the one thing on
+           it nobody could act on until they had read the rest. -->
+      <c8y-mc-handoff />
+
+      <!-- Directly under the table: the table is one month per period and its
+           D21 is the period's length; this is the same quantities across the
+           term those two imply. Further down the page the two read as
+           unrelated. -->
+      <c8y-mc-commitment />
+
       <!-- The workbook download. Built in the browser: no upload, no service,
            nothing leaves the tenant. It mirrors the Configurator's own rows so
            the transfer is a column copy, and it carries quantities only --
@@ -73,14 +84,6 @@ import { ScenarioStore } from '../scenario.store.js';
           <p class="mc-hint m-t-16">{{ 'workbook.builtHere' | t }}</p>
         </div>
       </div>
-
-      <c8y-mc-handoff />
-
-      <!-- Directly under the table: the table is one month per period and its
-           D21 is the period's length; this is the same quantities across the
-           term those two imply. Further down the page the two read as
-           unrelated. -->
-      <c8y-mc-commitment />
 
       <!-- The design the numbers came from, machine type by machine type.
            Somebody checking the estimate needs to see the shape that produced

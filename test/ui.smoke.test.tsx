@@ -95,7 +95,7 @@ describe('the wizard renders', () => {
     // Options come from the catalogue, and every list stays escapable.
     assert.match(html, /<optgroup label="Climate"/);
     assert.match(html, /Other/, 'every catalogue can be escaped');
-    assert.match(html, /A measurement type of its own/);
+    assert.match(html, /One measurement for all series/);
   });
 
   test('series: asks retention once per measurement type, not once per row', () => {
@@ -158,11 +158,11 @@ describe('the wizard renders', () => {
     assert.equal((html.match(/acme_Pressure · 1 series/g) ?? []).length, 3);
     // And the heading only appears where there is something to be bundled
     // with, which is those four rows on the 60 s tick.
-    assert.equal((html.match(/Bundled — shares a message/g) ?? []).length, 4);
+    assert.equal((html.match(/Shares a message/g) ?? []).length, 4);
     // So every continuous row carries the offer, including the one that took
     // it -- there it is the answer the dropdown is showing, which is how a
     // reader sees at a glance which rows are bundled and which are not.
-    assert.equal((html.match(/A measurement type of its own/g) ?? []).length, 6);
+    assert.equal((html.match(/One measurement for all series/g) ?? []).length, 6);
   });
 
   test('series: lets the measurement type be renamed in the table', () => {

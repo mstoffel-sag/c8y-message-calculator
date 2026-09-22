@@ -377,7 +377,7 @@ export class SeriesMachineComponent {
               })
             : types > 1
               ? t('series.solo.split', { types: n(types), max: n(MAX_SERIES_PER_BUNDLE) })
-              : t('series.solo.timed')
+              : t('series.oneMessagePerSample')
           : names
             ? bundleTypes(bundle.id) > 1
               ? t('series.messagesForAll', {
