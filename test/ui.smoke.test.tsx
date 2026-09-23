@@ -499,7 +499,10 @@ describe('the storage estimate shows its working', () => {
     // 400, plus 47.5 k documents a month and 1,000 managed objects. Twelve
     // month-ends make the period's quantity: 195 to 778 GiB-months.
     assert.match(html, /195 – 778 GiB/);
-    assert.match(html, /to be verified/, 'the provenance travels with the number');
+    // Shorter words, same duty: a reader must not be able to take the figure
+    // without also learning that the bytes behind it are unconfirmed.
+    assert.match(html, /unverified at source/, 'the provenance travels with the number');
+    assert.match(html, /100–400 bytes/, 'and the range it came from');
     assert.match(html, /kept for 30 days/);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
   });
@@ -532,7 +535,7 @@ describe('the storage estimate shows its working', () => {
     // Documents are counted in -- omitting them understates a commit-to-consume
     // bill -- so what the panel owes the reader is the share they make up, and
     // the fact that the byte figure was measured on datapoints.
-    assert.match(html, /Events, alarms, operations and every registered device are counted in/);
+    assert.match(html, /Events, alarms, operations and every registered device count too/);
     assert.match(html, /measured on datapoints/);
     assert.match(html, /under 1 %/, 'and how far off that can be for this fleet');
   });

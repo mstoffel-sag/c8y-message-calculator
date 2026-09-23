@@ -63,7 +63,10 @@ import { StepSeriesComponent } from './series.component.js';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <c8y-title>{{ 'app.title' | t }}</c8y-title>
+    <!-- The scenario, not the application. The navigator already says which
+         app you are in, and it says it once; the page header is the only place
+         that can say which of your estimates is open. -->
+    <c8y-title>{{ title() }}</c8y-title>
 
     <!-- Creating a scenario is a header action, not a row inside the picker.
          The picker is for choosing among what exists; making another is a
@@ -192,6 +195,11 @@ export class WizardComponent {
 
   readonly entries = this.store.entries;
   readonly currentId = this.store.currentId;
+
+  /** Falls back to the same words the navigator uses for a nameless one. */
+  readonly title = computed(
+    () => this.scenario().name.trim() || this.locales.t()('library.untitled'),
+  );
 
   /**
    * The route is what decides which scenario is open, so the navigator can link
