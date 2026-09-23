@@ -1086,33 +1086,38 @@ describe('what the left navigator shows', () => {
    * whole left menu with it, this app's entry and every other app's. Whatever
    * can be decided without the SDK is decided here, where a test can reach it.
    */
-  async function tree(entries: Array<{ id: string; name: string; savedAt: number }>, max?: number) {
-    const { scenarioNavTree } = await import('../lib/wizard/navigator.js');
-    return scenarioNavTree(entries, 'Untitled scenario', max);
+  async function nodes(entries: Array<{ id: string; name: string; savedAt: number }>, max?: number) {
+    const { scenarioNavNodes } = await import('../lib/wizard/navigator.js');
+    return scenarioNavNodes(entries, 'Untitled scenario', max);
   }
 
-  test('the app keeps its entry, and every scenario is a child of it', async () => {
-    const { root, children } = await tree([
+  test('every scenario is a top-level entry, in the library\'s own order', async () => {
+    const list = await nodes([
       { id: 's1', name: 'Acme rooftop HVAC', savedAt: 2 },
       { id: 's2', name: '   ', savedAt: 1 },
     ]);
-    assert.equal(root.label, 'Message calculator');
-    assert.equal(root.path, '/');
-    assert.equal(children.length, 2);
-    assert.equal(children[0]?.label, 'Acme rooftop HVAC');
-    assert.equal(children[0]?.path, '/scenario/s1');
+    assert.equal(list.length, 2, 'no parent node to fold them into');
+    assert.equal(list[0]?.label, 'Acme rooftop HVAC');
+    assert.equal(list[0]?.path, '/scenario/s1');
     // A customer's own name is data, so the shell must not translate it.
-    assert.equal(children[0]?.translateLabel, false);
+    assert.equal(list[0]?.translateLabel, false);
     // A nameless scenario still gets a row somebody can click, and that label
     // is the tool's own word, so it is translated.
-    assert.equal(children[1]?.label, 'Untitled scenario');
-    assert.equal(children[1]?.translateLabel, true);
+    assert.equal(list[1]?.label, 'Untitled scenario');
+    assert.equal(list[1]?.translateLabel, true);
+    // Descending priority, so the shell keeps newest-first rather than sorting
+    // equal priorities however it likes.
+    assert.ok(list[0]!.priority > list[1]!.priority, 'order is stated, not hoped for');
   });
 
   test('an empty library still leaves the application reachable', async () => {
-    const { root, children } = await tree([]);
-    assert.equal(root.label, 'Message calculator');
-    assert.equal(children.length, 0);
+    // Cannot happen -- both stores open one on first load -- but a menu is the
+    // way in, so it does not get to be empty on a technicality.
+    const list = await nodes([]);
+    assert.equal(list.length, 1);
+    assert.equal(list[0]?.label, 'Message calculator');
+    assert.equal(list[0]?.path, '/');
+    assert.equal(list[0]?.translateLabel, true);
   });
 
   test('the menu is capped, so it stays navigation rather than a filing cabinet', async () => {
@@ -1121,7 +1126,10 @@ describe('what the left navigator shows', () => {
       name: `Scenario ${i}`,
       savedAt: 100 - i,
     }));
-    assert.equal((await tree(many)).children.length, 8, 'the rest are on the page');
-    assert.equal((await tree(many, 0)).children.length, 0, 'a cap of none is not a crash');
+    assert.equal((await nodes(many)).length, 8, 'the rest are on the page');
+    // A cap of none is not a crash, and not an empty menu either.
+    const none = await nodes(many, 0);
+    assert.equal(none.length, 1);
+    assert.equal(none[0]?.path, '/');
   });
 });

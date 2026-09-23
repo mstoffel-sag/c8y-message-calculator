@@ -969,14 +969,29 @@ scenario leaves the tenant.
 ### 8.2 A library of scenarios, and where it is not yet
 
 One estimate per customer, kept side by side rather than overwritten. The Web SDK build lists them
-in the shell's **left navigator** — `hookNavigator` takes a factory whose `get()` may return an
-Observable, so the menu is derived from the store's index signal and redraws when one is added. Each
-is a route, `scenario/:id`, which is what makes a navigator entry a link and the browser's back
-button work between them. A scenario id is not a step ordinal, so §6's rule is untouched.
+in the shell's **left navigator, one top-level entry each** — not folded under the application's own
+node, because a nested menu puts them two clicks away and hides which one is open behind a collapsed
+parent. At the top level each reads as a tab, which is how a library of estimates is actually used.
+`hookNavigator` takes a factory whose `get()` may return an Observable, so the menu is derived from
+the store and redraws when one is added. Each is a route, `scenario/:id`, which is what makes an
+entry a link and the browser's back button work between them. A scenario id is not a step ordinal,
+so §6's rule is untouched.
 
-The navigator shows the **first eight**. Past that a menu shared with every other application in the
-tenant stops being navigation and becomes a filing cabinet, so the whole library is a picker on the
-page, in both builds — the standalone one has no navigator and puts it under the scenario name.
+**A factory's failure mode is the whole menu.** The first cut built that Observable with
+`toObservable(signal)` inside `get()`, which the shell calls outside any injection context: it threw
+there, the factory returned nothing, and the left navigator disappeared — this application's entry
+and every other application's with it. Nothing could have caught it. `c8y:typecheck` sees a runtime
+contract as well-typed, and `@c8y/ngx-components` cannot be imported outside a bundler, so that file
+was verified by a deploy and nothing else. What the menu should *contain* now lives in
+`lib/wizard/navigator.ts` as a pure function over the index, where a test reaches it; the factory is
+the few lines that build SDK objects from it, wrapped so a bad entry costs its own row and never the
+menu.
+
+The navigator shows the **first eight**, newest first, on stated descending priorities so the shell
+keeps that order rather than sorting equal ones however it likes. Past eight, a menu shared with
+every other application in the tenant stops being navigation and becomes a filing cabinet, so the
+whole library is a picker on the page, in both builds — the standalone one has no navigator and puts
+it under the scenario name.
 
 **The index is separate from the scenarios.** `lib/scenario/library.ts` holds the shape — an entry
 is `{ id, name, savedAt }` and nothing else — because a menu drawn on every page load must not parse

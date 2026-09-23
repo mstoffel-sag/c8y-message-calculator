@@ -1,5 +1,6 @@
 /**
- * What the shell's left navigator should show for the scenario library.
+ * What the shell's left navigator should show for the scenario library: one
+ * top-level entry per saved scenario.
  *
  * The shape only. Building the SDK's `NavigatorNode` objects is four lines in
  * the Angular factory; deciding what goes in them is this, where it can be
@@ -32,29 +33,52 @@ export interface NavEntry {
    */
   translateLabel: boolean;
   path: string;
+  /**
+   * The shell orders the menu by this, highest first. Handing out descending
+   * numbers is what keeps the library in its own order -- most recently saved
+   * at the top -- rather than in whatever order the shell happens to sort
+   * equal priorities in.
+   */
+  priority: number;
 }
 
-export interface NavTree {
-  root: NavEntry;
-  children: NavEntry[];
-}
+/** Where the app sits among every other application's entries. */
+const TOP_PRIORITY = 100;
 
 /**
+ * One top-level entry per scenario.
+ *
+ * Not a parent node with the library nested under it. A nested menu makes the
+ * scenarios two clicks away and hides which one is open behind a collapsed
+ * parent; at the top level each is a tab, which is what a library of estimates
+ * behaves like -- you switch between them constantly and want to see at a
+ * glance which you are in.
+ *
  * @param untitled what a scenario nobody has named is called. English, because
  *   the navigator is the shell's furniture and takes the shell's own
  *   translation route rather than `lib/i18n`.
  */
-export function scenarioNavTree(
+export function scenarioNavNodes(
   entries: ScenarioEntry[],
   untitled = 'Untitled scenario',
   max = MAX_NAV_SCENARIOS,
-): NavTree {
-  const children = entries.slice(0, Math.max(0, max)).map((entry) => {
+): NavEntry[] {
+  const shown = entries.slice(0, Math.max(0, max));
+  // An empty library cannot happen -- both stores open one on first load -- but
+  // a menu is the way into the application, so it does not get to be empty on
+  // a technicality.
+  if (shown.length === 0) {
+    return [
+      { label: 'Message calculator', translateLabel: true, path: '/', priority: TOP_PRIORITY },
+    ];
+  }
+  return shown.map((entry, i) => {
     const named = entry.name.trim();
-    return { label: named || untitled, translateLabel: named === '', path: `/scenario/${entry.id}` };
+    return {
+      label: named || untitled,
+      translateLabel: named === '',
+      path: `/scenario/${entry.id}`,
+      priority: TOP_PRIORITY - i,
+    };
   });
-  return {
-    root: { label: 'Message calculator', translateLabel: true, path: '/' },
-    children,
-  };
 }
