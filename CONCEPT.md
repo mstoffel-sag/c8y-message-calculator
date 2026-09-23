@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 35 — a library of scenarios, one per customer, in the browser · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
+**Status:** draft for review, rev 36 — the navigator is the library: every scenario, no on-page picker · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
 
 ---
 
@@ -987,11 +987,16 @@ was verified by a deploy and nothing else. What the menu should *contain* now li
 the few lines that build SDK objects from it, wrapped so a bad entry costs its own row and never the
 menu.
 
-The navigator shows the **first eight**, newest first, on stated descending priorities so the shell
-keeps that order rather than sorting equal ones however it likes. Past eight, a menu shared with
-every other application in the tenant stops being navigation and becomes a filing cabinet, so the
-whole library is a picker on the page, in both builds — the standalone one has no navigator and puts
-it under the scenario name.
+The navigator shows **every** scenario, newest first, on stated descending priorities so the shell
+keeps that order rather than sorting equal ones however it likes. It was capped at eight while the
+page also carried a picker; the picker is gone, because a second list of the same scenarios inside
+one of them only raised the question of which was authoritative — and with it the cap had to go too,
+or the ninth scenario would be reachable only from a saved URL. Both library verbs, **New** and
+**Delete**, are header actions beside Load example and Reset.
+
+**The standalone build keeps its picker**, under the scenario name, because it has no navigator to
+be redundant with. That is the same divergence as persistence: the two builds agree on what a
+library is and disagree about the furniture they hang it on.
 
 **The index is separate from the scenarios.** `lib/scenario/library.ts` holds the shape — an entry
 is `{ id, name, savedAt }` and nothing else — because a menu drawn on every page load must not parse

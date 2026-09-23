@@ -1120,13 +1120,16 @@ describe('what the left navigator shows', () => {
     assert.equal(list[0]?.translateLabel, true);
   });
 
-  test('the menu is capped, so it stays navigation rather than a filing cabinet', async () => {
+  test('every scenario reaches the menu, because nothing else lists them', async () => {
     const many = Array.from({ length: 30 }, (_, i) => ({
       id: `s${i}`,
       name: `Scenario ${i}`,
       savedAt: 100 - i,
     }));
-    assert.equal((await nodes(many)).length, 8, 'the rest are on the page');
+    // The page had a picker and the menu was capped at eight. The picker is
+    // gone -- the navigator is the library -- so a cap would not tidy the menu,
+    // it would strand the ninth scenario where only a saved URL could reach it.
+    assert.equal((await nodes(many)).length, 30);
     // A cap of none is not a crash, and not an empty menu either.
     const none = await nodes(many, 0);
     assert.equal(none.length, 1);

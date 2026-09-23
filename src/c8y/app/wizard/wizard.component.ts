@@ -74,6 +74,17 @@ import { StepSeriesComponent } from './series.component.js';
       </button>
     </c8y-action-bar-item>
 
+    <!-- Both library verbs in the header. The page has no picker: the navigator
+         is the library, so a second list of the same scenarios inside one of
+         them was asking which of the two was authoritative. -->
+    @if (entries().length > 1) {
+      <c8y-action-bar-item placement="right">
+        <button type="button" class="btn btn-link" (click)="drop()">
+          <i c8yIcon="minus-circle"></i> {{ 'library.delete' | t }}
+        </button>
+      </c8y-action-bar-item>
+    }
+
     <c8y-action-bar-item placement="right">
       <label class="c8y-checkbox m-r-8" [title]="'app.expert.title' | t">
         <input type="checkbox" [checked]="expert()" (change)="expert.set($any($event.target).checked)" />
@@ -117,31 +128,6 @@ import { StepSeriesComponent } from './series.component.js';
             [value]="scenario().name"
             (input)="rename($any($event.target).value)"
           />
-          <!-- The whole library, where the navigator shows only the first few:
-               past a handful the menu stops being navigation and starts being
-               a filing cabinet, and a filing cabinet belongs on the page. -->
-          <div class="mc-library">
-            <select
-              class="form-control"
-              [attr.aria-label]="'library.label' | t"
-              [value]="currentId()"
-              (change)="pick($any($event.target).value)"
-            >
-              @for (entry of entries(); track entry.id) {
-                <option [value]="entry.id" [selected]="entry.id === currentId()">
-                  {{ entry.name.trim() || ('library.untitled' | t) }}
-                </option>
-              }
-            </select>
-            @if (entries().length > 1) {
-              <button
-                type="button"
-                class="btn btn-link btn-sm"
-                [title]="'library.delete' | t"
-                (click)="drop()"
-              >&times;</button>
-            }
-          </div>
           <p class="mc-hint">{{ 'app.tagline' | t }}</p>
         </div>
 
@@ -224,10 +210,6 @@ export class WizardComponent {
     // on the same scenario. An id the library does not know mints that id
     // rather than redirecting, so a shared link keeps working.
     effect(() => this.store.openById(this.routed()));
-  }
-
-  pick(id: string): void {
-    void this.router.navigate(['/scenario', id]);
   }
 
   create(): void {

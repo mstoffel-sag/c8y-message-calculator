@@ -18,11 +18,15 @@
 import type { ScenarioEntry } from '../scenario/library.js';
 
 /**
- * How many scenarios reach the menu. Past this, a list shared with every other
- * application in the tenant stops being navigation and becomes a filing
- * cabinet, which belongs on the page instead.
+ * How many scenarios reach the menu.
+ *
+ * All of them. There was a cap of eight while the page also carried a picker,
+ * on the grounds that a menu shared with every other application should not
+ * become a filing cabinet. The picker is gone -- the navigator is the library
+ * now -- so a cap would not tidy the menu, it would strand the ninth scenario
+ * somewhere only a saved URL could reach. The parameter survives for tests.
  */
-export const MAX_NAV_SCENARIOS = 8;
+export const MAX_NAV_SCENARIOS = Number.POSITIVE_INFINITY;
 
 export interface NavEntry {
   label: string;
