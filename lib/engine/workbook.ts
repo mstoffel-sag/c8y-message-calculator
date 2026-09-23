@@ -67,198 +67,6 @@ function num(col: number, value: number, style: Cell['style'] = 'number'): Cell 
   return { col, value, style };
 }
 
-/**
- * Sheet 1: the hand-off, row-aligned with the Configurator.
- *
- * One row per line item, **one column per period**. The Configurator itself
- * stacks its periods vertically 30 rows apart, and this sheet used to mirror
- * that -- which made a five-period estimate 150 rows of near-identical blocks
- * that nobody could compare. Side by side, the ramp is the thing you see.
- *
- * The rows still sit at the Configurator's own period-1 addresses, so column D
- * pastes into period 1 cell for cell. Later periods are the same column of
- * values 30 rows further down: copy the period's column, paste at its D cell.
- * The note on the sheet says which.
- *
- * Only the peak month of each period appears. A period is quoted at one number
- * per counter and the peak is the honest one to quote -- the full month-by-month
- * spread is on its own sheet so the range stays visible.
- */
-function configuratorSheet(scenario: Scenario, result: ScenarioResult): Sheet {
-  const periods = result.periods;
-  /** Period p occupies this column: D for period 1, E for 2, and so on. */
-  const periodCol = (index: number) => COL.value + index - 1;
-  const unitCol = COL.value + periods.length;
-  const noteCol = unitCol + 1;
-
-  const rows: Row[] = [
-    row(1, [text(COL.category, 'Cumulocity message estimate', 'title')]),
-    row(2, [text(COL.category, scenario.name || 'Untitled scenario', 'label')]),
-    row(3, [
-      text(
-        COL.category,
-        'Quantities only. This is a volume estimate, not a quote -- no prices, no billable units, no commitment sizing.',
-        'note',
-      ),
-    ]),
-    row(4, [
-      text(
-        COL.category,
-        `Periods run left to right. Column D is period 1 at the Configurator's own rows, so it pastes ` +
-          `cell for cell; each later column pastes at its own period's D cell, ${PERIOD_ROW_STRIDE} rows further down per period. ` +
-          'Prices, discounts and currency stay in the Configurator -- this file has none.',
-        'note',
-      ),
-    ]),
-  ];
-
-  rows.push(
-    row(6, [
-      text(
-        COL.category,
-        'Rows 6 to 20 are deliberately empty. The Configurator keeps its own period summary and ' +
-          'commitment formulas there, so nothing is written into them -- paste from row 21 down.',
-        'note',
-      ),
-    ]),
-  );
-
-  // Row 21 is where the Configurator keeps period 1's length in months.
-  rows.push(
-    row(21, [
-      text(COL.label, 'Period length', 'label'),
-      ...periods.map((period) =>
-        num(
-          periodCol(period.index),
-          scenario.periods.find((p) => p.index === period.index)?.months ?? 0,
-          'numberBold',
-        ),
-      ),
-      text(unitCol, 'months', 'note'),
-      text(noteCol, 'paste each column at the cell named in its heading', 'note'),
-    ]),
-  );
-
-  rows.push(
-    row(22, [
-      text(COL.category, 'Category', 'heading'),
-      text(COL.label, 'Product Name', 'heading'),
-      ...periods.map((period) =>
-        text(
-          periodCol(period.index),
-          `Period ${period.index} -> ${periodMonthsCell(period.index)}`,
-          'heading',
-        ),
-      ),
-      text(unitCol, 'Unit', 'heading'),
-      text(noteCol, 'Where this came from', 'heading'),
-    ]),
-  );
-
-  let lastCategory = '';
-  for (const item of LINE_ITEMS) {
-    const cells: Cell[] = [];
-    if (item.group !== lastCategory) {
-      cells.push(text(COL.category, item.group, 'label'));
-      lastCategory = item.group;
-    }
-    cells.push(text(COL.label, item.label, item.key === 'messages' ? 'label' : 'default'));
-    cells.push(text(unitCol, item.unit, 'note'));
-
-    if (item.key === 'messages') {
-      // Left blank on purpose, in every period column. In the Configurator this
-      // cell holds =SUM(D28:D36) -- the only formula in the quantity column --
-      // so writing a value here would mean pasting a column that silently
-      // replaced a formula with a constant. The totals go in the notes column as
-      // a cross-check.
-      for (const period of periods) cells.push(text(periodCol(period.index), ''));
-      cells.push(
-        text(
-          noteCol,
-          'leave these cells alone: the Configurator sums the nine counters. Should come to ' +
-            periods
-              .map((p) => `${Math.round(p.peak.total).toLocaleString('en-GB')} (P${p.index})`)
-              .join(', '),
-          'note',
-        ),
-      );
-    } else {
-      let anyEstimated = false;
-      let anyStated = false;
-      for (const period of periods) {
-        const scenarioPeriod = scenario.periods.find((p) => p.index === period.index);
-        const value = scenarioPeriod?.commercial[item.key];
-        const stated = typeof value === 'number' && value > 0;
-        const storage =
-          item.key === 'ods' ? storageForPeriod(result.storage, period.index) : undefined;
-
-        if (stated) {
-          anyStated = true;
-          cells.push(num(periodCol(period.index), value as number));
-        } else if (value === true) {
-          anyStated = true;
-          cells.push(text(periodCol(period.index), 'Yes'));
-        } else if (storage !== undefined) {
-          anyEstimated = true;
-          cells.push(num(periodCol(period.index), Number(storage.giBMonths.toFixed(2))));
-        }
-      }
-
-      const storage = item.key === 'ods' ? storageForPeriod(result.storage, 1) : undefined;
-      cells.push(
-        text(
-          noteCol,
-          storage === undefined
-            ? 'stated in the wizard'
-            : anyEstimated
-              ? `estimated: what the database held at the end of each month, added up over the ` +
-                `period, at ${storage.peak?.bytesPerValue ?? BYTES_PER_VALUE_HIGH} B per value. ` +
-                `Retention comes from the measurement types (${retentionSpan(storage)}). ` +
-                'Unverified assumption -- the evidence spans ' +
-                `${storage.lowGiBMonths.toFixed(1)} to ${storage.highGiBMonths.toFixed(1)} ` +
-                'GiB-months in period 1. See the Storage sheet.'
-              : anyStated
-                ? 'stated in the wizard, overriding the storage estimate'
-                : 'stated in the wizard',
-          'note',
-        ),
-      );
-    }
-
-    rows.push(row(item.baseRow, cells));
-  }
-
-  // The nine counters, at the rows the Configurator keeps for them.
-  COUNTER_KEYS.forEach((key, i) => {
-    const r = COUNTER_BASE_ROWS[i]!;
-    rows.push(
-      row(r, [
-        text(COL.label, `- ${COUNTER_LABELS[key]}`),
-        ...periods.map((period) => num(periodCol(period.index), period.peak.counters[key])),
-        text(noteCol, periods.map((p) => cellFor(r, p.index)).join(' · '), 'cellRef'),
-      ]),
-    );
-  });
-
-  rows.push(
-    row(48, [
-      text(
-        COL.label,
-        `Every cell in a period column is an input in the Configurator except the Messages row, ` +
-          `which is left blank here so its SUM survives.`,
-        'note',
-      ),
-    ]),
-  );
-
-  return {
-    name: 'Configurator',
-    columnWidths: [3, 16, 34, ...periods.map(() => 16), 9, 46],
-    freezeRows: 22,
-    rows,
-  };
-}
-
 /** Sheet 2: the design the numbers came from. */
 function designSheet(scenario: Scenario): Sheet {
   const rows: Row[] = [
@@ -361,7 +169,7 @@ function designSheet(scenario: Scenario): Sheet {
   );
 
   return {
-    name: 'Design',
+    name: 'Machine Data',
     columnWidths: [22, 10, 22, 26, 8, 8, 12, 18, 26, 9, 21],
     freezeRows: 4,
     rows,
@@ -610,6 +418,11 @@ function commercialQuantity(period: Period | undefined, key: string): number {
   return typeof value === 'number' ? value : 0;
 }
 
+/** A yes/no line item, as the sheet prints it. */
+function commercialBool(period: Period | undefined, key: string): boolean {
+  return period?.commercial[key] === true;
+}
+
 /**
  * Sheet 2: the quote, and the commit-to-consume commitment.
  *
@@ -668,6 +481,16 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
       text(
         CAT,
         `Messages are sold per ${MESSAGE_BILLING_UNIT.toLocaleString('en-GB')} per month, so the term column rounds each period's monthly count up before multiplying by its length.`,
+        'note',
+      ),
+    ]),
+    // This line used to open the Configurator sheet. That sheet is gone and the
+    // statement is not optional: a file of quantities with a price column must
+    // say, on the sheet somebody prices it, that it is not itself a quote.
+    row(5, [
+      text(
+        CAT,
+        'Quantities only. This is a volume estimate, not a quote -- no prices, no billable units, no commitment sizing.',
         'note',
       ),
     ]),
@@ -730,16 +553,15 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
     cells.push(text(UNIT, item.unit, 'note'));
 
     if (item.key === 'messages') {
-      // The nine counters live on the Configurator sheet; this reads them there
-      // rather than restating them, so one edit moves both sheets.
+      // Stated, not referenced. These used to read
+      // `SUM(Configurator!D28:D36)` off a second sheet; that sheet is gone, so
+      // the quantity lives here. Nothing is lost -- it was one sheet quoting
+      // another, and the nine counters that made it up are on Machine Data.
       for (const period of periods) {
-        const c = colName(periodCol(period.index));
         cells.push({
           col: periodCol(period.index),
-          value: null,
+          value: period.peak.total,
           style: 'numberBold',
-          formula: `SUM(Configurator!${c}${COUNTER_BASE_ROWS[0]}:${c}${COUNTER_BASE_ROWS[COUNTER_BASE_ROWS.length - 1]})`,
-          cached: period.peak.total,
         });
       }
       cells.push({
@@ -763,18 +585,23 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
     } else {
       const quantities = periods.map((period) =>
         item.key === 'ods'
-          ? storageGiBMonthsForPeriod(result, period.index)
+          // Two decimals, as the Configurator sheet wrote it before this sheet
+          // had to carry the value: a GiB-month figure resting on an unverified
+          // 100-400 B has no business showing twelve of them.
+          ? Number(storageGiBMonthsForPeriod(result, period.index).toFixed(2))
           : commercialQuantity(scenario.periods.find((p) => p.index === period.index), item.key),
       );
 
       for (const [i, period] of periods.entries()) {
-        const c = colName(periodCol(period.index));
+        // A yes/no reads as a word, the way the Configurator sheet printed it
+        // before this sheet had to carry the value itself.
+        const chosen = item.source === 'choice'
+          ? commercialBool(scenario.periods.find((p) => p.index === period.index), item.key)
+          : false;
         cells.push({
           col: periodCol(period.index),
-          value: null,
+          value: item.source === 'choice' ? (chosen ? 'Yes' : 'No') : (quantities[i] ?? 0),
           style: item.source === 'choice' ? 'default' : 'number',
-          formula: `Configurator!${c}${item.baseRow}`,
-          cached: item.source === 'choice' ? undefined : quantities[i],
         });
       }
 
@@ -856,7 +683,6 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
 
 export function workbookSheets(scenario: Scenario, result: ScenarioResult): Sheet[] {
   return [
-    configuratorSheet(scenario, result),
     quoteSheet(scenario, result),
     designSheet(scenario),
     monthsSheet(result, scenario),

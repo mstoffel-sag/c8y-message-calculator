@@ -159,33 +159,38 @@ describe('the sheet writer', () => {
 });
 
 describe('the workbook content', () => {
-  test('six sheets, named for what they hold', () => {
+  test('five sheets, named for what they hold', () => {
+    // The Configurator sheet is gone. It restated the Quote sheet's quantities
+    // at the Sales Configurator's own row numbers so a column could be pasted
+    // cell for cell; the hand-off table in the app still offers that as a copy,
+    // and one sheet quoting another was the part nobody opened.
     assert.deepEqual(
       sheetsFor().map((s) => s.name),
-      ['Configurator', 'Quote', 'Design', 'Months', 'Storage', 'Guidance'],
+      ['Quote', 'Machine Data', 'Months', 'Storage', 'Guidance'],
     );
   });
 
-  test('the nine counters sit on the rows the Configurator keeps for them', () => {
-    const configurator = sheet('Configurator');
+  test('the Quote sheet states the message quantity rather than referencing it', () => {
+    const quote = sheet('Quote');
     const result = computeScenario(conceptSection9Scenario());
     const peak = result.periods[0]!.peak;
 
-    // Period 1 is column D, at the Configurator's own rows, so it pastes cell
-    // for cell. That is the property that makes the sheet worth aligning.
-    const valueAt = (r: number) =>
-      configurator.rows.find((row) => row.row === r)?.cells.find((c) => c.col === 4)?.value;
+    // It used to read `SUM(Configurator!D28:D36)` off a sheet that no longer
+    // exists -- which would be #REF!, not a number. The nine counters that make
+    // it up are itemised on Months.
+    const row = quote.rows.find((r) => r.cells.some((c) => c.value === 'Messages'))!;
+    const cell = row.cells.find((c) => typeof c.value === 'number' && c.value === peak.total);
+    assert.ok(cell, 'the peak total is stated as a value');
+    assert.equal(cell!.formula, undefined, 'and not as a cross-sheet reference');
 
-    assert.equal(valueAt(28), peak.counters.measurementsCreated, 'D28');
-    assert.equal(valueAt(29), peak.counters.eventsCreated, 'D29');
-    assert.equal(valueAt(33), peak.counters.inventoriesCreated, 'D33');
-    assert.equal(valueAt(36), peak.counters.operationsUpdated, 'D36');
-    assert.equal(valueAt(21), 12, 'D21 is the period length in months');
-
-    // D27 holds =SUM(D28:D36) in the Configurator -- the only formula in the
-    // column. Writing a value here would mean a pasted column silently
-    // replaced it with a constant.
-    assert.equal(valueAt(27), '', 'D27 must stay empty so the formula survives');
+    // Nothing anywhere still points at the removed sheet.
+    for (const s0 of sheetsFor()) {
+      for (const r of s0.rows) {
+        for (const c of r.cells) {
+          assert.doesNotMatch(String(c.formula ?? ''), /Configurator!/, `${s0.name} r${r.row}`);
+        }
+      }
+    }
   });
 
   test('the storage line is the period sum, and the Storage sheet shows the addition', () => {
@@ -195,9 +200,9 @@ describe('the workbook content', () => {
     // D37 carries the quantity storage is billed on: the month-end snapshots
     // added up. The fullest month is a stat, not the cell -- quoting it would
     // charge twelve full months for a year spent filling up.
-    const d37 = sheet('Configurator')
-      .rows.find((row) => row.row === 37)
-      ?.cells.find((c) => c.col === 4)?.value;
+    const d37 = sheet('Quote')
+      .rows.find((row) => row.cells.some((c) => c.value === 'Operational Data Store'))
+      ?.cells.find((c) => typeof c.value === 'number')?.value;
     assert.equal(d37, Number(period.giBMonths.toFixed(2)));
     assert.notEqual(d37, Number(period.peak!.quotedGiB.toFixed(2)));
 
@@ -236,85 +241,6 @@ describe('the workbook content', () => {
     );
   });
 
-  test('periods run left to right, one column each', () => {
-    const base = conceptSection9Scenario();
-    const hvac = base.machineTypes[0]!;
-    const scenario = {
-      ...base,
-      periods: [
-        { index: 1, months: 12, machineCountOverrides: {}, commercial: {} },
-        { index: 2, months: 24, machineCountOverrides: { [hvac.id]: 4000 }, commercial: {} },
-        { index: 3, months: 12, machineCountOverrides: { [hvac.id]: 8000 }, commercial: {} },
-      ],
-    };
-    const configurator = workbookSheets(scenario, computeScenario(scenario))[0]!;
-    const at = (r: number, c: number) =>
-      configurator.rows.find((row) => row.row === r)?.cells.find((x) => x.col === c)?.value;
-
-    // Months: D, E, F -- not three blocks 30 rows apart.
-    assert.equal(at(21, 4), 12);
-    assert.equal(at(21, 5), 24);
-    assert.equal(at(21, 6), 12);
-    // And the same row of measurements grows across the columns.
-    const [p1, p2, p3] = [at(28, 4), at(28, 5), at(28, 6)];
-    assert.ok(typeof p1 === 'number' && typeof p2 === 'number' && typeof p3 === 'number');
-    assert.equal(p2 / p1, 4, 'period 2 has four times the fleet');
-    assert.equal(p3 / p1, 8);
-    // Nothing is written at the old vertical offsets any more.
-    assert.equal(configurator.rows.find((row) => row.row === 58), undefined);
-    // Each column's heading names the cell it pastes into.
-    assert.equal(at(22, 4), 'Period 1 -> D21');
-    assert.equal(at(22, 5), 'Period 2 -> D51');
-    assert.equal(at(22, 6), 'Period 3 -> D81');
-  });
-
-  test('no period column carries a value that would clobber a formula', () => {
-    const base = conceptSection9Scenario();
-    const scenario = {
-      ...base,
-      periods: [1, 2, 3, 4, 5].map((i) => ({
-        index: i,
-        months: 12,
-        machineCountOverrides: {},
-        commercial: {},
-      })),
-    };
-    const configurator = workbookSheets(scenario, computeScenario(scenario))[0]!;
-    const messages = configurator.rows.find((row) => row.row === 27)!;
-    // Row 27 is the Messages row: five period columns, every one blank.
-    for (const col of [4, 5, 6, 7, 8]) {
-      const cell = messages.cells.find((c) => c.col === col);
-      assert.ok(
-        cell === undefined || cell.value === '' || cell.value === null,
-        `period column ${col} would overwrite the Messages SUM`,
-      );
-    }
-    // But the totals are still stated, so each paste can be checked.
-    const note = messages.cells.find((c) => c.value && String(c.value).includes('45,978,000'));
-    assert.ok(note, 'the cross-check total is missing');
-    assert.match(String(note!.value), /\(P1\)/);
-  });
-
-  test('the counter notes name the cell each period pastes into', () => {
-    const base = conceptSection9Scenario();
-    const scenario = {
-      ...base,
-      periods: [1, 2].map((i) => ({
-        index: i,
-        months: 12,
-        machineCountOverrides: {},
-        commercial: {},
-      })),
-    };
-    const configurator = workbookSheets(scenario, computeScenario(scenario))[0]!;
-    const note = configurator.rows
-      .find((row) => row.row === 28)!
-      .cells.find((c) => c.style === 'cellRef');
-    // Measurements Created is D28 in period 1 and D58 in period 2 -- the
-    // vertical stride the Configurator itself uses.
-    assert.equal(note?.value, 'D28 · D58');
-  });
-
   test('the Months sheet is the evidence for the range', () => {
     const months = sheet('Months');
     // Header rows plus twelve months plus a footnote.
@@ -328,8 +254,8 @@ describe('the workbook content', () => {
     assert.equal(Math.min(...totals), 41_528_000, 'February');
   });
 
-  test('the Design sheet carries how each machine talks', () => {
-    const design = sheet('Design');
+  test('the Machine Data sheet carries how each machine talks', () => {
+    const design = sheet('Machine Data');
     assert.ok(
       design.rows.some((r) => r.cells.some((c) => c.col === 3 && c.value === 'Talks')),
       'the heading',
@@ -343,8 +269,8 @@ describe('the workbook content', () => {
     assert.equal(talks, named, `named ${named} times, protocol ${talks}`);
   });
 
-  test('the Design sheet says which readings share a measurement', () => {
-    const design = sheet('Design');
+  test('the Machine Data sheet says which readings share a measurement', () => {
+    const design = sheet('Machine Data');
     const shared = design.rows.filter((r) =>
       r.cells.some((c) => c.value === 'shared'),
     );
@@ -369,7 +295,7 @@ describe('the workbook content', () => {
   test('an empty scenario still produces a valid workbook', () => {
     const scenario = blankScenario();
     const sheets = workbookSheets(scenario, computeScenario(scenario));
-    assert.equal(sheets.length, 6);
+    assert.equal(sheets.length, 5);
     assert.doesNotThrow(() => buildXlsx(sheets));
   });
 
@@ -499,10 +425,10 @@ describe('the Quote sheet', () => {
   const cell = (r: number, c: number) =>
     quote().rows.find((row) => row.row === r)?.cells.find((x) => x.col === c);
 
-  test('it is the second sheet, after the paste-ready quantities', () => {
+  test('it is the first sheet: the file opens on the thing that gets priced', () => {
     assert.deepEqual(
       sheetsFor().map((s) => s.name),
-      ['Configurator', 'Quote', 'Design', 'Months', 'Storage', 'Guidance'],
+      ['Quote', 'Machine Data', 'Months', 'Storage', 'Guidance'],
     );
   });
 
@@ -519,22 +445,27 @@ describe('the Quote sheet', () => {
     }
   });
 
-  test('quantities are referenced, not copied, so there is one source of truth', () => {
-    // The Quote sheet has its own compact row order; every quantity is a
-    // reference into the Configurator sheet, so one edit moves both.
-    assert.equal(cell(13, 4)?.formula, 'Configurator!D23', 'Public/Shared Cloud');
-    const referenced = quote()
+  test('quantities are stated here, since there is no second sheet to read them from', () => {
+    // They used to be `Configurator!D23` and friends -- one sheet quoting
+    // another. That sheet is gone, so the quantity is the value, and a
+    // dangling reference is the failure this guards against.
+    assert.equal(cell(13, 4)?.value, 1, 'Public/Shared Cloud');
+    assert.equal(cell(13, 4)?.formula, undefined);
+    const dangling = quote()
       .rows.flatMap((r) => r.cells)
-      .filter((c) => typeof c.formula === 'string' && c.formula.startsWith('Configurator!'));
-    assert.ok(referenced.length >= 15, `only ${referenced.length} referenced quantities`);
+      .filter((c) => typeof c.formula === 'string' && c.formula.includes('Configurator!'));
+    assert.deepEqual(dangling, [], 'nothing still points at the removed sheet');
   });
 
   test('messages are billed per 100,000, rounded up per month then over the term', () => {
     // One period of 12 months, so the messages row sits at 17.
     const quantity = cell(17, 4);
     const term = cell(17, 6);
-    assert.equal(quantity?.formula, 'SUM(Configurator!D28:D36)');
-    assert.equal(quantity?.cached, 45_978_000);
+    // Stated, not read off a second sheet -- that sheet is gone.
+    assert.equal(quantity?.formula, undefined);
+    assert.equal(typeof quantity?.value, 'number');
+    // `cached` belonged to the formula; a stated quantity is just the value.
+    assert.equal(quantity?.value, 45_978_000);
     // Rounded up per month and then multiplied by the months -- the order the
     // Configurator bills in. Rounding at the end would under-count.
     assert.equal(term?.formula, 'ROUNDUP(D17/100000,0)*D$11');
@@ -587,7 +518,7 @@ describe('the Quote sheet', () => {
         commercial: {},
       })),
     };
-    const sheet = workbookSheets(scenario, computeScenario(scenario))[1]!;
+    const sheet = workbookSheets(scenario, computeScenario(scenario))[0]!;
     const at = (r: number, c: number) =>
       sheet.rows.find((row) => row.row === r)?.cells.find((x) => x.col === c);
 

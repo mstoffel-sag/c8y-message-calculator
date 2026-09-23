@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 37 — the results page reads in quoting order: counters, commitment, storage, then the file · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
+**Status:** draft for review, rev 38 — the workbook is five sheets: no Configurator, and Design is Machine Data · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
 
 ---
 
@@ -937,7 +937,7 @@ double-clicking `dist/index.html` has no clipboard API at all; the copy falls ba
 `document.execCommand` and the button says **Copied** or **Blocked** rather than leaving a reader to
 guess whether it is wired up.
 
-**Export** — JSON that round-trips back into the tool, and an **Excel workbook** of six sheets.
+**Export** — JSON that round-trips back into the tool, and an **Excel workbook** of five sheets.
 
 The workbook is what makes the hand-off work in the direction it actually flows: **the customer fills
 in the wizard and sends the file to their account team, who price it up.** So it carries the quantities
@@ -945,12 +945,20 @@ in the wizard and sends the file to their account team, who price it up.** So it
 
 | Sheet | For | Contents |
 |---|---|---|
-| **Configurator** | transfer | every quantity on the row the Configurator keeps for it, **one column per period**, so column D pastes at the same cell and each later column pastes at the cell its heading names. The Messages row is left blank in every period column on purpose — it is the one formula in that column (`=SUM(D28:D36)`) and a pasted constant would destroy it |
-| **Quote** | the account team | quantities referenced from the Configurator sheet, periods side by side, billable units over the whole term, a shaded unit-price column, and **the CTC commitment** as a formula (§6.6). Messages are rounded into blocks of 100,000 per month before being multiplied by the months |
+| **Quote** | the account team | every quantity, periods side by side, billable units over the whole term, a shaded unit-price column, and **the CTC commitment** as a formula (§6.6). Messages are rounded into blocks of 100,000 per month before being multiplied by the months |
 | **Storage** | review | the operational-storage range month by month plus each period's sum, with its assumptions and their provenance (§4.6) |
-| **Design** | the device team | every reading, its cadence, and the measurement it travels in |
+| **Machine Data** | the device team | every reading, its cadence, and the measurement it travels in |
 | **Months** | evidence | all nine counters for every calendar month, so the range is demonstrable rather than asserted |
 | **Guidance** | review | every finding with its volume delta |
+
+**There was a sixth sheet, and it is gone.** *Configurator* restated every quantity at the Sales
+Configurator's own row numbers — `D28:D36` for the counters, `D21` for the length — so a column could
+be copied and pasted cell for cell, and the Quote sheet read its quantities out of it by formula. Two
+sheets carrying the same numbers meant one had to quote the other, and the one people opened was the
+Quote. So the quantities are stated on the Quote sheet directly, and the paste-ready column lives
+only where it is actually used: **the hand-off table in the app**, which still offers the nine
+counters as one copy per period, at the cells it names. What the file lost is the ability to paste
+from the file; what it gained is not having a sheet whose only job was to be referenced by another.
 
 **Every price cell ships empty.** This is what lets §1 hold while still producing a quote: the tool
 contains no price list, the file the customer sends contains no price list, and the numbers arrive
