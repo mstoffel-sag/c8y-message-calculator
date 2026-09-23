@@ -9,7 +9,7 @@ import {
 } from '../../../lib/engine/index.js';
 import { buildXlsx } from '../../../lib/xlsx/writer.js';
 import { Handoff } from './Handoff.js';
-import { Commitment, Results } from '../Results.js';
+import { Commitment, Results, Storage } from '../Results.js';
 import { Payloads } from '../Payloads.js';
 import { MeasurementDiagram } from '../MeasurementDiagram.js';
 import { Empty } from '../parts.js';
@@ -36,6 +36,10 @@ export function StepResults({
           it nobody could act on until they had read the rest. */}
       <Handoff scenario={scenario} result={result} />
       <Commitment scenario={scenario} result={result} />
+      {/* Storage is the other quantity a period is quoted on, so it belongs
+          beside the commitment rather than further down among the volume
+          panels: D27 and D37 are the two numbers that leave this page. */}
+      <Storage result={result} />
       <DownloadWorkbook scenario={scenario} result={result} />
       <Design scenario={scenario} />
       <Results scenario={scenario} result={result} />
@@ -123,31 +127,6 @@ function DownloadWorkbook({ scenario, result }: { scenario: Scenario; result: Sc
             <Rich k="workbook.sendIt" />
           </p>
         </div>
-
-        <table style="margin-top:14px">
-          <tbody>
-            <tr>
-              <td style="width:130px"><b>{t('workbook.sheet.quote')}</b></td>
-              <td class="hint" style="margin:0">{t('workbook.sheet.quote.what')}</td>
-            </tr>
-            <tr>
-              <td><b>{t('workbook.sheet.configurator')}</b></td>
-              <td class="hint" style="margin:0">{t('workbook.sheet.configurator.what')}</td>
-            </tr>
-            <tr>
-              <td><b>{t('workbook.sheet.design')}</b></td>
-              <td class="hint" style="margin:0">{t('workbook.sheet.design.what')}</td>
-            </tr>
-            <tr>
-              <td><b>{t('workbook.sheet.months')}</b></td>
-              <td class="hint" style="margin:0">{t('workbook.sheet.months.what')}</td>
-            </tr>
-            <tr>
-              <td><b>{t('workbook.sheet.guidance')}</b></td>
-              <td class="hint" style="margin:0">{t('workbook.sheet.guidance.what')}</td>
-            </tr>
-          </tbody>
-        </table>
 
         <p class="hint" style="margin-top:14px">{t('workbook.builtHere')}</p>
       </div>

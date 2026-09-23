@@ -74,8 +74,6 @@ export function Results({ scenario, result }: { scenario: Scenario; result: Scen
         </div>
       </div>
 
-      <Storage result={result} />
-
       <div class="grid two">
         <ByMachineType peak={peak} />
         <Ramp periods={result.periods} />
@@ -243,7 +241,7 @@ export function Findings({ findings }: { findings: Finding[] }) {
  * period whose peak lands in its last month is a period that will be quoted
  * higher next time.
  */
-function Storage({ result }: { result: ScenarioResult }) {
+export function Storage({ result }: { result: ScenarioResult }) {
   const t = useT();
   const peak = result.peakStorage;
   // The quote is anchored on the first period, which is what the Configurator's

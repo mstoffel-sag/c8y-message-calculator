@@ -6,6 +6,15 @@ dist-c8y/
 .angular/
 .DS_Store
 
+# Editor swap files. A stale .CONCEPT.md.swp from a vim session left open for
+# five days held rev 27 while the file on disk had reached rev 36 -- one :w
+# would have overwritten eight commits of the design doc. Keeping them out of
+# the repository does not stop that, but it does stop `git add -A` committing
+# one by accident.
+*.swp
+*.swo
+*~
+
 # Tenant credentials. `@c8y/devkit:deploy` reads url/user/password from here
 # (dotenv, C8Y_-prefixed), which is the convenient way to deploy and exactly
 # the file that must never reach a remote.

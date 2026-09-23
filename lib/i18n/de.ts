@@ -16,7 +16,6 @@ import type { Key } from './en.js';
 
 export const de: Record<Key, string> = {
   /* ------------------------------------------------------- app chrome */
-  'app.title': 'Nachrichtenrechner',
   'app.tagline': 'Nachrichtenrechner — eine Mengenschätzung, kein Angebot',
   'app.scenarioName': 'Name des Szenarios',
   'app.stat.peakMonth': 'Nachrichten / Spitzenmonat',
@@ -354,22 +353,12 @@ export const de: Record<Key, string> = {
   'workbook.sub': 'Fünf Blätter, und ein Quote-Blatt, das nur noch bepreist werden muss',
   'workbook.download': 'Excel-Arbeitsmappe herunterladen',
   'workbook.sendIt': '**Schicken Sie das an Ihr Account-Team.** Sie enthält die Mengen und die Preisspalten, die es braucht, und keine Preise — sie kann also in jedem Fall gefahrlos gemailt werden.',
-  'workbook.sheet.quote': 'Quote',
-  'workbook.sheet.quote.what': 'Wo das Account-Team arbeitet. Die Mengen sind schon eingetragen; es tippt seine eigenen Stückpreise in die schattierte Spalte, und Positionssummen, Monatssumme und Periodensumme rechnen sich selbst. Nachrichten sind auf Blöcke von 100.000 vorgerundet.',
-  'workbook.sheet.configurator': 'Configurator',
-  'workbook.sheet.configurator.what': 'Jede Menge in der Zeile, die der Sales Configurator dafür vorsieht, damit Spalte D für eine Periode kopiert und an derselben Zelle eingefügt werden kann.',
-  'workbook.sheet.design': 'Design',
-  'workbook.sheet.design.what': 'Jeder Messwert, sein Takt, und die Messung, in der er reist.',
-  'workbook.sheet.months': 'Months',
-  'workbook.sheet.months.what': 'Alle neun Zähler für jeden Kalendermonat — woher die Spanne kommt.',
-  'workbook.sheet.guidance': 'Guidance',
-  'workbook.sheet.guidance.what': 'Was das Werkzeug angemerkt hat, und was jeder Hinweis wert ist.',
   'workbook.builtHere': 'In Ihrem Browser erzeugt: nichts wird hochgeladen, und kein Szenario verlässt den Tenant. Das Werkzeug hat keine Preisliste, die Datei kann also keine enthalten — die Zahlen kommen von denen, die das Angebot machen. Rabatte über das einzelne Katalogfeld hinaus, Genehmigungsschwellen und Währungsumrechnung bleiben im Sales Configurator, der die maßgebliche Quelle für ein genehmigtes Angebot bleibt.',
   'payload.hidden': 'Das genaue JSON, das jede Maschine senden soll — ein Beispiel pro Messung, Ereignis, Alarm und Inventarschreibvorgang — liegt bereit für alle, die den Gerätecode schreiben. Schalten Sie oben **Expertenmodus** ein, um es zu sehen.',
 
   /* --------------------------------- engine prose the UI shows */
   'engine.naiveBaselineRule': 'Jede Messreihe in ihrer eigenen Messung, im angegebenen Intervall, statt sich eine mit allem auf demselben Takt zu teilen. Ereignisse, Alarme, Inventarschreibvorgänge und Operationen sind in beiden Modellen identisch — der ganze Unterschied liegt in der Measurement-API.',
-  'engine.storageSourceNote': '100-400 Bytes pro gespeicherten Wert in MongoDB, und ein DataHub-Extrakt mit 20-25 % davon. Beides sind Daumenregeln aus Tests auf Edge und einem Proof of Concept, beide an der Quelle als „zu verifizieren“ markiert. Die Spanne ist der Befund, keine Rundung: behandeln Sie die Spanne als die Antwort.',
+  'engine.storageSourceNote': '100–400 Bytes je gespeichertem Wert, an der Quelle unbestätigt. Die Spanne ist der Befund, keine Rundung.',
 
   /* -------------------------------------- results: the figures */
   'results.stat.peakMonth': 'Spitzenmonat',
@@ -418,11 +407,11 @@ export const de: Record<Key, string> = {
   'storage.stat.perMeasurement.alone': 'ein Umschlag pro Wert: nichts geteilt',
   'storage.stat.dataHub': 'DataHub-Extrakt, Periode {index} · GiB-Monate',
   'storage.stat.dataHub.sub': '20–25 % derselben Daten',
-  'storage.odsCell': '**{amount} kommt in die ODS-Zelle für Periode {index}** — was die Datenbank am Ende jedes ihrer {months} Monate hielt, addiert, bei {bytes} Bytes pro Wert. Das ist eine Zahl aus einer Spanne, und die Spanne ist der Beleg: {note} Überschreiben Sie sie im Deployment-Bereich, wenn der Tenant vermessen wurde.',
-  'storage.bundlingHelps': 'Bündeln schiebt die Zahl auch innerhalb dieser Spanne nach unten, nicht nur die Nachrichten: eine Messung mit {count} Werten zahlt ihren Umschlag einmal statt {count}-mal. Die Quelle misst Umschlag und Wert zusammen, ein gut gebündelter Maschinenpark hat also Luft nach unten, nicht nach oben.',
-  'storage.retentionDecides': '**Die Aufbewahrung entscheidet über die Größe, nicht über den Verkehr.** Derselbe Verkehr, 90 Tage gehalten, belegt das Dreifache von 30 Tagen. Dieser Maschinenpark wird **{kept}** gehalten{note} — eine Regel pro Typ, über dem Standardwert im Schritt Vertrag.',
+  'storage.odsCell': '**{amount}** kommt in die ODS-Zelle für Periode {index}: {months} Monatsenden addiert, bei {bytes} B je Wert. Eine Zahl aus einer Spanne — {note} Überschreiben Sie sie im Deployment-Bereich.',
+  'storage.bundlingHelps': 'Eine Messung mit {count} Werten zahlt ihren Umschlag einmal, nicht {count}-mal — ein gut gebündelter Maschinenpark liegt also unter der genannten Zahl, nicht darüber.',
+  'storage.retentionDecides': '**Die Aufbewahrung entscheidet über die Größe, nicht über den Verkehr.** Gehalten **{kept}**{note} — eine Regel pro Typ, über dem Standardwert im Schritt Vertrag.',
   'storage.retentionDefault': ' (die Ausgangsannahme)',
-  'storage.documentsToo': 'Ereignisse, Alarme, Operationen und jedes registrierte Gerät zählen ebenfalls mit — **{share}** dessen, was dieser Maschinenpark hält. Die Byte-Zahl wurde an Datenpunkten gemessen, dieser Anteil ruht also auf der schwächeren Annahme, und ein Managed Object ist das Einzige, das keine Aufbewahrungsregel entfernt.',
+  'storage.documentsToo': 'Ereignisse, Alarme, Operationen und jedes registrierte Gerät zählen mit: **{share}** des Gehaltenen. Die Byte-Zahl wurde an Datenpunkten gemessen, dieser Anteil ist also die schwächere Hälfte.',
   'storage.kept.uniform': '{days} Tage',
   'storage.kept.mixed': '{from} bis {to} Tage, je Messtyp',
   'storage.perPeriod': 'Nach Periode:',

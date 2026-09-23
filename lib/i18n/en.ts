@@ -17,7 +17,6 @@ export const en = {
   // The page's own title, shown by the shell's `c8y-title` in the Web SDK
   // build. The standalone build has no header to put it in -- it is the browser
   // tab there -- so this key belongs to one of the two apps.
-  'app.title': 'Message calculator',
   'app.tagline': 'Message calculator — a volume estimate, never a quote',
   'app.scenarioName': 'Scenario name',
   'app.stat.peakMonth': 'messages / peak month',
@@ -371,22 +370,12 @@ export const en = {
   'workbook.sub': 'Five sheets, and a Quote sheet ready to be priced',
   'workbook.download': 'Download Excel workbook',
   'workbook.sendIt': '**Send this to your account team.** It carries the quantities and the price columns they need, and no prices — so it is safe to email either way.',
-  'workbook.sheet.quote': 'Quote',
-  'workbook.sheet.quote.what': 'Where the account team works. Quantities are already filled in; they type their own unit prices into the shaded column and the line totals, monthly total and period total compute themselves. Messages come pre-rounded into blocks of 100,000.',
-  'workbook.sheet.configurator': 'Configurator',
-  'workbook.sheet.configurator.what': 'Every quantity on the row the Sales Configurator keeps for it, so column D can be copied for a period and pasted at the same cell.',
-  'workbook.sheet.design': 'Design',
-  'workbook.sheet.design.what': 'Every reading, its cadence, and the measurement it travels in.',
-  'workbook.sheet.months': 'Months',
-  'workbook.sheet.months.what': 'All nine counters for every calendar month — where the range comes from.',
-  'workbook.sheet.guidance': 'Guidance',
-  'workbook.sheet.guidance.what': 'What the tool flagged, and what each finding is worth.',
   'workbook.builtHere': 'Built in your browser: nothing is uploaded and no scenario leaves the tenant. The tool holds no price list, so the file cannot carry one — the numbers arrive from whoever does the quoting. Discounts beyond the single catalog field, approval thresholds and currency conversion stay in the Sales Configurator, which remains the source of truth for an approved quote.',
   'payload.hidden': 'The exact JSON each machine should send — one example per measurement, event, alarm and inventory write — is ready for whoever writes the device code. Turn on **Expert mode** in the header to see it.',
 
   /* --------------------------------- engine prose the UI shows */
   'engine.naiveBaselineRule': 'Every series in its own measurement, at the interval it was given, instead of sharing one with everything on the same tick. Events, alarms, inventory writes and operations are identical in both models — the whole difference is in the Measurement API.',
-  'engine.storageSourceNote': '100-400 bytes per stored value in MongoDB, and a DataHub extract at 20-25 % of it. Both are rules of thumb from tests on Edge and one proof of concept, both marked “to be verified” at source. The spread is the evidence, not a rounding: treat the range as the answer.',
+  'engine.storageSourceNote': '100–400 bytes a stored value, unverified at source. The spread is the evidence, not a rounding.',
 
   /* -------------------------------------- results: the figures */
   'results.stat.peakMonth': 'Peak month',
@@ -435,11 +424,11 @@ export const en = {
   'storage.stat.perMeasurement.alone': 'one envelope per value: nothing shared',
   'storage.stat.dataHub': 'DataHub extract, period {index} · GiB-months',
   'storage.stat.dataHub.sub': '20–25 % of the same data',
-  'storage.odsCell': '**{amount} goes in the ODS cell for period {index}** — what the database held at the end of each of its {months} months, added up, at {bytes} bytes per value. That is one figure picked out of a range, and the range is the evidence: {note} Override it in the deployment panel if the tenant has been measured.',
-  'storage.bundlingHelps': 'Bundling moves the figure down inside that range as well as cutting messages: a measurement carrying {count} values pays for its envelope once instead of {count} times. The source measures envelope and value together, so a well-bundled fleet has room below the quoted figure, not above it.',
-  'storage.retentionDecides': '**Retention decides the size, not the traffic.** Identical traffic held for 90 days occupies three times what it does at 30. This fleet is kept **{kept}**{note} — a rule per type, over the default on the Contract step.',
+  'storage.odsCell': '**{amount}** goes in the ODS cell for period {index}: {months} month-ends added up, at {bytes} B a value. One figure out of a range — {note} Override it in the deployment panel.',
+  'storage.bundlingHelps': 'A measurement carrying {count} values pays for its envelope once, not {count} times, so a well-bundled fleet sits below the quoted figure rather than above it.',
+  'storage.retentionDecides': '**Retention decides the size, not the traffic.** Kept **{kept}**{note} — a rule per type, over the default on the Contract step.',
   'storage.retentionDefault': ' (the starting assumption)',
-  'storage.documentsToo': 'Events, alarms, operations and every registered device are counted in too — **{share}** of what this fleet keeps. The byte figure was measured on datapoints, so that share rests on the weaker assumption, and a managed object is the one thing no retention rule removes.',
+  'storage.documentsToo': 'Events, alarms, operations and every registered device count too: **{share}** of what is kept. The byte figure was measured on datapoints, so that share is the weaker half.',
   'storage.kept.uniform': 'for {days} days',
   'storage.kept.mixed': 'for {from} to {to} days, by measurement type',
   'storage.perPeriod': 'By period:',

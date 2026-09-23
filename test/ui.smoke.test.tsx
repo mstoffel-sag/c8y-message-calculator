@@ -18,7 +18,7 @@ import { StepTimeSeries } from '../src/ui/wizard/StepTimeSeries.js';
 import { StepDiscrete } from '../src/ui/wizard/StepDiscrete.js';
 import { StepContract } from '../src/ui/wizard/StepContract.js';
 import { StepResults } from '../src/ui/wizard/StepResults.js';
-import { Results } from '../src/ui/Results.js';
+import { Results, Storage as StoragePanel } from '../src/ui/Results.js';
 import { Handoff } from '../src/ui/wizard/Handoff.js';
 import { CANVAS_HEIGHT, Explainer, LAYOUT, boxFor, rowCentre } from '../src/ui/Explainer.js';
 
@@ -492,20 +492,23 @@ describe('the storage estimate shows its working', () => {
   const result = computeScenario(scenario);
 
   test('results: reports a range, both ends of it, and where it came from', () => {
-    const html = render(<Results scenario={scenario} result={result} />);
+    const html = render(<StoragePanel result={result} />);
     assert.match(html, /Operational storage/);
     // The §9 fleet holds 174 M values at every month end -- 30 days of writing
     // at 5.8 M values a day -- which is 16.2 GiB at 100 bytes each and 64.8 at
     // 400, plus 47.5 k documents a month and 1,000 managed objects. Twelve
     // month-ends make the period's quantity: 195 to 778 GiB-months.
     assert.match(html, /195 – 778 GiB/);
-    assert.match(html, /to be verified/, 'the provenance travels with the number');
+    // Shorter words, same duty: a reader must not be able to take the figure
+    // without also learning that the bytes behind it are unconfirmed.
+    assert.match(html, /unverified at source/, 'the provenance travels with the number');
+    assert.match(html, /100–400 bytes/, 'and the range it came from');
     assert.match(html, /kept for 30 days/);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
   });
 
   test('the figure it quotes is one end of the range, and says so', () => {
-    const html = render(<Results scenario={scenario} result={result} />);
+    const html = render(<StoragePanel result={result} />);
     // 400 B per value is the default: the top of the range, because
     // under-stating usage on a commit-to-consume contract depletes the
     // commitment early rather than saving anybody anything.
@@ -528,11 +531,11 @@ describe('the storage estimate shows its working', () => {
   });
 
   test('it says which half of itself rests on the weaker assumption', () => {
-    const html = render(<Results scenario={scenario} result={result} />);
+    const html = render(<StoragePanel result={result} />);
     // Documents are counted in -- omitting them understates a commit-to-consume
     // bill -- so what the panel owes the reader is the share they make up, and
     // the fact that the byte figure was measured on datapoints.
-    assert.match(html, /Events, alarms, operations and every registered device are counted in/);
+    assert.match(html, /Events, alarms, operations and every registered device count too/);
     assert.match(html, /measured on datapoints/);
     assert.match(html, /under 1 %/, 'and how far off that can be for this fleet');
   });
