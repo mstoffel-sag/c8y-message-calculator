@@ -65,6 +65,15 @@ import { StepSeriesComponent } from './series.component.js';
   template: `
     <c8y-title>{{ 'app.title' | t }}</c8y-title>
 
+    <!-- Creating a scenario is a header action, not a row inside the picker.
+         The picker is for choosing among what exists; making another is a
+         different verb and belongs where the other verbs are. -->
+    <c8y-action-bar-item placement="right">
+      <button type="button" class="btn btn-link" (click)="create()">
+        <i c8yIcon="plus-circle"></i> {{ 'library.add' | t }}
+      </button>
+    </c8y-action-bar-item>
+
     <c8y-action-bar-item placement="right">
       <label class="c8y-checkbox m-r-8" [title]="'app.expert.title' | t">
         <input type="checkbox" [checked]="expert()" (change)="expert.set($any($event.target).checked)" />
@@ -123,7 +132,6 @@ import { StepSeriesComponent } from './series.component.js';
                   {{ entry.name.trim() || ('library.untitled' | t) }}
                 </option>
               }
-              <option [value]="NEW">{{ 'library.add' | t }}</option>
             </select>
             @if (entries().length > 1) {
               <button
@@ -196,9 +204,6 @@ export class WizardComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  /** Matches the sentinel in the standalone build's picker. */
-  protected readonly NEW = '\u0000new';
-
   readonly entries = this.store.entries;
   readonly currentId = this.store.currentId;
 
@@ -222,8 +227,11 @@ export class WizardComponent {
   }
 
   pick(id: string): void {
-    if (id === this.NEW) void this.router.navigate(['/scenario', this.store.add()]);
-    else void this.router.navigate(['/scenario', id]);
+    void this.router.navigate(['/scenario', id]);
+  }
+
+  create(): void {
+    void this.router.navigate(['/scenario', this.store.add()]);
   }
 
   drop(): void {

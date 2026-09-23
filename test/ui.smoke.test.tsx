@@ -861,7 +861,12 @@ describe('the scenario library', () => {
     assert.match(html, /aria-label="Scenario"/, 'the picker is on the frame');
     assert.match(html, /Acme rooftop HVAC/);
     assert.match(html, /Northwind meters/);
-    assert.match(html, /\+ New scenario/, 'adding one is the same gesture as switching');
+    // Creating one is a header action now, not a row inside the picker: the
+    // picker chooses among what exists, and making another is a different verb.
+    const picker = html.slice(html.indexOf('aria-label="Scenario"'));
+    const options = picker.slice(0, picker.indexOf('</select>'));
+    assert.doesNotMatch(options, /New scenario/, 'not an option in the list');
+    assert.match(html, /New scenario/, 'but present on the frame');
     // Two scenarios, so deleting the open one leaves somewhere to land.
     assert.match(html, /Delete this scenario/);
   });

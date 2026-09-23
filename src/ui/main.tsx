@@ -35,13 +35,6 @@ import { Findings } from './Results.js';
 import { compact, nf1 } from './format.js';
 
 /**
- * The "add one" row of the picker. A sentinel rather than a button beside it:
- * the select is already the thing you reach for to change scenario, so adding
- * belongs in the same gesture.
- */
-const NEW_SCENARIO = '\u0000new';
-
-/**
  * Exported so a test can render the frame, not only the steps. The picker, the
  * running total and the step rail all live out here, and until this was
  * exported none of them was rendered by anything but a browser.
@@ -134,18 +127,13 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
               <select
                 aria-label={t('library.label')}
                 value={openId}
-                onChange={(e) => {
-                  const value = (e.target as HTMLSelectElement).value;
-                  if (value === NEW_SCENARIO) addScenario();
-                  else open(value);
-                }}
+                onChange={(e) => open((e.target as HTMLSelectElement).value)}
               >
                 {library.map((entry) => (
                   <option key={entry.id} value={entry.id}>
                     {entry.name.trim() || t('library.untitled')}
                   </option>
                 ))}
-                <option value={NEW_SCENARIO}>{t('library.add')}</option>
               </select>
               {library.length > 1 && (
                 <button
@@ -193,6 +181,11 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
             />
             {t('app.expert')}
           </label>
+
+          {/* Creating a scenario is a header action, not a row inside the
+              picker. The picker is for choosing among what exists; making
+              another is a different verb and belongs with the other verbs. */}
+          <button class="ghost" onClick={addScenario}>+ {t('library.add')}</button>
 
           <LocaleSwitch locale={locale} onChange={onLocale} />
         </div>
