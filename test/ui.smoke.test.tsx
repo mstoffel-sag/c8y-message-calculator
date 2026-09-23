@@ -825,3 +825,52 @@ describe('a step is never named by its number', () => {
     }
   });
 });
+
+
+describe('the scenario library', () => {
+  /**
+   * The frame needs browser storage the moment it loads, so the shims go in
+   * before `main.js` is imported. They are deliberately tiny: what is under
+   * test is the picker, not a browser.
+   */
+  async function frame(
+    seed: (save: (id: string, scenario: ReturnType<typeof blankScenario>) => void, id: () => string) => void,
+  ) {
+    const cells = new Map<string, string>();
+    const g = globalThis as Record<string, unknown>;
+    g.localStorage = {
+      getItem: (k: string) => (cells.has(k) ? cells.get(k)! : null),
+      setItem: (k: string, v: string) => void cells.set(k, String(v)),
+      removeItem: (k: string) => void cells.delete(k),
+    };
+    // getElementById returns null, so importing main.js does not try to mount.
+    g.document = { getElementById: () => null };
+    g.window = { scrollTo() {} };
+
+    const store = await import('../src/ui/store.js');
+    seed(store.saveScenario, store.newScenarioId);
+    const { App } = await import('../src/ui/main.js');
+    return render(<App />);
+  }
+
+  test('the picker lists every saved scenario and offers another', async () => {
+    const html = await frame((save, id) => {
+      save(id(), { ...conceptSection9Scenario(), name: 'Acme rooftop HVAC' });
+      save(id(), { ...blankScenario(), name: 'Northwind meters' });
+    });
+    assert.match(html, /aria-label="Scenario"/, 'the picker is on the frame');
+    assert.match(html, /Acme rooftop HVAC/);
+    assert.match(html, /Northwind meters/);
+    assert.match(html, /\+ New scenario/, 'adding one is the same gesture as switching');
+    // Two scenarios, so deleting the open one leaves somewhere to land.
+    assert.match(html, /Delete this scenario/);
+  });
+
+  test('one scenario cannot be deleted, because nothing would be left open', async () => {
+    const html = await frame((save, id) => {
+      save(id(), { ...blankScenario(), name: 'Only one' });
+    });
+    assert.match(html, /Only one/);
+    assert.doesNotMatch(html, /Delete this scenario/);
+  });
+});

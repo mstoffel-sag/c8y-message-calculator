@@ -26,6 +26,11 @@ export const de: Record<Key, string> = {
   'app.expert': 'Expertenmodus',
   'app.expert.title': 'Zeigt die rohen JSON-Payloads für alle, die den Gerätecode schreiben.',
   'app.language': 'Sprache',
+  'library.label': 'Szenario',
+  'library.add': '+ Neues Szenario',
+  'library.delete': 'Dieses Szenario löschen',
+  'library.untitled': 'Unbenanntes Szenario',
+  'library.confirmDelete': '„{name}“ löschen? Das kann nicht rückgängig gemacht werden.',
 
   'nav.back': 'Zurück',
   'nav.progress': 'Schritt {step} von {total}',

@@ -1021,3 +1021,58 @@ describe('the commit-to-consume commitment', () => {
     assert.equal(c.headroom, 0, 'not NaN');
   });
 });
+
+describe('a library of scenarios', () => {
+  test('entries sort newest first and survive a rubbish index', async () => {
+    const { normaliseEntries, sortedEntries, touch, removeEntry, mostRecent } =
+      await import('../lib/scenario/library.js');
+
+    let entries = touch([], 'a', 'Acme', 1_000);
+    entries = touch(entries, 'b', 'Northwind', 2_000);
+    assert.deepEqual(entries.map((e) => e.id), ['b', 'a'], 'newest first');
+    assert.equal(mostRecent(entries)?.id, 'b');
+
+    // Saving again moves it up and takes the new name with it -- the name is
+    // copied from the scenario rather than being a second thing to keep in step.
+    entries = touch(entries, 'a', 'Acme GmbH', 3_000);
+    assert.deepEqual(entries.map((e) => e.id), ['a', 'b']);
+    assert.equal(entries[0]?.name, 'Acme GmbH');
+    assert.equal(entries.length, 2, 'touch updates, it does not duplicate');
+
+    assert.deepEqual(removeEntry(entries, 'a').map((e) => e.id), ['b']);
+
+    // A library that throws on load leaves the app with no way in, so a bad
+    // row is dropped rather than fatal.
+    assert.deepEqual(normaliseEntries(null), []);
+    assert.deepEqual(normaliseEntries('nonsense'), []);
+    const cleaned = normaliseEntries([
+      { id: 'ok', name: 'Fine', savedAt: 5 },
+      { id: 'ok', name: 'Duplicate', savedAt: 9 },
+      { name: 'No id', savedAt: 1 },
+      { id: '', name: 'Empty id' },
+      { id: 'nodate' },
+    ]);
+    assert.deepEqual(cleaned.map((e) => e.id), ['ok', 'nodate']);
+    assert.equal(cleaned.find((e) => e.id === 'nodate')?.savedAt, 0);
+    assert.equal(sortedEntries(cleaned)[0]?.id, 'ok');
+  });
+
+  test('an id is safe in a URL, because the Web SDK build routes on it', async () => {
+    const { newScenarioId } = await import('../lib/scenario/library.js');
+    for (let i = 0; i < 200; i += 1) {
+      const id = newScenarioId();
+      assert.match(id, /^s[a-z0-9]+$/, id);
+      assert.equal(encodeURIComponent(id), id, 'must survive scenario/:id');
+    }
+    // Distinct within the same millisecond, which is when two clicks land.
+    const ids = new Set(Array.from({ length: 500 }, () => newScenarioId(1_700_000_000_000)));
+    assert.ok(ids.size > 490, `expected near-unique ids, got ${ids.size}`);
+  });
+
+  test('a nameless scenario still gets a row somebody can click', async () => {
+    const { entryName } = await import('../lib/scenario/library.js');
+    assert.equal(entryName({ name: 'Acme' }, 'Untitled'), 'Acme');
+    assert.equal(entryName({ name: '   ' }, 'Untitled'), 'Untitled');
+    assert.equal(entryName({ name: '' }, 'Untitled'), 'Untitled');
+  });
+});

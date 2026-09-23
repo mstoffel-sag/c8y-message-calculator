@@ -13,7 +13,16 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { computeScenario, type Scenario } from '../../lib/engine/index.js';
 import type { Locale } from '../../lib/i18n/index.js';
 import { blankScenario, conceptSection9Scenario } from '../../lib/presets/index.js';
-import { load, normalise, save } from './store.js';
+import {
+  deleteScenario,
+  listScenarios,
+  loadScenario,
+  migrate,
+  mostRecent,
+  newScenarioId,
+  normalise,
+  saveScenario,
+} from './store.js';
 import { useExpert } from './expert.js';
 import { LocaleContext, LocaleSwitch, useLocale, useT } from './i18n.js';
 import { STEPS } from './wizard/steps.js';
@@ -25,7 +34,19 @@ import { StepResults } from './wizard/StepResults.js';
 import { Findings } from './Results.js';
 import { compact, nf1 } from './format.js';
 
-function App() {
+/**
+ * The "add one" row of the picker. A sentinel rather than a button beside it:
+ * the select is already the thing you reach for to change scenario, so adding
+ * belongs in the same gesture.
+ */
+const NEW_SCENARIO = '\u0000new';
+
+/**
+ * Exported so a test can render the frame, not only the steps. The picker, the
+ * running total and the step rail all live out here, and until this was
+ * exported none of them was rendered by anything but a browser.
+ */
+export function App() {
   const [locale, setLocale] = useLocale();
 
   return (
@@ -37,13 +58,51 @@ function App() {
 
 function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale) => void }) {
   const t = useT();
-  const [scenario, setScenario] = useState<Scenario>(() => load() ?? blankScenario());
+  // The library, and which of it is open. One estimate per customer, kept side
+  // by side rather than overwritten -- the Web SDK build lists them in the
+  // shell's navigator, and this build has no navigator to list them in, so the
+  // picker sits in the top bar beside the name.
+  const [openId, setOpenId] = useState<string>(() => {
+    migrate();
+    const recent = mostRecent(listScenarios());
+    if (recent) return recent.id;
+    const id = newScenarioId();
+    saveScenario(id, blankScenario());
+    return id;
+  });
+  const [scenario, setScenario] = useState<Scenario>(
+    () => loadScenario(openId) ?? blankScenario(),
+  );
+  const [library, setLibrary] = useState(() => listScenarios());
   const [step, setStep] = useState(0);
   const [expert, setExpert] = useExpert();
 
   useEffect(() => {
-    save(scenario);
-  }, [scenario]);
+    saveScenario(openId, scenario);
+    setLibrary(listScenarios());
+  }, [scenario, openId]);
+
+  const open = (id: string) => {
+    setOpenId(id);
+    setScenario(loadScenario(id) ?? blankScenario());
+    setStep(0);
+  };
+
+  const addScenario = () => {
+    const id = newScenarioId();
+    saveScenario(id, blankScenario());
+    open(id);
+  };
+
+  const dropScenario = (id: string) => {
+    deleteScenario(id);
+    const rest = listScenarios();
+    setLibrary(rest);
+    if (id !== openId) return;
+    const next = mostRecent(rest);
+    if (next) open(next.id);
+    else addScenario();
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -67,6 +126,41 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
               aria-label={t('app.scenarioName')}
               onInput={(e) => setScenario({ ...scenario, name: (e.target as HTMLInputElement).value })}
             />
+            {/* The library, where this build has no navigator to put it in.
+                A select rather than a list of tabs: the top bar is capped at
+                1240 px and already wrapped once, and a customer with a dozen
+                estimates would push the stat block off the end of it. */}
+            <div class="library">
+              <select
+                aria-label={t('library.label')}
+                value={openId}
+                onChange={(e) => {
+                  const value = (e.target as HTMLSelectElement).value;
+                  if (value === NEW_SCENARIO) addScenario();
+                  else open(value);
+                }}
+              >
+                {library.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name.trim() || t('library.untitled')}
+                  </option>
+                ))}
+                <option value={NEW_SCENARIO}>{t('library.add')}</option>
+              </select>
+              {library.length > 1 && (
+                <button
+                  class="ghost"
+                  title={t('library.delete')}
+                  aria-label={t('library.delete')}
+                  onClick={() => {
+                    const name = scenario.name.trim() || t('library.untitled');
+                    if (confirm(t('library.confirmDelete', { name }))) dropScenario(openId);
+                  }}
+                >
+                  &times;
+                </button>
+              )}
+            </div>
             <small>{t('app.tagline')}</small>
           </div>
           <div class="runner">

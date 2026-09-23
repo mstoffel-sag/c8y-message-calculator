@@ -24,10 +24,14 @@ import {
   Component,
   ElementRef,
   computed,
+  effect,
   inject,
   viewChild,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AlertService, CoreModule, StepperModule } from '@c8y/ngx-components';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs';
 
 import { compact, nf1 } from '../../../../lib/format/index.js';
 import { blankScenario, conceptSection9Scenario } from '../../../../lib/presets/index.js';
@@ -104,6 +108,32 @@ import { StepSeriesComponent } from './series.component.js';
             [value]="scenario().name"
             (input)="rename($any($event.target).value)"
           />
+          <!-- The whole library, where the navigator shows only the first few:
+               past a handful the menu stops being navigation and starts being
+               a filing cabinet, and a filing cabinet belongs on the page. -->
+          <div class="mc-library">
+            <select
+              class="form-control"
+              [attr.aria-label]="'library.label' | t"
+              [value]="currentId()"
+              (change)="pick($any($event.target).value)"
+            >
+              @for (entry of entries(); track entry.id) {
+                <option [value]="entry.id" [selected]="entry.id === currentId()">
+                  {{ entry.name.trim() || ('library.untitled' | t) }}
+                </option>
+              }
+              <option [value]="NEW">{{ 'library.add' | t }}</option>
+            </select>
+            @if (entries().length > 1) {
+              <button
+                type="button"
+                class="btn btn-link btn-sm"
+                [title]="'library.delete' | t"
+                (click)="drop()"
+              >&times;</button>
+            }
+          </div>
           <p class="mc-hint">{{ 'app.tagline' | t }}</p>
         </div>
 
@@ -163,6 +193,42 @@ export class WizardComponent {
   private readonly store = inject(ScenarioStore);
   private readonly locales = inject(LocaleService);
   private readonly alerts = inject(AlertService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+
+  /** Matches the sentinel in the standalone build's picker. */
+  protected readonly NEW = '\u0000new';
+
+  readonly entries = this.store.entries;
+  readonly currentId = this.store.currentId;
+
+  /**
+   * The route is what decides which scenario is open, so the navigator can link
+   * straight to one and the back button works between them. `toSignal` rather
+   * than a subscription: the store is a signal too, and one reactive graph is
+   * easier to reason about than two.
+   */
+  private readonly routed = toSignal(
+    this.route.paramMap.pipe(map(params => params.get('id'))),
+    { initialValue: null },
+  );
+
+  constructor() {
+    // The route drives the store, never the other way round: a navigator link,
+    // a pasted URL and the back button all arrive here, and all three must land
+    // on the same scenario. An id the library does not know mints that id
+    // rather than redirecting, so a shared link keeps working.
+    effect(() => this.store.openById(this.routed()));
+  }
+
+  pick(id: string): void {
+    if (id === this.NEW) void this.router.navigate(['/scenario', this.store.add()]);
+    else void this.router.navigate(['/scenario', id]);
+  }
+
+  drop(): void {
+    void this.router.navigate(['/scenario', this.store.remove(this.currentId())]);
+  }
   private readonly shell = viewChild<ElementRef<HTMLElement>>('shell');
 
   readonly scenario = this.store.scenario;

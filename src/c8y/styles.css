@@ -462,3 +462,8 @@
 .dg-legend i.key { width: 22px; height: 12px; border-radius: 2px; display: inline-block; }
 .dg-legend i.key.shared { background: var(--accent-soft); border: 1.5px solid var(--brand); }
 .dg-legend i.key.solo { background: var(--panel-2); border: 1.5px solid var(--line); }
+
+/* The scenario picker, under the name it belongs to. Quiet on purpose: it is
+   navigation, not a figure, and the top line's job is the running total. */
+.mc-library { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.mc-library select { max-width: 260px; font-size: 12.5px; height: auto; padding: 2px 4px; }

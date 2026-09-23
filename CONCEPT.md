@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 34 — the commitment panel is three figures and nothing else · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
+**Status:** draft for review, rev 35 — a library of scenarios, one per customer, in the browser · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
 
 ---
 
@@ -966,6 +966,32 @@ scenario leaves the tenant.
 /src/ui/wizard    the five step components and the hand-off table
 ```
 
+### 8.2 A library of scenarios, and where it is not yet
+
+One estimate per customer, kept side by side rather than overwritten. The Web SDK build lists them
+in the shell's **left navigator** — `hookNavigator` takes a factory whose `get()` may return an
+Observable, so the menu is derived from the store's index signal and redraws when one is added. Each
+is a route, `scenario/:id`, which is what makes a navigator entry a link and the browser's back
+button work between them. A scenario id is not a step ordinal, so §6's rule is untouched.
+
+The navigator shows the **first eight**. Past that a menu shared with every other application in the
+tenant stops being navigation and becomes a filing cabinet, so the whole library is a picker on the
+page, in both builds — the standalone one has no navigator and puts it under the scenario name.
+
+**The index is separate from the scenarios.** `lib/scenario/library.ts` holds the shape — an entry
+is `{ id, name, savedAt }` and nothing else — because a menu drawn on every page load must not parse
+a dozen fleets to print a dozen names. Like `edits.ts` it reads and writes nothing; each app supplies
+the four lines that persist, which is what keeps it inside `lib/`, where browser storage may not even
+be named.
+
+**It is still the browser.** Managed objects (`type: c8y_MessageCalculatorScenario`) remain the right
+home in a tenant — shared with the account team, surviving the machine — and remain unbuilt: that is
+the first thing in this tool that would call the platform API, which costs it the posture that lets
+the same bundle be handed to a prospect. The library was built browser-first deliberately, because
+the index, the routing, the navigator and the picker are the same work either way; only the four
+lines underneath change. A pre-library scenario is migrated on first load, once, and the old key is
+left where it is so an older build still finds its work.
+
 ### 8.1 The string catalogue
 
 Two languages, one file each, and the components hold no prose at all. `en.ts` is the source of
@@ -1084,7 +1110,7 @@ the bytes. Which is why both builds are kept.
 | P1 | ~~The wizard steps and results~~ · ~~deployable into a tenant~~ **done** — `npm run package` produces the hosted-application zip; manifest at `cumulocity.json` | — |
 | P1b | ~~The Web SDK build~~ **done** — Angular 21 + `@c8y/ngx-components` 1024.18.0 in `src/c8y`, inside the shell, from the same `lib/`. Compiles and type-checks; **never opened in a tenant** | — |
 | P2 | ~~Explainer, quantified guidance report, machine presets~~ **done** | — |
-| P3 | Persistence, export, standalone build | ~1 week |
+| P3 | ~~Persistence, export, standalone build~~ **done** — plus a **library**: many scenarios, one per customer, `scenario/:id` in the Web SDK build and a picker in the standalone one. Still the browser, not the tenant (§8.2) | — |
 | P4 | Pre-fill from tenant statistics; A/B scenario comparison | later |
 | P5 | Write the counters straight into a Configurator copy, so nobody retypes nine numbers per period | later |
 

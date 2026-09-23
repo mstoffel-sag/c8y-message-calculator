@@ -27,6 +27,11 @@ export const en = {
   'app.expert': 'Expert mode',
   'app.expert.title': 'Shows the raw JSON payloads for whoever writes the device code.',
   'app.language': 'Language',
+  'library.label': 'Scenario',
+  'library.add': '+ New scenario',
+  'library.delete': 'Delete this scenario',
+  'library.untitled': 'Untitled scenario',
+  'library.confirmDelete': 'Delete “{name}”? This cannot be undone.',
 
   'nav.back': 'Back',
   'nav.progress': 'Step {step} of {total}',
