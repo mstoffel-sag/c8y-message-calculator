@@ -232,7 +232,7 @@ h4 {
 p { margin: 0 0 calc(var(--u) * 1.25); }
 a { color: var(--accent); }
 
-.shell { max-width: 1240px; margin: 0 auto; padding: 0 calc(var(--u) * 2.5) calc(var(--u) * 10); }
+.shell { max-width: 1240px; margin: 0 auto; padding: 0 calc(var(--u) * 2.5) calc(var(--u) * 2); }
 
 /* ---------------------------------------------------------------- top bar */
 
@@ -564,9 +564,20 @@ details.explain[open] summary { border-bottom: 1px solid var(--line-soft); }
 .step-head h1 { font-size: var(--c8y-font-size-h2); margin-bottom: 4px; }
 .step-head p { color: var(--ink-mute); font-size: var(--c8y-font-size-large); margin: 0; }
 
+/* The step buttons stay on screen.
+   Every step is taller than a screen -- the measurements table alone is -- so
+   the way forward used to be somewhere you had to scroll to find, and on the
+   long steps a reader could be forgiven for thinking there wasn't one. Sticky
+   rather than fixed: it sits in the flow, so it cannot overlap the content
+   above it and the page still ends where the page ends.
+   An opaque background is not decoration here: without it the rows underneath
+   scroll through the buttons. */
 .nav {
   display: flex; gap: calc(var(--u) * 1.5); align-items: center; flex-wrap: wrap;
-  margin-top: calc(var(--u) * 4); padding-top: calc(var(--u) * 2); border-top: 1px solid var(--line);
+  position: sticky; bottom: 0; z-index: 5;
+  margin-top: calc(var(--u) * 4);
+  padding: calc(var(--u) * 2) 0;
+  background: var(--bg); border-top: 1px solid var(--line);
 }
 
 /* The teaching block is an alert: 4px brand bar, no fill. */

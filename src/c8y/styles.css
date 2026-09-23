@@ -462,3 +462,25 @@
 .dg-legend i.key { width: 22px; height: 12px; border-radius: 2px; display: inline-block; }
 .dg-legend i.key.shared { background: var(--accent-soft); border: 1.5px solid var(--brand); }
 .dg-legend i.key.solo { background: var(--panel-2); border: 1.5px solid var(--line); }
+
+/* The step buttons stay on screen.
+
+   Every step is taller than a screen -- the measurements table alone is -- so
+   the way forward was somewhere you had to scroll to find. `c8y-stepper-buttons`
+   is the SDK's component and sits at the end of each `cdk-step`, so this pins
+   the element rather than rebuilding it: the labels, the disabled states and
+   which buttons a step shows are all still the SDK's business.
+
+   Sticky rather than fixed, so it stays inside the step's own column and cannot
+   cover the shell's furniture. The background is opaque on purpose -- without it
+   the table rows scroll through the buttons. `--panel` is the card colour, which
+   is what sits behind the wizard here. */
+.mc-shell c8y-stepper-buttons {
+  display: block;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  padding: calc(var(--u) * 2) 0;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
