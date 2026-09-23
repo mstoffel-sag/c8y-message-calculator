@@ -1076,3 +1076,52 @@ describe('a library of scenarios', () => {
     assert.equal(entryName({ name: '' }, 'Untitled'), 'Untitled');
   });
 });
+
+
+describe('what the left navigator shows', () => {
+  /**
+   * The shape, not the SDK objects. `@c8y/ngx-components` cannot be imported
+   * outside a bundler, so the factory itself is verified by a deploy -- which
+   * is exactly how the first cut shipped a `get()` that threw and took the
+   * whole left menu with it, this app's entry and every other app's. Whatever
+   * can be decided without the SDK is decided here, where a test can reach it.
+   */
+  async function tree(entries: Array<{ id: string; name: string; savedAt: number }>, max?: number) {
+    const { scenarioNavTree } = await import('../lib/wizard/navigator.js');
+    return scenarioNavTree(entries, 'Untitled scenario', max);
+  }
+
+  test('the app keeps its entry, and every scenario is a child of it', async () => {
+    const { root, children } = await tree([
+      { id: 's1', name: 'Acme rooftop HVAC', savedAt: 2 },
+      { id: 's2', name: '   ', savedAt: 1 },
+    ]);
+    assert.equal(root.label, 'Message calculator');
+    assert.equal(root.path, '/');
+    assert.equal(children.length, 2);
+    assert.equal(children[0]?.label, 'Acme rooftop HVAC');
+    assert.equal(children[0]?.path, '/scenario/s1');
+    // A customer's own name is data, so the shell must not translate it.
+    assert.equal(children[0]?.translateLabel, false);
+    // A nameless scenario still gets a row somebody can click, and that label
+    // is the tool's own word, so it is translated.
+    assert.equal(children[1]?.label, 'Untitled scenario');
+    assert.equal(children[1]?.translateLabel, true);
+  });
+
+  test('an empty library still leaves the application reachable', async () => {
+    const { root, children } = await tree([]);
+    assert.equal(root.label, 'Message calculator');
+    assert.equal(children.length, 0);
+  });
+
+  test('the menu is capped, so it stays navigation rather than a filing cabinet', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: `s${i}`,
+      name: `Scenario ${i}`,
+      savedAt: 100 - i,
+    }));
+    assert.equal((await tree(many)).children.length, 8, 'the rest are on the page');
+    assert.equal((await tree(many, 0)).children.length, 0, 'a cap of none is not a crash');
+  });
+});

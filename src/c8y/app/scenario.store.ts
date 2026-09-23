@@ -20,6 +20,7 @@
  */
 
 import { Injectable, computed, effect, signal } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 
 import { computeScenario, type Scenario } from '../../../lib/engine/index.js';
 import { blankScenario } from '../../../lib/presets/index.js';
@@ -53,6 +54,17 @@ export class ScenarioStore {
   private readonly index = signal<ScenarioEntry[]>(readIndex());
 
   readonly entries = this.index.asReadonly();
+
+  /**
+   * The same list as an Observable, for the navigator.
+   *
+   * Not `toObservable(entries)`: that has to run inside an injection context,
+   * and the shell calls `NavigatorNodeFactory.get()` long after construction.
+   * Doing it there threw, the factory produced nothing, and the whole left menu
+   * disappeared -- every app's entries, not just this one's. A subject fed from
+   * here cannot fail that way, because it is created where the injector is.
+   */
+  readonly entries$ = new BehaviorSubject<ScenarioEntry[]>(readIndex());
   readonly currentId = this.openId.asReadonly();
 
   private readonly current = signal<Scenario>(readScenario(firstId()) ?? blankScenario());
@@ -81,7 +93,7 @@ export class ScenarioStore {
       keep(scenarioKey(id), JSON.stringify(scenario));
       const next = touch(readIndex(), id, scenario.name);
       keep(INDEX_KEY, JSON.stringify(next));
-      this.index.set(next);
+      this.setIndex(next);
     });
     effect(() => keep(EXPERT_KEY, this.expert() ? '1' : '0'));
   }
@@ -114,7 +126,7 @@ export class ScenarioStore {
     keep(scenarioKey(id), JSON.stringify(blankScenario()));
     const next = touch(readIndex(), id, '');
     keep(INDEX_KEY, JSON.stringify(next));
-    this.index.set(next);
+    this.setIndex(next);
     return id;
   }
 
@@ -127,13 +139,19 @@ export class ScenarioStore {
     }
     const next = removeEntry(readIndex(), id);
     keep(INDEX_KEY, JSON.stringify(next));
-    this.index.set(next);
+    this.setIndex(next);
     const recent = mostRecent(next);
     return recent ? recent.id : this.add();
   }
 
   set(next: Scenario): void {
     this.current.set(next);
+  }
+
+  /** Signal and subject move together, so the page and the menu agree. */
+  private setIndex(next: ScenarioEntry[]): void {
+    this.index.set(next);
+    this.entries$.next(next);
   }
 
   /** The one way a component changes anything: hand in an edit from lib/. */
