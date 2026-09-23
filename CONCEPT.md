@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 33 — the results page drops the naive comparison and every row at zero · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
+**Status:** draft for review, rev 34 — the commitment panel is three figures and nothing else · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
 
 ---
 
@@ -832,15 +832,15 @@ Two quantities, deliberately both reported:
   summed across the term. This is what the fleet will actually consume.
 
 The second is always the smaller, because a ramping fleet spends most of the term below its peak and
-because February is short. **The gap is stated, and it matters commercially in one direction only:**
-unused commitment is forfeited, so a commitment sized on peak × months is money the customer pays for
-and does not use. That is an argument to have before signature, which is why the tool puts a number on
-it rather than leaving it implicit.
+because February is short. The gap matters commercially in one direction only: unused commitment is
+forfeited, so a commitment sized on peak × months is money the customer pays for and does not use.
 
-It is stated in the paragraph rather than as a fourth figure beside the other three. A stat tile can
-say how big the gap is and cannot say why that matters, and "quoted but not expected" read as a fourth
-quantity to transfer rather than as an argument to have. The sentence carries the same number and the
-reason for it.
+**The tool no longer states that gap, in either form.** It was a fourth stat, then a paragraph, and
+both are gone: the panel is the three quantities and nothing else. Both quantities are still there,
+so the difference is a subtraction away for anyone who wants it, and the argument belongs to the
+person doing the quoting rather than to a volume estimate. `Commitment.headroom` survives in the
+engine, computed and unread — the workbook's Quote sheet is where a figure like this earns its place,
+next to the prices that make it money.
 
 **The panel sits directly under the hand-off table.** The table states one month per period and the
 period's length in `D21`; this is the same quantities carried across the term those two imply. With

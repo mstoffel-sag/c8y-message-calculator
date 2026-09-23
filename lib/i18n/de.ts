@@ -427,8 +427,6 @@ export const de: Record<Key, string> = {
   'commitment.stat.messages': 'Nachrichten über die Laufzeit',
   'commitment.stat.quoted': 'Abrechenbare Einheiten, wie angeboten',
   'commitment.stat.actual': 'Abrechenbare Einheiten, Monat für Monat',
-  'commitment.oneShort': '**Das Werkzeug hört eine Multiplikation vorher auf.** Eine Verpflichtung sind abrechenbare Einheiten mal einem Satz, und der Satz steht nicht hier drin — das Quote-Blatt der Arbeitsmappe trägt die Multiplikation als lebende Formel über einer leeren Preisspalte, die Verpflichtung erscheint also in dem Moment, in dem jemand seine Sätze eintippt, und nie davor.',
-  'commitment.peakOverstates': '**Die Spitze anzubieten ist richtig, und es überschätzt.** Eine Periode wird mit der Menge eines Monats angeboten, und die Spitze ist der ehrliche Monat dafür — aber die Monate summieren sich auf {gap} abrechenbare Einheiten weniger als {quoted}, weil der Maschinenpark hochläuft und nicht jeder Monat 31 Tage hat. Nicht verbrauchte Verpflichtung verfällt bei Ablauf, statt übertragen zu werden, dieser Abstand sollte also vor der Unterschrift geklärt sein.',
 
   /* ---------------------------------------------- the hand-off */
   'handoff.heading': 'Übergabe an den Sales Configurator',

@@ -402,7 +402,6 @@ export function Commitment({ scenario, result }: { scenario: Scenario; result: S
   const t = useT();
   const c = commitmentFor(scenario, result);
   if (c.termMonths === 0 || c.termUnitsQuoted === 0) return null;
-  const gap = c.termUnitsQuoted - c.termUnitsActual;
 
   return (
     <section class="panel">
@@ -430,21 +429,6 @@ export function Commitment({ scenario, result }: { scenario: Scenario; result: S
           </div>
         </div>
 
-        <div class="grid two">
-          <div>
-            <p class="note" style="margin:0">
-              <Rich k="commitment.oneShort" />
-            </p>
-          </div>
-          <div>
-            <p style="font-size:13px;color:var(--ink-mute);margin-top:0">
-              <Rich
-                k="commitment.peakOverstates"
-                p={{ gap: compact(gap), quoted: compact(c.termUnitsQuoted) }}
-              />
-            </p>
-          </div>
-        </div>
       </div>
     </section>
   );

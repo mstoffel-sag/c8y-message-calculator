@@ -444,8 +444,6 @@ export const en = {
   'commitment.stat.messages': 'Messages over the term',
   'commitment.stat.quoted': 'Billable units, as quoted',
   'commitment.stat.actual': 'Billable units, month by month',
-  'commitment.oneShort': '**The tool stops one multiplication short.** A commitment is billable units times a rate, and the rate is not in here — the Quote sheet of the workbook carries the multiplication as a live formula over an empty price column, so the commitment appears the moment somebody types their rates and never before.',
-  'commitment.peakOverstates': '**Quoting the peak is right, and it over-states.** A period is quoted at one month’s quantity, and the peak is the honest month to pick — but the months add up to {gap} fewer billable units than {quoted}, because the fleet ramps and not every month has 31 days. Unused commitment is forfeited at expiry, not carried forward, so that gap is worth settling before signature.',
 
   /* ---------------------------------------------- the hand-off */
   'handoff.heading': 'Hand-off to the Sales Configurator',
