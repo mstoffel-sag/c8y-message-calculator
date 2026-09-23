@@ -18,7 +18,7 @@ import { StepTimeSeries } from '../src/ui/wizard/StepTimeSeries.js';
 import { StepDiscrete } from '../src/ui/wizard/StepDiscrete.js';
 import { StepContract } from '../src/ui/wizard/StepContract.js';
 import { StepResults } from '../src/ui/wizard/StepResults.js';
-import { Results } from '../src/ui/Results.js';
+import { Results, Storage as StoragePanel } from '../src/ui/Results.js';
 import { Handoff } from '../src/ui/wizard/Handoff.js';
 import { CANVAS_HEIGHT, Explainer, LAYOUT, boxFor, rowCentre } from '../src/ui/Explainer.js';
 
@@ -492,7 +492,7 @@ describe('the storage estimate shows its working', () => {
   const result = computeScenario(scenario);
 
   test('results: reports a range, both ends of it, and where it came from', () => {
-    const html = render(<Results scenario={scenario} result={result} />);
+    const html = render(<StoragePanel result={result} />);
     assert.match(html, /Operational storage/);
     // The §9 fleet holds 174 M values at every month end -- 30 days of writing
     // at 5.8 M values a day -- which is 16.2 GiB at 100 bytes each and 64.8 at
@@ -508,7 +508,7 @@ describe('the storage estimate shows its working', () => {
   });
 
   test('the figure it quotes is one end of the range, and says so', () => {
-    const html = render(<Results scenario={scenario} result={result} />);
+    const html = render(<StoragePanel result={result} />);
     // 400 B per value is the default: the top of the range, because
     // under-stating usage on a commit-to-consume contract depletes the
     // commitment early rather than saving anybody anything.
@@ -531,7 +531,7 @@ describe('the storage estimate shows its working', () => {
   });
 
   test('it says which half of itself rests on the weaker assumption', () => {
-    const html = render(<Results scenario={scenario} result={result} />);
+    const html = render(<StoragePanel result={result} />);
     // Documents are counted in -- omitting them understates a commit-to-consume
     // bill -- so what the panel owes the reader is the share they make up, and
     // the fact that the byte figure was measured on datapoints.

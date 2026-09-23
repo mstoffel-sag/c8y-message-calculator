@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 36 — the navigator is the library: every scenario, no on-page picker · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
+**Status:** draft for review, rev 37 — the results page reads in quoting order: counters, commitment, storage, then the file · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
 
 ---
 
@@ -855,6 +855,13 @@ a test pins the order.
 ---
 
 ## 7. Output
+
+**The page reads in the order a quote is built.** The hand-off table, then the commitment it adds up
+to, then operational storage — `D27` and `D37` are the two quantities that leave this page, so they
+sit together rather than with storage further down among the volume panels — and only then the
+workbook that carries them away. The sheet-by-sheet description under the download button is gone:
+it told a reader what was in a file they had not opened yet, and the sheets name themselves once it
+is open.
 
 **Rows at zero collapse.** A line item nobody filled in, and a counter that is zero in every period,
 are both one line of a checklist with nothing to transfer — 14 of them on the §9 fleet, burying the

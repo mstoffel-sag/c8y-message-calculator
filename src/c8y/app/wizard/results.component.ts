@@ -16,6 +16,7 @@ import { LocaleService } from '../i18n/locale.service.js';
 import { RichComponent } from '../i18n/rich.component.js';
 import { TPipe } from '../i18n/t.pipe.js';
 import { CommitmentComponent } from '../results/commitment.component.js';
+import { StorageComponent } from '../results/storage.component.js';
 import { HandoffComponent } from '../results/handoff.component.js';
 import { PayloadsComponent } from '../results/payloads.component.js';
 import { ResultsPanelsComponent } from '../results/results-panels.component.js';
@@ -29,6 +30,7 @@ import { ScenarioStore } from '../scenario.store.js';
     EmptyComponent,
     CommitmentComponent,
     HandoffComponent,
+    StorageComponent,
     MeasurementDiagramComponent,
     PayloadsComponent,
     ResultsPanelsComponent,
@@ -51,6 +53,11 @@ import { ScenarioStore } from '../scenario.store.js';
            unrelated. -->
       <c8y-mc-commitment />
 
+      <!-- Storage is the other quantity a period is quoted on, so it belongs
+           beside the commitment rather than further down among the volume
+           panels: D27 and D37 are the two numbers that leave this page. -->
+      <c8y-mc-storage />
+
       <!-- The workbook download. Built in the browser: no upload, no service,
            nothing leaves the tenant. It mirrors the Configurator's own rows so
            the transfer is a column copy, and it carries quantities only --
@@ -69,17 +76,6 @@ import { ScenarioStore } from '../scenario.store.js';
             </button>
             <p class="mc-hint mc-flex"><c8y-mc-rich k="workbook.sendIt" /></p>
           </div>
-
-          <table class="table mc-table m-t-16">
-            <tbody>
-              @for (sheet of sheets; track sheet.name) {
-                <tr>
-                  <td style="width:130px"><b>{{ sheet.name | t }}</b></td>
-                  <td class="mc-hint">{{ sheet.what | t }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
 
           <p class="mc-hint m-t-16">{{ 'workbook.builtHere' | t }}</p>
         </div>
@@ -125,13 +121,6 @@ export class StepResultsComponent {
   private readonly store = inject(ScenarioStore);
   private readonly locales = inject(LocaleService);
 
-  protected readonly sheets = [
-    { name: 'workbook.sheet.quote', what: 'workbook.sheet.quote.what' },
-    { name: 'workbook.sheet.configurator', what: 'workbook.sheet.configurator.what' },
-    { name: 'workbook.sheet.design', what: 'workbook.sheet.design.what' },
-    { name: 'workbook.sheet.months', what: 'workbook.sheet.months.what' },
-    { name: 'workbook.sheet.guidance', what: 'workbook.sheet.guidance.what' },
-  ] as const;
 
   readonly machineTypes = computed(() => this.store.scenario().machineTypes);
   readonly expert = this.store.expert;
