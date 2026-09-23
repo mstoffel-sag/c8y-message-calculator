@@ -20,17 +20,54 @@
  */
 
 import { Injectable, computed, effect, signal } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 
 import { computeScenario, type Scenario } from '../../../lib/engine/index.js';
 import { blankScenario } from '../../../lib/presets/index.js';
 import { normalise } from '../../../lib/scenario/edits.js';
+import {
+  mostRecent,
+  newScenarioId,
+  normaliseEntries,
+  removeEntry,
+  touch,
+  type ScenarioEntry,
+} from '../../../lib/scenario/library.js';
 
+/** The single scenario this build kept before it kept several. Read once, by
+ *  `migrate`, so nobody loses work in progress to an upgrade. Never written. */
 const STORAGE_KEY = 'c8y.message-calculator.scenario';
+const INDEX_KEY = 'c8y.message-calculator.scenarios';
 const EXPERT_KEY = 'c8y.message-calculator.expert';
+const scenarioKey = (id: string) => `c8y.message-calculator.scenario.${id}`;
 
 @Injectable({ providedIn: 'root' })
 export class ScenarioStore {
-  private readonly current = signal<Scenario>(restore() ?? blankScenario());
+  /**
+   * Which scenario is open. The route carries it (`scenario/:id`), so the
+   * navigator can link straight to one and the browser's back button works
+   * between them.
+   */
+  private readonly openId = signal<string>(firstId());
+
+  /** The index, as a signal, so the navigator redraws when one is added. */
+  private readonly index = signal<ScenarioEntry[]>(readIndex());
+
+  readonly entries = this.index.asReadonly();
+
+  /**
+   * The same list as an Observable, for the navigator.
+   *
+   * Not `toObservable(entries)`: that has to run inside an injection context,
+   * and the shell calls `NavigatorNodeFactory.get()` long after construction.
+   * Doing it there threw, the factory produced nothing, and the whole left menu
+   * disappeared -- every app's entries, not just this one's. A subject fed from
+   * here cannot fail that way, because it is created where the injector is.
+   */
+  readonly entries$ = new BehaviorSubject<ScenarioEntry[]>(readIndex());
+  readonly currentId = this.openId.asReadonly();
+
+  private readonly current = signal<Scenario>(readScenario(firstId()) ?? blankScenario());
 
   /** Read-only everywhere except through `set` and `patch`. */
   readonly scenario = this.current.asReadonly();
@@ -50,12 +87,71 @@ export class ScenarioStore {
   readonly expert = signal<boolean>(restoreExpert());
 
   constructor() {
-    effect(() => keep(STORAGE_KEY, JSON.stringify(this.current())));
+    effect(() => {
+      const id = this.openId();
+      const scenario = this.current();
+      keep(scenarioKey(id), JSON.stringify(scenario));
+      const next = touch(readIndex(), id, scenario.name);
+      keep(INDEX_KEY, JSON.stringify(next));
+      this.setIndex(next);
+    });
     effect(() => keep(EXPERT_KEY, this.expert() ? '1' : '0'));
+  }
+
+  /**
+   * Opens a scenario by id, or creates one when the id is unknown -- a stale
+   * link, or a scenario deleted in another tab. The route is the only caller.
+   */
+  openById(id: string | null): void {
+    if (id && id === this.openId()) return;
+    const found = id ? readScenario(id) : null;
+    if (id && found) {
+      this.openId.set(id);
+      this.current.set(found);
+      return;
+    }
+    if (id) {
+      // Unknown id: keep the URL honest by minting the scenario it names.
+      this.openId.set(id);
+      this.current.set(blankScenario());
+      return;
+    }
+    this.openId.set(firstId());
+    this.current.set(readScenario(this.openId()) ?? blankScenario());
+  }
+
+  /** A new, empty scenario. Returns its id so the caller can route to it. */
+  add(): string {
+    const id = newScenarioId();
+    keep(scenarioKey(id), JSON.stringify(blankScenario()));
+    const next = touch(readIndex(), id, '');
+    keep(INDEX_KEY, JSON.stringify(next));
+    this.setIndex(next);
+    return id;
+  }
+
+  /** Removes one, and returns the id that should be opened instead. */
+  remove(id: string): string {
+    try {
+      localStorage.removeItem(scenarioKey(id));
+    } catch {
+      // The index is what the navigator reads, so dropping that is what counts.
+    }
+    const next = removeEntry(readIndex(), id);
+    keep(INDEX_KEY, JSON.stringify(next));
+    this.setIndex(next);
+    const recent = mostRecent(next);
+    return recent ? recent.id : this.add();
   }
 
   set(next: Scenario): void {
     this.current.set(next);
+  }
+
+  /** Signal and subject move together, so the page and the menu agree. */
+  private setIndex(next: ScenarioEntry[]): void {
+    this.index.set(next);
+    this.entries$.next(next);
   }
 
   /** The one way a component changes anything: hand in an edit from lib/. */
@@ -73,15 +169,41 @@ function keep(key: string, value: string): void {
   }
 }
 
-function restore(): Scenario | null {
+function read(key: string): unknown {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    // normalise() so a scenario written by an older build, or by the standalone
-    // one, loads instead of taking the page down.
-    return raw ? normalise(JSON.parse(raw)) : null;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
+}
+
+function readIndex(): ScenarioEntry[] {
+  return normaliseEntries(read(INDEX_KEY));
+}
+
+/**
+ * normalise() so a scenario written by an older build, or by the standalone
+ * one, loads instead of taking the page down.
+ */
+function readScenario(id: string): Scenario | null {
+  const raw = read(scenarioKey(id));
+  return raw ? normalise(raw) : null;
+}
+
+/**
+ * The id to open before the route has said otherwise, moving a pre-library
+ * scenario into the library on the way. The old key is left where it is: a
+ * browser that opens an older build still finds its work.
+ */
+function firstId(): string {
+  const existing = mostRecent(readIndex());
+  if (existing) return existing.id;
+  const id = newScenarioId();
+  const old = read(STORAGE_KEY);
+  keep(scenarioKey(id), JSON.stringify(old ? normalise(old) : blankScenario()));
+  keep(INDEX_KEY, JSON.stringify(touch([], id, '')));
+  return id;
 }
 
 function restoreExpert(): boolean {

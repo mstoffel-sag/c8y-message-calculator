@@ -203,8 +203,8 @@ function bundleExample(
     // The split note comes first where there is one: it changes what the
     // developer builds, and the bundling note underneath still applies to each
     // of the types it names.
-    noteKeys: types > 1
-      ? ['payload.note.split', 'payload.note.bundle', 'payload.note.smartrest']
+    noteKeys: series > MAX_SERIES_PER_BUNDLE
+      ? ['payload.note.overRecommended', 'payload.note.bundle', 'payload.note.smartrest']
       : ['payload.note.bundle', 'payload.note.smartrest'],
     noteParams: { count: series, types, max: MAX_SERIES_PER_BUNDLE },
   };
@@ -245,8 +245,8 @@ function soloExample(metric: Metric, prefix: string): PayloadExample {
     mqttBody: measurementBody(shown, [metric]),
     noteKeys: perSeries
       ? ['payload.note.perSeries']
-      : types > 1
-        ? ['payload.note.split', 'payload.note.bundle']
+      : series > MAX_SERIES_PER_BUNDLE
+        ? ['payload.note.overRecommended', 'payload.note.bundle']
         : ['payload.note.alone'],
     noteParams: { count: series, types, max: MAX_SERIES_PER_BUNDLE, name },
   };

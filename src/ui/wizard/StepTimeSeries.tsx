@@ -321,9 +321,9 @@ function MachineBlock({
                                       count: n(count),
                                       name: ownFragmentName(prefix, metric),
                                     })
-                                  : types > 1
-                                    ? t('series.solo.split', {
-                                        types: n(types),
+                                  : count > MAX_SERIES_PER_BUNDLE
+                                    ? t('series.solo.overRecommended', {
+                                        count: n(count),
                                         max: n(MAX_SERIES_PER_BUNDLE),
                                       })
                                     : t('series.oneMessagePerSample')
@@ -348,9 +348,8 @@ function MachineBlock({
                                     count: a 450-tag row sharing a type with two
                                     named readings splits on 452, not on 450. So
                                     it is said here, where the type is named. */}
-                                {bundleTypes(bundle.id) > 1
-                                  ? t('series.messagesForAll', {
-                                      types: n(bundleTypes(bundle.id)),
+                                {seriesInBundle(bundle.id) > MAX_SERIES_PER_BUNDLE
+                                  ? t('series.overRecommended', {
                                       count: n(seriesInBundle(bundle.id)),
                                       max: n(MAX_SERIES_PER_BUNDLE),
                                     })

@@ -131,7 +131,7 @@ function valueFor(
 
               <!-- The nine counters sit directly under Messages in the workbook. -->
               @if (row.isMessages) {
-                @for (counter of counters(); track counter.key) {
+                @for (counter of visibleCounters(); track counter.key) {
                   <tr>
                     <td class="mc-indent">{{ counter.label }}</td>
                     @for (cell of counter.cells; track cell.index) {
@@ -223,7 +223,9 @@ export class HandoffComponent {
     );
   });
 
-  readonly unusedCount = computed(() => this.unused().size);
+  readonly unusedCount = computed(
+    () => this.unused().size + this.counters().filter(c => c.allZero).length,
+  );
 
   readonly unusedLabel = computed(() =>
     this.locales.t().plural('handoff.unused', this.unusedCount()),
@@ -305,6 +307,11 @@ export class HandoffComponent {
     return COUNTER_KEYS.map((key, i) => ({
       key,
       label: COUNTER_LABELS[key],
+      // Zero in every period, so it has nothing to transfer. The nine are
+      // still one contiguous paste block -- which is why these collapse rather
+      // than disappear, and why the Counters button copies all nine whatever
+      // is on screen.
+      allZero: periods.every(period => period.peak.counters[key] === 0),
       cells: periods.map(period => ({
         index: period.index,
         text: n(period.peak.counters[key]),
@@ -313,6 +320,10 @@ export class HandoffComponent {
       })),
     }));
   });
+
+  readonly visibleCounters = computed(() =>
+    this.showUnused() ? this.counters() : this.counters().filter(c => !c.allZero),
+  );
 
   readonly explainParams = computed(() => ({
     range: `${cellFor(COUNTER_BASE_ROWS[0]!, 1)}:${cellFor(COUNTER_BASE_ROWS[8]!, 1)}`,

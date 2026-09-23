@@ -344,15 +344,16 @@ export function seriesIn(metrics: Metric[]): number {
 }
 
 /**
- * How many measurement types a given number of series actually travels in.
+ * Measurement types the platform's recommendation would imply for this many
+ * series -- `lint.ts` only, to price what following it would cost.
  *
- * A measurement type carrying more than the platform recommends is not a
- * design the tool is willing to quote: 450 tags in one measurement would be
- * the cheapest possible answer and the one nobody should build. So the series
- * are spread over as few types as the recommendation allows, and the extra
- * sends are counted. This is the floor a real fleet can hit, not the floor
- * arithmetic allows -- and it is why L6 now reports a split rather than asking
- * for one.
+ * It is NOT what the engine counts. A customer who says 450 series share a
+ * measurement is describing an agent they have built, and the tool quotes the
+ * design it is given: 100 is a recommendation about document shape and query
+ * performance, not a limit the platform enforces, and a 450-series measurement
+ * is accepted and billed as one message. The tool used to spread them anyway
+ * and quote 5x, which over-stated every fleet whose agent really does post one
+ * fat measurement. L6 says so instead.
  */
 export function typesFor(series: number): number {
   return Math.max(1, Math.ceil(series / MAX_SERIES_PER_BUNDLE));
@@ -363,9 +364,9 @@ export function typesFor(series: number): number {
  *
  * Two kinds of row, added up rather than chosen between: one that sends each
  * of its series separately contributes one type per series, and everything
- * else pools into as few types as the platform recommendation allows. A
- * measurement type with nothing in it is no types at all, which is what makes
- * this safe to call on an empty list.
+ * else pools into a single type however many series that is. A measurement
+ * type with nothing in it is no types at all, which is what makes this safe to
+ * call on an empty list.
  */
 export function typesIn(metrics: Metric[]): number {
   let pooled = 0;
@@ -374,7 +375,7 @@ export function typesIn(metrics: Metric[]): number {
     if (metric.typePerSeries) own += seriesCountOf(metric);
     else pooled += seriesCountOf(metric);
   }
-  return own + (pooled > 0 ? typesFor(pooled) : 0);
+  return own + (pooled > 0 ? 1 : 0);
 }
 
 export function addCounters(into: Counters, from: Counters): Counters {

@@ -102,11 +102,11 @@ function lintMachineType(machineType: MachineType, prefix: string): Finding[] {
       (sum, members) => sum + typesIn(members),
       0,
     );
-    // The floor pools everything and splits only where the platform
-    // recommendation forces it -- deliberately NOT typesIn, which honours the
-    // one-type-per-series flag and would therefore report a row as already
+    // One type is the floor: a pool is never split, so anything sharing a tick
+    // and a meaning can share one measurement. Deliberately NOT typesIn, which
+    // honours the one-type-per-series flag and would report a row as already
     // optimal at the very moment it is the thing worth advising about.
-    const fewestTypes = typesFor(seriesIn(metrics));
+    const fewestTypes = 1;
     if (currentTypes <= fewestTypes) continue;
     const sendsPerType = (n * REFERENCE_SECONDS) / group.interval;
     // '(none)' is the key these were grouped under, not a group anybody named,
@@ -122,10 +122,7 @@ function lintMachineType(machineType: MachineType, prefix: string): Finding[] {
         semantic: group.semantic,
         containers: currentTypes,
       },
-      // The advice is "one message instead of nine" until the platform's
-      // 100-series recommendation makes the floor higher than one, and then it
-      // has to say so rather than promising a measurement nobody should send.
-      detailKey: fewestTypes === 1 ? 'lint.L1.detail' : 'lint.L1.detailCapped',
+      detailKey: 'lint.L1.detail',
       detailParams: {
         // The series are the sentence's subject; the row names are a list at
         // the end of it. One row standing for 1,000 series is still 1,000
@@ -133,8 +130,6 @@ function lintMachineType(machineType: MachineType, prefix: string): Finding[] {
         count: seriesIn(metrics),
         names: metrics.map((m) => m.name).join(', '),
         containers: currentTypes,
-        target: fewestTypes,
-        max: MAX_SERIES_PER_BUNDLE,
       },
       machineTypeId: machineType.id,
       metricIds: metrics.map((m) => m.id),
@@ -226,27 +221,28 @@ function lintMachineType(machineType: MachineType, prefix: string): Finding[] {
       });
     }
 
-    // The tool does not leave a type over the recommendation and ask for it to
-    // be split -- it models the split, because a 450-series measurement is not
-    // a design anybody should be quoted on. What is left to report is what the
-    // split costs, which is the figure a customer can act on: fewer tags, or a
-    // slower scan.
+    // The recommendation is advice, and the engine quotes what it is given:
+    // 450 series in one measurement is one message, which is what the platform
+    // does with it. So this reports the shape, and prices what *following* the
+    // recommendation would cost -- a positive delta, because splitting adds
+    // messages. The tool used to split regardless and quote the larger number,
+    // which over-stated every fleet whose agent really does post one fat
+    // measurement.
     const series = seriesIn(members);
-    const types = typesFor(series);
     if (series > MAX_SERIES_PER_BUNDLE) {
       const ticks = (n * REFERENCE_SECONDS) / Math.max(bundle.intervalSeconds, 1e-9);
+      const split = typesFor(series);
       findings.push({
         rule: 'L6',
         severity: 'warning',
         titleKey: 'lint.L6.size.title',
-        titleParams: { fragment: nameOf(bundle), count: series, types },
+        titleParams: { fragment: nameOf(bundle), count: series, max: MAX_SERIES_PER_BUNDLE },
         detailKey: 'lint.L6.size.detail',
-        detailParams: { max: MAX_SERIES_PER_BUNDLE, types, count: series },
+        detailParams: { max: MAX_SERIES_PER_BUNDLE, count: series, types: split },
         machineTypeId: machineType.id,
         bundleId: bundle.id,
-        // What the split costs against the one message a tick the arithmetic
-        // alone would allow. Positive: this is volume the design adds.
-        messageDelta: (types - 1) * ticks,
+        // What following the advice would add, so the trade is explicit.
+        messageDelta: (split - 1) * ticks,
       });
     }
 

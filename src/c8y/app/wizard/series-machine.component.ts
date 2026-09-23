@@ -375,13 +375,12 @@ export class SeriesMachineComponent {
                 count: n(count),
                 name: ownFragmentName(this.prefix(), metric),
               })
-            : types > 1
-              ? t('series.solo.split', { types: n(types), max: n(MAX_SERIES_PER_BUNDLE) })
+            : count > MAX_SERIES_PER_BUNDLE
+              ? t('series.solo.overRecommended', { count: n(count), max: n(MAX_SERIES_PER_BUNDLE) })
               : t('series.oneMessagePerSample')
           : names
-            ? bundleTypes(bundle.id) > 1
-              ? t('series.messagesForAll', {
-                  types: n(bundleTypes(bundle.id)),
+            ? seriesInBundle(bundle.id) > MAX_SERIES_PER_BUNDLE
+              ? t('series.overRecommended', {
                   count: n(seriesInBundle(bundle.id)),
                   max: n(MAX_SERIES_PER_BUNDLE),
                 })

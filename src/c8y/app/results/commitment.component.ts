@@ -17,14 +17,13 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { commitmentFor } from '../../../../lib/engine/index.js';
 import { compact } from '../../../../lib/format/index.js';
 import { LocaleService } from '../i18n/locale.service.js';
-import { RichComponent } from '../i18n/rich.component.js';
 import { TPipe } from '../i18n/t.pipe.js';
 import { ScenarioStore } from '../scenario.store.js';
 
 @Component({
   selector: 'c8y-mc-commitment',
   standalone: true,
-  imports: [RichComponent, TPipe],
+  imports: [TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (commitment(); as c) {
@@ -46,10 +45,6 @@ import { ScenarioStore } from '../scenario.store.js';
               </div>
             }
           </div>
-          <div class="mc-grid mc-two">
-            <div><p class="mc-note"><c8y-mc-rich k="commitment.oneShort" /></p></div>
-            <div><p class="mc-muted"><c8y-mc-rich k="commitment.peakOverstates" [p]="c.overstateParams" /></p></div>
-          </div>
         </div>
       </div>
     }
@@ -63,7 +58,6 @@ export class CommitmentComponent {
     const t = this.locales.t();
     const c = commitmentFor(this.store.scenario(), this.store.result());
     if (c.termMonths === 0 || c.termUnitsQuoted === 0) return null;
-    const gap = c.termUnitsQuoted - c.termUnitsActual;
 
     return {
       sub: t('commitment.sub', { months: c.termMonths }),
@@ -84,7 +78,6 @@ export class CommitmentComponent {
           value: compact(c.termUnitsActual),
         },
       ],
-      overstateParams: { gap: compact(gap), quoted: compact(c.termUnitsQuoted) },
     };
   });
 }

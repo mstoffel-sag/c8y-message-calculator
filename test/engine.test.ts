@@ -571,10 +571,13 @@ describe('a row can stand for many series', () => {
   // asked about how many requests a tick takes.
   const TICKS = 44_640_000;
 
-  test('the tags decide what is stored; the measurement types decide the messages', () => {
+  test('the tags decide what is stored; the measurement type decides the messages', () => {
     const month = computeMachineTypeMonth(tags(450), 1_000, 31);
-    // 450 series will not go in one measurement, so the design sends five.
-    assert.equal(month.counters.measurementsCreated, TICKS * 5);
+    // One measurement type, however many series the customer put in it. The
+    // platform's 100-series recommendation is advice (L6), not arithmetic: it
+    // accepts a wide measurement and bills it as one message, and the tool
+    // quotes the design it was given rather than one it would have preferred.
+    assert.equal(month.counters.measurementsCreated, TICKS);
     // Every tag is still read once a tick, whatever it travels in.
     assert.equal(month.storedValues, TICKS * 450);
   });
@@ -582,9 +585,9 @@ describe('a row can stand for many series', () => {
   test('the naive baseline is every tag in a message of its own', () => {
     const month = computeMachineTypeMonth(tags(450), 1_000, 31);
     assert.equal(month.naiveTotal, TICKS * 450);
-    // Which is the whole argument for the row: 450 tags modelled as one row
-    // cost 5 messages a tick, and 450 if nobody bundles them.
-    assert.equal(month.naiveTotal / month.total, 90);
+    // Which is the whole argument for the row: 450 tags in one measurement are
+    // one message a tick, and 450 if nobody bundles them.
+    assert.equal(month.naiveTotal / month.total, 450);
   });
 
   test('a count of one is the ordinary row, unchanged', () => {
@@ -612,17 +615,19 @@ describe('a row can stand for many series', () => {
       31,
     );
     assert.equal(month.storedValues, TICKS * 452);
-    // 452 still needs five types, so the two named readings ride along free.
-    assert.equal(month.counters.measurementsCreated, TICKS * 5);
+    // One type for all 452, so the two named readings ride along free.
+    assert.equal(month.counters.measurementsCreated, TICKS);
   });
 
-  test('L6 reports the split rather than asking for one', () => {
+  test('L6 warns about a wide measurement and prices following the advice', () => {
     const findings = lintScenario({ ...blankScenario(), machineTypes: [tags(450)] });
     const l6 = must(findings.find((f) => f.rule === 'L6'), 'expected L6');
+    assert.equal(l6.severity, 'warning', 'advice, not an error -- the platform accepts it');
     assert.equal(l6.titleParams?.count, 450);
-    assert.equal(l6.titleParams?.types, 5);
-    // What the split costs above the one message a tick the arithmetic alone
-    // would allow -- positive, because this is volume the design adds.
+    assert.equal(l6.titleParams?.max, 100);
+    // Splitting into five is what the recommendation asks for, and it costs
+    // four extra messages a tick. Positive: complying adds volume.
+    assert.equal(l6.detailParams?.types, 5);
     assert.equal(l6.messageDelta, TICKS * 4);
   });
 
@@ -630,13 +635,13 @@ describe('a row can stand for many series', () => {
     const [example] = payloadsFor(tags(450), 'acme');
     const shown = must(example, 'no payload example');
     assert.equal(shown.seriesCount, 450);
-    assert.equal(shown.types, 5);
+    assert.equal(shown.types, 1, 'one measurement, as described');
     // Valid JSON a developer can paste: the tail is in the note, never an
     // ellipsis inside the object.
     const body = JSON.parse(shown.restBody);
     assert.deepEqual(Object.keys(body.acme_Plc60s), ['plcTags1', 'plcTags2', 'plcTags3']);
-    assert.ok(shown.noteKeys.includes('payload.note.split'));
-    assert.equal(shown.noteParams?.types, 5);
+    assert.ok(shown.noteKeys.includes('payload.note.overRecommended'));
+    assert.equal(shown.noteParams?.max, 100);
   });
 
   test('the diagram draws one row and says what it stands for', () => {
@@ -645,16 +650,16 @@ describe('a row can stand for many series', () => {
     assert.equal(group.members.length, 1, 'one row, not 450');
     assert.equal(group.members[0]?.seriesCount, 450);
     assert.equal(group.seriesCount, 450);
-    assert.equal(group.types, 5);
-    // The envelope is five messages a tick, and the readings in it are 450.
-    assert.equal(group.messagesPerMonth, group.ticksPerMonth * 5);
+    assert.equal(group.types, 1);
+    // One envelope a tick, carrying 450 readings.
+    assert.equal(group.messagesPerMonth, group.ticksPerMonth);
     assert.equal(view.storedPerMonth, group.ticksPerMonth * 450);
   });
 
   test('the summary counts series and the types they really travel in', () => {
     const summary = machineTypeSummary(tags(450));
     assert.equal(summary.parts.find((p) => p.kind === 'continuous')?.count, 450);
-    assert.equal(summary.measurementTypes, 5);
+    assert.equal(summary.measurementTypes, 1);
   });
   test('each series can be given a message of its own', () => {
     // A count says how many series there are; it does not say they share a
@@ -734,12 +739,12 @@ describe('a row can stand for many series', () => {
       lintScenario({ ...blankScenario(), machineTypes: [perSeriesTags(450)] }).find((f) => f.rule === 'L1'),
       'expected L1',
     );
-    // 450 types now, 5 if they shared a timestamp -- not 1, because the
-    // platform recommendation is the floor.
+    // 450 types now, one if they shared a timestamp. Nothing caps a pool any
+    // more, so the floor is one measurement however wide it is -- L6 is where
+    // the width gets argued about.
     assert.equal(l1.titleParams?.containers, 450);
-    assert.equal(l1.detailParams?.target, 5);
-    assert.equal(l1.detailKey, 'lint.L1.detailCapped');
-    assert.equal(l1.messageDelta, -445 * TICKS);
+    assert.equal(l1.detailKey, 'lint.L1.detail');
+    assert.equal(l1.messageDelta, -449 * TICKS);
   });
 
   test('the payload example for a per-series row is one series in one message', () => {

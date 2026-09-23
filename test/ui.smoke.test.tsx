@@ -329,9 +329,12 @@ describe('the wizard renders', () => {
 
   test('results: carries every counter cell and the hand-off', () => {
     const html = render(<StepResults scenario={scenario} result={result} expert />);
-    for (const cell of ['D28', 'D29', 'D30', 'D31', 'D32', 'D33', 'D34', 'D35', 'D36']) {
+    // D30 is Events Updated, zero on this fleet and therefore collapsed --
+    // the other eight carry a figure and are on screen.
+    for (const cell of ['D28', 'D29', 'D31', 'D32', 'D33', 'D34', 'D35', 'D36']) {
       assert.match(html, new RegExp(cell), `missing ${cell}`);
     }
+    assert.doesNotMatch(html, /D30/, 'a counter at zero collapses with the rest');
     assert.match(html, /Measurements Created/);
     assert.match(html, /volume estimate/);
     assert.match(html, /measurement\/measurements\/create/);
@@ -399,23 +402,25 @@ describe('the hand-off row explains its own buttons', () => {
     assert.doesNotMatch(html, /D28:36/);
   });
 
-  test('line items nobody filled in collapse, and the nine counters never do', () => {
+  test('every row at zero collapses, counters included', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
-    // 13 of the 15 asked line items are dashes on this estimate, and they
-    // buried the two that are not.
-    assert.match(html, /13 line items not in use/);
+    // 13 unused line items plus Events Updated, which is zero on this fleet.
+    assert.match(html, /14 rows at zero/);
     assert.doesNotMatch(html, /Streaming Analytics/, 'an unused add-on is collapsed');
     assert.doesNotMatch(html, /VPN Services/);
+    assert.doesNotMatch(html, /Events Updated/, 'and so is a counter at zero');
     // What is in use stays, and so does everything that is never "unused":
     // Messages is calculated, the storage line is estimated.
     assert.match(html, /Public\/Shared Cloud/);
     assert.match(html, /Messages/);
     assert.match(html, /Operational Data Store/);
-    // The nine counters are one contiguous paste block. A zero hidden out of
-    // D28:D36 is a stale value left behind in the Configurator, so they stay
-    // whole even when one of them is zero -- Events Updated is, here.
-    for (const label of COUNTER_LABELS_ALL) assert.ok(html.includes(label), label);
-    assert.match(html, /Events Updated/);
+    // The eight counters that carry a figure are all still on screen.
+    for (const label of COUNTER_LABELS_ALL.filter((l) => l !== 'Events Updated')) {
+      assert.ok(html.includes(label), label);
+    }
+    // Collapsed, not dropped: the Counters button still copies all nine, so a
+    // paste cannot leave a stale value in D28:D36 whatever is on screen.
+    assert.match(html, /D28:D36/);
   });
 
   test('the column header carries the period length, not just the quoted month', () => {
@@ -818,5 +823,59 @@ describe('a step is never named by its number', () => {
         `${relative(root, file)} names a step by number -- use the component name or its key`,
       );
     }
+  });
+});
+
+
+describe('the scenario library', () => {
+  /**
+   * The frame needs browser storage the moment it loads, so the shims go in
+   * before `main.js` is imported. They are deliberately tiny: what is under
+   * test is the picker, not a browser.
+   */
+  async function frame(
+    seed: (save: (id: string, scenario: ReturnType<typeof blankScenario>) => void, id: () => string) => void,
+  ) {
+    const cells = new Map<string, string>();
+    const g = globalThis as Record<string, unknown>;
+    g.localStorage = {
+      getItem: (k: string) => (cells.has(k) ? cells.get(k)! : null),
+      setItem: (k: string, v: string) => void cells.set(k, String(v)),
+      removeItem: (k: string) => void cells.delete(k),
+    };
+    // getElementById returns null, so importing main.js does not try to mount.
+    g.document = { getElementById: () => null };
+    g.window = { scrollTo() {} };
+
+    const store = await import('../src/ui/store.js');
+    seed(store.saveScenario, store.newScenarioId);
+    const { App } = await import('../src/ui/main.js');
+    return render(<App />);
+  }
+
+  test('the picker lists every saved scenario and offers another', async () => {
+    const html = await frame((save, id) => {
+      save(id(), { ...conceptSection9Scenario(), name: 'Acme rooftop HVAC' });
+      save(id(), { ...blankScenario(), name: 'Northwind meters' });
+    });
+    assert.match(html, /aria-label="Scenario"/, 'the picker is on the frame');
+    assert.match(html, /Acme rooftop HVAC/);
+    assert.match(html, /Northwind meters/);
+    // Creating one is a header action now, not a row inside the picker: the
+    // picker chooses among what exists, and making another is a different verb.
+    const picker = html.slice(html.indexOf('aria-label="Scenario"'));
+    const options = picker.slice(0, picker.indexOf('</select>'));
+    assert.doesNotMatch(options, /New scenario/, 'not an option in the list');
+    assert.match(html, /New scenario/, 'but present on the frame');
+    // Two scenarios, so deleting the open one leaves somewhere to land.
+    assert.match(html, /Delete this scenario/);
+  });
+
+  test('one scenario cannot be deleted, because nothing would be left open', async () => {
+    const html = await frame((save, id) => {
+      save(id(), { ...blankScenario(), name: 'Only one' });
+    });
+    assert.match(html, /Only one/);
+    assert.doesNotMatch(html, /Delete this scenario/);
   });
 });

@@ -31,7 +31,6 @@ export function Results({ scenario, result }: { scenario: Scenario; result: Scen
     (best, m) => (!best || m.total < best.total ? m : best),
     undefined,
   );
-  const saving = peak.naiveTotal - peak.total;
 
   return (
     <>
@@ -74,62 +73,6 @@ export function Results({ scenario, result }: { scenario: Scenario; result: Scen
           <small>{t('results.stat.perSecond.sub')}</small>
         </div>
       </div>
-
-      <section class="panel">
-        <header>
-          <h2>{t('naive.heading')}</h2>
-          <span class="sub">{monthYear(peak.year, peak.month)}</span>
-        </header>
-        <div class="body">
-          <div class="grid two">
-            <div>
-              <table>
-                <tbody>
-                  <tr>
-                    <td>{t('naive.asDesigned')}</td>
-                    <td class="num">{n(peak.total)}</td>
-                  </tr>
-                  <tr>
-                    <td>{t('naive.naive')}</td>
-                    <td class="num">{n(peak.naiveTotal)}</td>
-                  </tr>
-                  <tr class="total">
-                    <td>{t('naive.difference')}</td>
-                    <td class="num">{n(saving)}</td>
-                  </tr>
-                </tbody>
-              </table>
-              {peak.naiveTotal > 0 && peak.total > 0 && (
-                <>
-                  <div class="bar">
-                    <i style={`width:${(peak.total / peak.naiveTotal) * 100}%`} />
-                  </div>
-                  <p style="margin-top:8px;font-size:13.5px">
-                    <Rich
-                      k="naive.less"
-                      p={{
-                        factor: nf1.format(peak.naiveTotal / peak.total),
-                        pct: n((1 - peak.total / peak.naiveTotal) * 100),
-                      }}
-                    />
-                  </p>
-                </>
-              )}
-            </div>
-            <div>
-              <p class="note" style="margin:0">
-                <b>{t('naive.baselineLabel')}</b> {t('engine.naiveBaselineRule')}
-              </p>
-              <p style="font-size:13px;color:var(--ink-mute);margin-top:10px">
-                {t('naive.notCost', { saving: compact(saving) })}
-              </p>
-              <p style="font-size:13px;color:var(--ink-mute)">
-                <Rich k="naive.storedValues" p={{ count: compact(peak.storedValues) }} />
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <Storage result={result} />
 
@@ -459,7 +402,6 @@ export function Commitment({ scenario, result }: { scenario: Scenario; result: S
   const t = useT();
   const c = commitmentFor(scenario, result);
   if (c.termMonths === 0 || c.termUnitsQuoted === 0) return null;
-  const gap = c.termUnitsQuoted - c.termUnitsActual;
 
   return (
     <section class="panel">
@@ -487,21 +429,6 @@ export function Commitment({ scenario, result }: { scenario: Scenario; result: S
           </div>
         </div>
 
-        <div class="grid two">
-          <div>
-            <p class="note" style="margin:0">
-              <Rich k="commitment.oneShort" />
-            </p>
-          </div>
-          <div>
-            <p style="font-size:13px;color:var(--ink-mute);margin-top:0">
-              <Rich
-                k="commitment.peakOverstates"
-                p={{ gap: compact(gap), quoted: compact(c.termUnitsQuoted) }}
-              />
-            </p>
-          </div>
-        </div>
       </div>
     </section>
   );

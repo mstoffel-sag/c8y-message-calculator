@@ -732,3 +732,13 @@ label.locale select:hover { color: var(--ink); }
 .dg-legend i.key { width: 22px; height: 12px; border-radius: 2px; display: inline-block; }
 .dg-legend i.key.shared { background: var(--accent-soft); border: 1.5px solid var(--brand); }
 .dg-legend i.key.solo { background: var(--panel-2); border: 1.5px solid var(--line); }
+
+/* The scenario picker, under the name it belongs to. Deliberately quiet: it is
+   navigation, not a figure, and the top bar's job is the running total. */
+.library { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.library select {
+  max-width: 260px; font-size: 12.5px; padding: 2px 4px;
+  background: transparent; color: var(--ink-mute);
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.library button { padding: 0 5px; line-height: 1.2; color: var(--ink-faint); }

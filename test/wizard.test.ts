@@ -1021,3 +1021,118 @@ describe('the commit-to-consume commitment', () => {
     assert.equal(c.headroom, 0, 'not NaN');
   });
 });
+
+describe('a library of scenarios', () => {
+  test('entries sort newest first and survive a rubbish index', async () => {
+    const { normaliseEntries, sortedEntries, touch, removeEntry, mostRecent } =
+      await import('../lib/scenario/library.js');
+
+    let entries = touch([], 'a', 'Acme', 1_000);
+    entries = touch(entries, 'b', 'Northwind', 2_000);
+    assert.deepEqual(entries.map((e) => e.id), ['b', 'a'], 'newest first');
+    assert.equal(mostRecent(entries)?.id, 'b');
+
+    // Saving again moves it up and takes the new name with it -- the name is
+    // copied from the scenario rather than being a second thing to keep in step.
+    entries = touch(entries, 'a', 'Acme GmbH', 3_000);
+    assert.deepEqual(entries.map((e) => e.id), ['a', 'b']);
+    assert.equal(entries[0]?.name, 'Acme GmbH');
+    assert.equal(entries.length, 2, 'touch updates, it does not duplicate');
+
+    assert.deepEqual(removeEntry(entries, 'a').map((e) => e.id), ['b']);
+
+    // A library that throws on load leaves the app with no way in, so a bad
+    // row is dropped rather than fatal.
+    assert.deepEqual(normaliseEntries(null), []);
+    assert.deepEqual(normaliseEntries('nonsense'), []);
+    const cleaned = normaliseEntries([
+      { id: 'ok', name: 'Fine', savedAt: 5 },
+      { id: 'ok', name: 'Duplicate', savedAt: 9 },
+      { name: 'No id', savedAt: 1 },
+      { id: '', name: 'Empty id' },
+      { id: 'nodate' },
+    ]);
+    assert.deepEqual(cleaned.map((e) => e.id), ['ok', 'nodate']);
+    assert.equal(cleaned.find((e) => e.id === 'nodate')?.savedAt, 0);
+    assert.equal(sortedEntries(cleaned)[0]?.id, 'ok');
+  });
+
+  test('an id is safe in a URL, because the Web SDK build routes on it', async () => {
+    const { newScenarioId } = await import('../lib/scenario/library.js');
+    for (let i = 0; i < 200; i += 1) {
+      const id = newScenarioId();
+      assert.match(id, /^s[a-z0-9]+$/, id);
+      assert.equal(encodeURIComponent(id), id, 'must survive scenario/:id');
+    }
+    // Distinct within the same millisecond, which is when two clicks land.
+    const ids = new Set(Array.from({ length: 500 }, () => newScenarioId(1_700_000_000_000)));
+    assert.ok(ids.size > 490, `expected near-unique ids, got ${ids.size}`);
+  });
+
+  test('a nameless scenario still gets a row somebody can click', async () => {
+    const { entryName } = await import('../lib/scenario/library.js');
+    assert.equal(entryName({ name: 'Acme' }, 'Untitled'), 'Acme');
+    assert.equal(entryName({ name: '   ' }, 'Untitled'), 'Untitled');
+    assert.equal(entryName({ name: '' }, 'Untitled'), 'Untitled');
+  });
+});
+
+
+describe('what the left navigator shows', () => {
+  /**
+   * The shape, not the SDK objects. `@c8y/ngx-components` cannot be imported
+   * outside a bundler, so the factory itself is verified by a deploy -- which
+   * is exactly how the first cut shipped a `get()` that threw and took the
+   * whole left menu with it, this app's entry and every other app's. Whatever
+   * can be decided without the SDK is decided here, where a test can reach it.
+   */
+  async function nodes(entries: Array<{ id: string; name: string; savedAt: number }>, max?: number) {
+    const { scenarioNavNodes } = await import('../lib/wizard/navigator.js');
+    return scenarioNavNodes(entries, 'Untitled scenario', max);
+  }
+
+  test('every scenario is a top-level entry, in the library\'s own order', async () => {
+    const list = await nodes([
+      { id: 's1', name: 'Acme rooftop HVAC', savedAt: 2 },
+      { id: 's2', name: '   ', savedAt: 1 },
+    ]);
+    assert.equal(list.length, 2, 'no parent node to fold them into');
+    assert.equal(list[0]?.label, 'Acme rooftop HVAC');
+    assert.equal(list[0]?.path, '/scenario/s1');
+    // A customer's own name is data, so the shell must not translate it.
+    assert.equal(list[0]?.translateLabel, false);
+    // A nameless scenario still gets a row somebody can click, and that label
+    // is the tool's own word, so it is translated.
+    assert.equal(list[1]?.label, 'Untitled scenario');
+    assert.equal(list[1]?.translateLabel, true);
+    // Descending priority, so the shell keeps newest-first rather than sorting
+    // equal priorities however it likes.
+    assert.ok(list[0]!.priority > list[1]!.priority, 'order is stated, not hoped for');
+  });
+
+  test('an empty library still leaves the application reachable', async () => {
+    // Cannot happen -- both stores open one on first load -- but a menu is the
+    // way in, so it does not get to be empty on a technicality.
+    const list = await nodes([]);
+    assert.equal(list.length, 1);
+    assert.equal(list[0]?.label, 'Message calculator');
+    assert.equal(list[0]?.path, '/');
+    assert.equal(list[0]?.translateLabel, true);
+  });
+
+  test('every scenario reaches the menu, because nothing else lists them', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({
+      id: `s${i}`,
+      name: `Scenario ${i}`,
+      savedAt: 100 - i,
+    }));
+    // The page had a picker and the menu was capped at eight. The picker is
+    // gone -- the navigator is the library -- so a cap would not tidy the menu,
+    // it would strand the ninth scenario where only a saved URL could reach it.
+    assert.equal((await nodes(many)).length, 30);
+    // A cap of none is not a crash, and not an empty menu either.
+    const none = await nodes(many, 0);
+    assert.equal(none.length, 1);
+    assert.equal(none[0]?.path, '/');
+  });
+});
