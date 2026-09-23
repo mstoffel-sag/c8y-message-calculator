@@ -440,10 +440,10 @@ export const de: Record<Key, string> = {
   'handoff.unused.show': 'Einblenden',
   'handoff.unused.hide': 'Ausblenden',
   'handoff.counters': 'Zähler',
-  'handoff.counters.explain': '**Zähler** kopiert die neun Zahlen oben als eine einzelne Spalte, in der Reihenfolge des Configurators. Markieren Sie den Zählerblock dieser Periode — `{range}` in Periode 1, und {stride} Zeilen tiefer für jede weitere Periode — und fügen Sie einmal ein.',
+  'handoff.counters.explain': '**Zähler** kopiert die neun Zahlen oben als eine Spalte. Fügen Sie sie in `{range}` des Sales Configurators ein. Jede weitere Periode liegt {stride} Zeilen tiefer.',
   'handoff.counters.title': 'Neun Zähler für Periode {index}, bereit zum Einfügen bei {cell}',
   'handoff.all': 'Alles',
-  'handoff.all.explain': '**Alles** kopiert jede Zeile als *Zelle, Wert, Bezeichnung*, tabgetrennt. Kein Einfügeziel — die Zellen liegen nicht zusammenhängend — aber eine Liste zum Abarbeiten.',
+  'handoff.all.explain': '**Alles** kopiert jede Zeile als *Zelle, Wert, Bezeichnung*. Diese Zellen liegen über das Blatt verstreut, es ist also eine Liste zum Abarbeiten und kein Einfügeziel.',
   'handoff.all.title': 'Jede Zelle, jeder Wert und jede Bezeichnung für Periode {index}',
 
   /* --------------------------------- the guidance rules L1-L10 */

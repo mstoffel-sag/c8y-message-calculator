@@ -394,7 +394,7 @@ describe('the hand-off row explains its own buttons', () => {
   test('each button says what it copies, and where it goes', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
     // The old row was two bare labels against one run-on sentence.
-    assert.match(html, /<b>Counters<\/b> copies the nine numbers above as a single column/);
+    assert.match(html, /<b>Counters<\/b> copies the nine numbers above as one column/);
     assert.match(html, /<b>All<\/b> copies every row as <em>cell, value, label<\/em>/);
     // The paste target is a real Excel range. It used to render as "D28:36",
     // which Excel does not accept.
