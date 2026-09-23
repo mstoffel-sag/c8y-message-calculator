@@ -29,7 +29,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AlertService, CoreModule, StepperModule } from '@c8y/ngx-components';
+import { AlertService, C8yStepper, CoreModule, StepperModule } from '@c8y/ngx-components';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 
@@ -212,12 +212,29 @@ export class WizardComponent {
     { initialValue: null },
   );
 
+  private readonly stepper = viewChild(C8yStepper);
+  /** The route id the stepper is currently showing, so a change can be seen. */
+  private shown: string | null | undefined = undefined;
+
   constructor() {
     // The route drives the store, never the other way round: a navigator link,
     // a pasted URL and the back button all arrive here, and all three must land
     // on the same scenario. An id the library does not know mints that id
     // rather than redirecting, so a shared link keeps working.
-    effect(() => this.store.openById(this.routed()));
+    effect(() => {
+      const id = this.routed();
+      this.store.openById(id);
+
+      // A different scenario is a different piece of work, so it opens on step
+      // one with nothing marked done. The stepper keeps its own selected index
+      // and its steps keep their own `interacted` flag; neither is derived from
+      // the scenario, so without this a new scenario arrived wearing the last
+      // one's progress -- four ticked circles over an empty fleet. The
+      // standalone build has always reset its rail here for the same reason.
+      const first = this.shown === undefined;
+      if (!first && id !== this.shown) this.stepper()?.reset();
+      this.shown = id;
+    });
   }
 
   create(): void {
