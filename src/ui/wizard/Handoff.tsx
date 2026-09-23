@@ -104,6 +104,16 @@ export function Handoff({ scenario, result }: Props) {
   // are dashes, and they bury the two that are not.
   const [showUnused, setShowUnused] = useState(false);
   const unused = LINE_ITEMS.filter((item) => isUnused(scenario, item));
+  // A counter is zero across every period, so it has nothing to transfer. The
+  // nine are still one contiguous paste block -- which is why these collapse
+  // rather than disappear, and why the Counters button below copies all nine
+  // whatever is on screen. Hand-typing from a collapsed table is the one way
+  // to leave a stale value in D28:D36, and Show is a click away.
+  const counterRows = COUNTER_KEYS.map((key, i) => ({ key, i }));
+  const zeroCounters = counterRows.filter(({ key }) =>
+    result.periods.every((p) => p.peak.counters[key] === 0),
+  );
+  const hiddenCount = unused.length + zeroCounters.length;
   const tsvFor = (periodResult: PeriodResult): string => {
     const period = scenario.periods.find((p) => p.index === periodResult.index);
     const lines: string[] = [
@@ -221,7 +231,11 @@ export function Handoff({ scenario, result }: Props) {
 
                 {/* The nine counters sit directly under Messages in the workbook. */}
                 {item.key === 'messages' &&
-                  COUNTER_KEYS.map((key, i) => (
+                  counterRows
+                    .filter(({ key }) =>
+                      showUnused || !zeroCounters.some((z) => z.key === key),
+                    )
+                    .map(({ key, i }) => (
                     <tr key={key}>
                       <td style="padding-left:26px">{COUNTER_LABELS[key]}</td>
                       {result.periods.map((p) => (
@@ -243,10 +257,10 @@ export function Handoff({ scenario, result }: Props) {
                 be findable. The nine counters are never in here -- they are one
                 contiguous paste block, and a zero hidden out of D28:D36 is a
                 stale value left behind in the Configurator. */}
-            {unused.length > 0 && (
+            {hiddenCount > 0 && (
               <tr>
                 <td class="hint" colSpan={1 + result.periods.length}>
-                  {t.plural('handoff.unused', unused.length)}{' '}
+                  {t.plural('handoff.unused', hiddenCount)}{' '}
                   <button
                     class="ghost"
                     style="padding:0 4px;text-decoration:underline"

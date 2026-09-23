@@ -47,46 +47,6 @@ import { FindingsComponent } from './findings.component.js';
       }
     </div>
 
-    <div class="mc-panel">
-      <header>
-        <h2>{{ 'naive.heading' | t }}</h2>
-        <span class="mc-sub-label">{{ naive().month }}</span>
-      </header>
-      <div class="mc-body">
-        <div class="mc-grid mc-two">
-          <div>
-            <table class="table mc-table">
-              <tbody>
-                <tr>
-                  <td>{{ 'naive.asDesigned' | t }}</td>
-                  <td class="text-right">{{ naive().designed }}</td>
-                </tr>
-                <tr>
-                  <td>{{ 'naive.naive' | t }}</td>
-                  <td class="text-right">{{ naive().unbundled }}</td>
-                </tr>
-                <tr class="mc-total">
-                  <td>{{ 'naive.difference' | t }}</td>
-                  <td class="text-right">{{ naive().saving }}</td>
-                </tr>
-              </tbody>
-            </table>
-            @if (naive().share !== null) {
-              <div class="mc-bar"><i [style.width.%]="naive().share"></i></div>
-              <p class="m-t-8"><c8y-mc-rich k="naive.less" [p]="naive().lessParams!" /></p>
-            }
-          </div>
-          <div>
-            <p class="mc-note">
-              <b>{{ 'naive.baselineLabel' | t }}</b> {{ 'engine.naiveBaselineRule' | t }}
-            </p>
-            <p class="mc-muted m-t-8">{{ naive().notCost }}</p>
-            <p class="mc-muted"><c8y-mc-rich k="naive.storedValues" [p]="naive().storedParams" /></p>
-          </div>
-        </div>
-      </div>
-    </div>
-
     @if (storage(); as s) {
       <div class="mc-panel">
         <header>
@@ -250,37 +210,6 @@ export class ResultsPanelsComponent {
     ];
   });
 
-  readonly naive = computed(() => {
-    const t = this.locales.t();
-    const peak = this.peak();
-    const saving = peak.naiveTotal - peak.total;
-    const comparable = peak.naiveTotal > 0 && peak.total > 0;
-
-    return {
-      month: monthYear(peak.year, peak.month),
-      designed: n(peak.total),
-      unbundled: n(peak.naiveTotal),
-      saving: n(saving),
-      share: comparable ? (peak.total / peak.naiveTotal) * 100 : null,
-      lessParams: comparable
-        ? {
-            factor: nf1.format(peak.naiveTotal / peak.total),
-            pct: n((1 - peak.total / peak.naiveTotal) * 100),
-          }
-        : undefined,
-      notCost: t('naive.notCost', { saving: compact(saving) }),
-      storedParams: { count: compact(peak.storedValues) },
-    };
-  });
-
-  /**
-   * Operational storage: a range, and why it is a range.
-   *
-   * The two figures behind it are rules of thumb marked "to be verified" at
-   * source, and one of them spans 4x on its own. Reporting a midpoint would
-   * make that look like a measurement, so both ends are shown, the retention
-   * that scales them is stated, and the ODS line stays somebody's decision.
-   */
   readonly storage = computed(() => {
     const t = this.locales.t();
     const result = this.store.result();

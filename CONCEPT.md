@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 32 — the 100-series recommendation is advice again: the tool quotes the design it is given and warns · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-22
+**Status:** draft for review, rev 33 — the results page drops the naive comparison and every row at zero · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
 
 ---
 
@@ -630,10 +630,11 @@ There is no month-basis setting, because billing is per calendar month and the e
 month lengths. What replaces it is more useful: results carry a **range** across the months in each
 period, with the peak month named. There is no headroom or commit setting either — see §2.
 
-**Naive baseline.** Every result is shown against the unbundled counterfactual — **every series in
-its own measurement**, at the interval it was given. That delta is the tool's headline: *"your design
-produces 134 million fewer messages in your peak month — 74 % less volume — than the obvious
-implementation."* It used to carry a second clause, every state metric interval-sampled at the
+**Naive baseline.** The engine still computes the unbundled counterfactual — **every series in its
+own measurement**, at the interval it was given — and `L1` prices it per finding. The panel that
+showed it fleet-wide, *Against the obvious implementation*, is **gone from the results page**: it
+compared the design against one nobody proposed, which is an argument to have on the Measurements
+step where it can still be acted on, not a line item in a hand-off. The top bar keeps the ratio. It used to carry a second clause, every state metric interval-sampled at the
 fleet's fastest tick, which put the §9 figure at 222 million and 83 %. That clause went with the
 on-change rhythm (§4.4): there are no flags left to re-sample, only series read at the rate they were
 given, so the counterfactual is smaller and the whole delta is now the bundling.
@@ -855,6 +856,13 @@ a test pins the order.
 
 ## 7. Output
 
+**Rows at zero collapse.** A line item nobody filled in, and a counter that is zero in every period,
+are both one line of a checklist with nothing to transfer — 14 of them on the §9 fleet, burying the
+handful that carry a figure. They fold behind one *Show*. Collapsed rather than dropped, because the
+table is a checklist of Configurator cells and a cell empty *because nobody has decided yet* still
+has to be findable; the Counters button copies all nine whatever is on screen, so a paste cannot
+leave a stale value in `D28:D36`.
+
 **The hand-off table** — the primary artefact. Every number the tool produces, next to the exact
 Configurator cell it belongs in, per period: the nine counters, the period length, and every
 deployment and add-on quantity collected in the **Deployment & add-ons** panel. Two copy actions per period — the nine counters
@@ -864,7 +872,7 @@ page supports this table.
 **Volume figures**
 - **The calendar-month range, with the peak month named.** Every period reports its leanest and
   peak month. A single averaged number is misleading in both directions (§2).
-- Total messages/month split by counter and by machine type, with the naive baseline alongside.
+- Total messages/month split by counter and by machine type.
 - The per-machine-per-month figure — the number architects actually reason with.
 - Average messages/second: a throughput sanity check, and only that.
 
