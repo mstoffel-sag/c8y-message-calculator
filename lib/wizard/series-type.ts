@@ -40,6 +40,19 @@ export interface TypeChoice {
   group: string;
 }
 
+/**
+ * Whether the row really sends one measurement type per series.
+ *
+ * The flag alone is not the answer: on a row standing for one series, "a type
+ * per series" and "a type of its own" are the same arrangement, so the flag
+ * says nothing and the row is an ordinary lone series. Reading the flag without
+ * the count is what kept six single-series rows from being offered to each
+ * other even after they were put on the same tick.
+ */
+export function sendsTypePerSeries(metric: Metric): boolean {
+  return Boolean(metric.typePerSeries) && seriesCountOf(metric) > 1;
+}
+
 /** The interval a series is read on. Anything else is 60 s by convention. */
 function intervalOf(metric: Metric): number {
   return metric.cadence.mode === 'interval' ? metric.cadence.seconds : 60;
@@ -62,7 +75,7 @@ function soloBundleOf(machineType: MachineType, metric: Metric) {
 
 /** Which option is selected, given what the row is actually doing. */
 export function typeChoiceOf(machineType: MachineType, metric: Metric): string {
-  if (Boolean(metric.typePerSeries) && seriesCountOf(metric) > 1) return PER_SERIES;
+  if (sendsTypePerSeries(metric)) return PER_SERIES;
   if (soloBundleOf(machineType, metric)) return '';
   return metric.bundleId ?? '';
 }
@@ -96,10 +109,12 @@ export function seriesTypeChoices(
 
   // Lone series on the same tick. They have no Bundle to point at yet, so they
   // are offered by the name the type they would mint is going to have, and
-  // choosing one mints it. A row sending one type per series is left out: it
-  // cannot be in a shared type, which is the whole of what it means.
+  // choosing one mints it. A row that really does send one type per series is
+  // left out: it cannot be in a shared type, which is the whole of what it
+  // means -- but the flag has to be read with the count, or a single-series row
+  // that happens to carry it disappears from everyone else's list.
   for (const other of series) {
-    if (other.id === metric.id || other.bundleId || other.typePerSeries) continue;
+    if (other.id === metric.id || other.bundleId || sendsTypePerSeries(other)) continue;
     if (intervalOf(other) !== seconds) continue;
     options.push({
       value: WITH + other.id,

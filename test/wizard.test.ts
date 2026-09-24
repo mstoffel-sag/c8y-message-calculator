@@ -1199,6 +1199,42 @@ describe('the measurement-type dropdown', () => {
     );
   });
 
+  test('a one-series row carrying the per-series flag is still offered to others', () => {
+    // The flag has to be read with the count. On a row standing for one series
+    // "a type per series" and "a type of its own" are the same arrangement, so
+    // the flag says nothing -- but a filter that read it alone dropped such a
+    // row out of every other row's list, which is how six series sitting on the
+    // same tick still had nothing to share a message with.
+    const s = hvac();
+    const mt = mtOf(s);
+    const flagged = {
+      ...mt,
+      metrics: mt.metrics.map((m) =>
+        m.name === 'Filter status' ? { ...m, typePerSeries: true } : m,
+      ),
+    };
+    const compressor = flagged.metrics.find((m) => m.name === 'Compressor on/off')!;
+    assert.ok(
+      seriesTypeChoices(t, flagged, compressor, 'acme').some((o) =>
+        o.label.startsWith('acme_FilterStatus'),
+      ),
+      'one series is one series, whatever the flag says',
+    );
+    // And a row that really does send one type per series stays out: it cannot
+    // be in a shared type, which is the whole of what it means.
+    const many = {
+      ...mt,
+      metrics: mt.metrics.map((m) =>
+        m.name === 'Filter status' ? { ...m, typePerSeries: true, seriesCount: 12 } : m,
+      ),
+    };
+    assert.ok(
+      !seriesTypeChoices(t, many, compressor, 'acme').some((o) =>
+        o.label.startsWith('acme_FilterStatus'),
+      ),
+    );
+  });
+
   test('the answer the row is already on is the one selected', () => {
     const s = hvac();
     assert.equal(typeChoiceOf(mtOf(s), by(s, 'Supply air temp')), by(s, 'Supply air temp').bundleId);
