@@ -31,6 +31,7 @@ export const en = {
   'library.delete': 'Delete',
   'library.untitled': 'Untitled scenario',
   'library.confirmDelete': 'Delete “{name}”? This cannot be undone.',
+  'nav.confirmReset': 'Empty this scenario and start over? This cannot be undone.',
 
   'nav.back': 'Back',
   'nav.progress': 'Step {step} of {total}',

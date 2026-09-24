@@ -241,7 +241,18 @@ export class WizardComponent {
     void this.router.navigate(['/scenario', this.store.add()]);
   }
 
+  /**
+   * Both destructive verbs ask first, through `window.confirm`.
+   *
+   * Not the shell's own affordance, which is a popover component rather than
+   * something a handler can await, and this app has never been rendered by
+   * anything -- a confirmation wired blind against an API nobody has watched
+   * work is a worse bargain than a plain dialog that behaves identically in
+   * both builds. Swap it for the popover the first time somebody can watch it.
+   */
   drop(): void {
+    const name = this.store.scenario().name.trim() || this.locales.t()('library.untitled');
+    if (!confirm(this.locales.t()('library.confirmDelete', { name }))) return;
     void this.router.navigate(['/scenario', this.store.remove(this.currentId())]);
   }
   private readonly shell = viewChild<ElementRef<HTMLElement>>('shell');
@@ -311,6 +322,7 @@ export class WizardComponent {
   }
 
   reset(): void {
+    if (!confirm(this.locales.t()('nav.confirmReset'))) return;
     this.store.set(blankScenario());
   }
 

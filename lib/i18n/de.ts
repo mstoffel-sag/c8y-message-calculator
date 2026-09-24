@@ -30,6 +30,7 @@ export const de: Record<Key, string> = {
   'library.delete': 'Löschen',
   'library.untitled': 'Unbenanntes Szenario',
   'library.confirmDelete': '„{name}“ löschen? Das kann nicht rückgängig gemacht werden.',
+  'nav.confirmReset': 'Dieses Szenario leeren und neu beginnen? Das kann nicht rückgängig gemacht werden.',
 
   'nav.back': 'Zurück',
   'nav.progress': 'Schritt {step} von {total}',

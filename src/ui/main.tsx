@@ -182,7 +182,12 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
           <button onClick={() => setScenario(conceptSection9Scenario())} class="ghost">
             {t('nav.loadExample')}
           </button>
-          <button onClick={() => setScenario(blankScenario())} class="ghost danger">
+          <button
+            class="ghost danger"
+            onClick={() => {
+              if (confirm(t('nav.confirmReset'))) setScenario(blankScenario());
+            }}
+          >
             {t('nav.reset')}
           </button>
           <ScenarioIO scenario={scenario} onChange={setScenario} />
