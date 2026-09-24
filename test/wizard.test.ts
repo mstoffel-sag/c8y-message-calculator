@@ -3,7 +3,7 @@
  * numbers to Configurator cells.
  */
 
-import { en } from '../lib/i18n/index.js';
+import { en, makeT } from '../lib/i18n/index.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -34,6 +34,11 @@ import {
   REFERENCE_DAYS,
 } from '../lib/engine/index.js';
 import { blankScenario, conceptSection9Scenario, presetByKey } from '../lib/presets/index.js';
+import {
+  applySeriesTypeChoice,
+  seriesTypeChoices,
+  typeChoiceOf,
+} from '../lib/wizard/series-type.js';
 
 function unbundled(): MachineType {
   const hvac = presetByKey('hvac')!;
@@ -1134,5 +1139,69 @@ describe('what the left navigator shows', () => {
     const none = await nodes(many, 0);
     assert.equal(none.length, 1);
     assert.equal(none[0]?.path, '/');
+  });
+});
+
+describe('the measurement-type dropdown', () => {
+  const t = makeT('en');
+  /** The shipped preset, whose two 72-minute statuses are each in no bundle. */
+  const hvac = () => conceptSection9Scenario();
+  const mtOf = (s: ReturnType<typeof hvac>) => s.machineTypes[0]!;
+  const by = (s: ReturnType<typeof hvac>, name: string) =>
+    mtOf(s).metrics.find((m) => m.name === name)!;
+
+  test('two lone series on the same tick can find each other', () => {
+    // The bug: `siblings` was read off `mt.bundles`, and a series in no bundle
+    // is in none of them. Both statuses sit at 4320 s with bundleId null, so
+    // each dropdown held exactly one option -- "One measurement for all series"
+    // -- which is the option it was already on. Nothing to change it to, while
+    // L1 said to put the two together.
+    const s = hvac();
+    const options = seriesTypeChoices(t, mtOf(s), by(s, 'Compressor on/off'), 'acme');
+    assert.ok(options.length > 1, 'the dropdown is not dead');
+    const partner = options.find((o) => o.label.startsWith('acme_FilterStatus'));
+    assert.ok(partner, 'the other lone series on the same tick is offered');
+    assert.equal(partner.group, t('series.typesOnInterval'));
+  });
+
+  test('a series on another tick is not offered, because one timestamp', () => {
+    const s = hvac();
+    const options = seriesTypeChoices(t, mtOf(s), by(s, 'Compressor on/off'), 'acme');
+    assert.ok(
+      !options.some((o) => o.label.includes('acme_Climate')),
+      'the 60 s measurement type cannot carry a 72-minute reading',
+    );
+  });
+
+  test('choosing the partner puts both in one measurement type, and clears L1', () => {
+    const before = hvac();
+    const flag = by(before, 'Compressor on/off');
+    const other = by(before, 'Filter status');
+    const options = seriesTypeChoices(t, mtOf(before), flag, 'acme');
+    const partner = options.find((o) => o.label.startsWith('acme_FilterStatus'))!;
+
+    const after = applySeriesTypeChoice(before, mtOf(before).id, flag.id, partner.value);
+    const mt = mtOf(after);
+    const a = mt.metrics.find((m) => m.id === flag.id)!;
+    const b = mt.metrics.find((m) => m.id === other.id)!;
+    assert.ok(a.bundleId, 'the type was minted');
+    assert.equal(a.bundleId, b.bundleId, 'and both series are in it');
+
+    // The whole point: the guidance that could not be acted on goes away, and
+    // the messages it costed are gone with it.
+    const l1 = (r: ReturnType<typeof computeScenario>) =>
+      r.findings.filter((f) => f.rule === 'L1').length;
+    assert.equal(l1(computeScenario(before)), 1, 'L1 was asking for this');
+    assert.equal(l1(computeScenario(after)), 0, 'and is satisfied by it');
+    assert.ok(
+      computeScenario(after).peakMonth.total < computeScenario(before).peakMonth.total,
+      'one message instead of two, for identical information',
+    );
+  });
+
+  test('the answer the row is already on is the one selected', () => {
+    const s = hvac();
+    assert.equal(typeChoiceOf(mtOf(s), by(s, 'Supply air temp')), by(s, 'Supply air temp').bundleId);
+    assert.equal(typeChoiceOf(mtOf(s), by(s, 'Filter status')), '', 'a lone series is on its own');
   });
 });

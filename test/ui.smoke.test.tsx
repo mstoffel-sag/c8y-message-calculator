@@ -156,9 +156,14 @@ describe('the wizard renders', () => {
     // make "Bundled -- shares a message" a lie. The two 72-minute statuses
     // never see it: a measurement carries one timestamp.
     assert.equal((html.match(/acme_Pressure · 1 series/g) ?? []).length, 3);
-    // And the heading only appears where there is something to be bundled
-    // with, which is those four rows on the 60 s tick.
-    assert.equal((html.match(/Shares a message/g) ?? []).length, 4);
+    // And the heading appears wherever there is something to be bundled with:
+    // the four rows on the 60 s tick, and the two 72-minute statuses, which are
+    // each other's only candidate. They are in no bundle, so they used to be
+    // invisible to one another and each had a dropdown of exactly one option --
+    // while L1 told the customer to put them together.
+    assert.equal((html.match(/Shares a message/g) ?? []).length, 6);
+    assert.equal((html.match(/acme_CompressorOnOff · 1 series/g) ?? []).length, 1);
+    assert.equal((html.match(/acme_FilterStatus · 1 series/g) ?? []).length, 1);
     // So every continuous row carries the offer, including the one that took
     // it -- there it is the answer the dropdown is showing, which is how a
     // reader sees at a glance which rows are bundled and which are not.

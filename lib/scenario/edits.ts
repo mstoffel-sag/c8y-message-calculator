@@ -265,6 +265,34 @@ export function assignOwnBundle(
 }
 
 /**
+ * Puts this series in the same measurement type as another one.
+ *
+ * The case the dropdown could not express: two series on the same tick, neither
+ * of them in a bundle, so neither appears in `mt.bundles` and neither can be
+ * offered as somewhere for the other to go. One of them has to mint the type
+ * before the other can join it, which is what this does -- `assignOwnBundle`
+ * for the target if it needs one, then the ordinary join.
+ *
+ * Composed rather than written out, so the naming, the emptied-type cleanup and
+ * the cancelling of one-type-per-series all keep happening exactly once.
+ */
+export function shareWithSeries(
+  scenario: Scenario,
+  machineTypeId: string,
+  metricId: string,
+  otherMetricId: string,
+): Scenario {
+  if (otherMetricId === metricId) return scenario;
+  const minted = assignOwnBundle(scenario, machineTypeId, otherMetricId);
+  const mt = minted.machineTypes.find((m) => m.id === machineTypeId);
+  const target = mt?.metrics.find((m) => m.id === otherMetricId)?.bundleId;
+  // The other series is not continuous, or is gone: nothing was minted and
+  // there is nowhere to join, so the scenario is returned untouched.
+  if (!target) return scenario;
+  return assignBundle(minted, machineTypeId, metricId, target);
+}
+
+/**
  * Every series on this row travels in a measurement type of its own.
  *
  * The third answer to "where does this row send", and the one a count made

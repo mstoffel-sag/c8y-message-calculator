@@ -32,12 +32,14 @@ import {
   type Metric,
 } from '../../../../lib/engine/index.js';
 import { compact, n } from '../../../../lib/format/index.js';
+import {
+  applySeriesTypeChoice,
+  seriesTypeChoices,
+  typeChoiceOf,
+} from '../../../../lib/wizard/series-type.js';
 import { DATAPOINTS, STATES, UNITS, type Choice } from '../../../../lib/presets/catalog.js';
 import {
   addDatapoint,
-  assignBundle,
-  assignOwnBundle,
-  assignTypePerSeries,
   patchBundle,
   patchUnit,
   removeMetric,
@@ -70,21 +72,10 @@ const SERIES_SEEDS = [...DATAPOINTS, ...STATES];
 /** Seconds in a 31-day month, for the "samples per month" hint. */
 const PEAK_MONTH_SECONDS = 2_678_400;
 
-/**
- * The measurement-type dropdown's third answer, which is not a bundle id.
- *
- * A sentinel rather than a second control: the three answers are mutually
- * exclusive -- a row cannot both ride in `acme_Climate` and send each of its
- * series separately -- so one dropdown makes the contradiction unrepresentable.
- * Empty string already means "a measurement type of its own", so this needs a
- * value no bundle id can collide with.
- */
-const PER_SERIES = '\u0000per-series';
-
 interface Row {
   metric: Metric;
   seconds: number;
-  /** The dropdown's current answer: a bundle id, '' or PER_SERIES. */
+  /** The dropdown's current answer; `lib/wizard/series-type.ts` decides it. */
   typeChoice: string;
   /** How many series this row stands for; 1 on nearly every row. */
   count: number;
@@ -325,10 +316,6 @@ export class SeriesMachineComponent {
       // lie, and choosing it would be a no-op. Its answer is "a measurement
       // type of its own", below, and its name is still editable in the field
       // under the dropdown.
-      const soloBundle = bundle !== undefined && bundle.metricIds.length === 1;
-      const siblings = mt.bundles.filter(
-        b => b.intervalSeconds === seconds && !(soloBundle && b.id === bundle?.id),
-      );
       // The name belongs to the measurement type, not to the row, so only the
       // first series in it gets the field. Four identical boxes for one value
       // would invite an edit in row three and change row one.
@@ -340,25 +327,10 @@ export class SeriesMachineComponent {
         seconds,
         count,
         types,
-        typeChoice: perSeries ? PER_SERIES : soloBundle ? '' : (metric.bundleId ?? ''),
+        typeChoice: typeChoiceOf(mt, metric),
         bundle,
         names,
-        typeOptions: [
-          ...siblings.map(b => ({
-            value: b.id,
-            label: t('series.typeOption', {
-              name: b.fragmentName.trim() || t('series.typeUnnamed'),
-              series: t.plural('series.count', seriesInBundle(b.id)),
-            }),
-            group: t('series.typesOnInterval'),
-          })),
-          { value: '', label: t('series.ownType'), group: t('series.onItsOwn') },
-          // Only where it would mean something different: for a single series,
-          // one type per series and a type of its own are the same answer.
-          ...(count > 1
-            ? [{ value: PER_SERIES, label: t('series.typePerSeries'), group: t('series.onItsOwn') }]
-            : []),
-        ],
+        typeOptions: seriesTypeChoices(t, mt, metric, this.prefix()),
         samplesHint: t('series.samplesPerMonth', {
           count: compact(PEAK_MONTH_SECONDS / seconds),
         }),
@@ -413,14 +385,8 @@ export class SeriesMachineComponent {
     this.edit(s => setMetricInterval(s, this.machineType().id, metricId, seconds));
   }
 
-  assign(metricId: string, bundleId: string): void {
-    this.edit(s =>
-      bundleId === PER_SERIES
-        ? assignTypePerSeries(s, this.machineType().id, metricId)
-        : bundleId
-          ? assignBundle(s, this.machineType().id, metricId, bundleId)
-          : assignOwnBundle(s, this.machineType().id, metricId),
-    );
+  assign(metricId: string, choice: string): void {
+    this.edit(s => applySeriesTypeChoice(s, this.machineType().id, metricId, choice));
   }
 
   renameSolo(metricId: string, fragmentName: string): void {

@@ -42,9 +42,6 @@ import {
 import { DATAPOINTS, STATES, UNITS } from '../../../lib/presets/catalog.js';
 import {
   addDatapoint,
-  assignBundle,
-  assignOwnBundle,
-  assignTypePerSeries,
   patchBundle,
   removeMetric,
   setBundleRetentionDays,
@@ -61,6 +58,11 @@ import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
 import { compact, n } from '../format.js';
 import { Prose, Rich, useT } from '../i18n.js';
+import {
+  applySeriesTypeChoice,
+  seriesTypeChoices,
+  typeChoiceOf,
+} from '../../../lib/wizard/series-type.js';
 import { Explainer } from '../Explainer.js';
 import { MeasurementDiagram } from '../MeasurementDiagram.js';
 
@@ -99,7 +101,6 @@ const SERIES_SEEDS = [...DATAPOINTS, ...STATES];
  * Empty string already means "a measurement type of its own", so this needs a
  * value no bundle id can collide with.
  */
-const PER_SERIES = '\u0000per-series';
 
 export function StepTimeSeries({ scenario, onChange }: Props) {
   const t = useT();
@@ -228,9 +229,6 @@ function MachineBlock({
                 // answer is "a measurement type of its own", below, and its
                 // name is still editable in the field under the dropdown.
                 const soloBundle = bundle !== undefined && bundle.metricIds.length === 1;
-                const siblings = mt.bundles.filter(
-                  (b) => b.intervalSeconds === seconds && !(soloBundle && b.id === bundle?.id),
-                );
                 // The name belongs to the measurement type, not to the row, so only
                 // the first series in it gets the field. Four identical boxes for
                 // one value would invite an edit in row three and change row one.
@@ -277,38 +275,11 @@ function MachineBlock({
                           principle. */}
                       <>
                           <Choice
-                            value={
-                              perSeries ? PER_SERIES : soloBundle ? '' : (metric.bundleId ?? '')
-                            }
+                            value={typeChoiceOf(mt, metric)}
                             allowOther={false}
-                            options={[
-                              ...siblings.map((b) => ({
-                                value: b.id,
-                                label: t('series.typeOption', {
-
-                                  name: b.fragmentName.trim() || t('series.typeUnnamed'),
-
-                                  series: t.plural('series.count', seriesInBundle(b.id)),
-
-                                }),
-                                group: t('series.typesOnInterval'),
-                              })),
-                              { value: '', label: t('series.ownType'), group: t('series.onItsOwn') },
-                              // Only where it would mean something different:
-                              // for a single series, one type per series and a
-                              // type of its own are the same answer.
-                              ...(count > 1
-                                ? [{ value: PER_SERIES, label: t('series.typePerSeries'), group: t('series.onItsOwn') }]
-                                : []),
-                            ]}
-                            onChange={(id) =>
-                              onChange(
-                                id === PER_SERIES
-                                  ? assignTypePerSeries(scenario, mt.id, metric.id)
-                                  : id
-                                    ? assignBundle(scenario, mt.id, metric.id, id)
-                                    : assignOwnBundle(scenario, mt.id, metric.id),
-                              )
+                            options={seriesTypeChoices(t, mt, metric, prefix)}
+                            onChange={(choice) =>
+                              onChange(applySeriesTypeChoice(scenario, mt.id, metric.id, choice))
                             }
                           />
                           {!bundle ? (
