@@ -478,10 +478,10 @@ export const en = {
   'handoff.unused.show': 'Show',
   'handoff.unused.hide': 'Hide',
   'handoff.counters': 'Counters',
-  'handoff.counters.explain': '**Counters** copies the nine numbers above as a single column, in Configurator order. Select that period’s counter block — `{range}` in period 1, and {stride} rows lower for each period after — and paste once.',
+  'handoff.counters.explain': '**Counters** copies the nine numbers above as one column. Paste it into `{range}` of the Sales Configurator. Each later period goes {stride} rows further down.',
   'handoff.counters.title': 'Nine counters for period {index}, ready to paste at {cell}',
   'handoff.all': 'All',
-  'handoff.all.explain': '**All** copies every row as *cell, value, label*, tab separated. Not a paste target — the cells are not contiguous — but a checklist to work down and tick off.',
+  'handoff.all.explain': '**All** copies every row as *cell, value, label*. These cells are spread around the sheet, so it is a list to work through rather than something to paste.',
   'handoff.all.title': 'Every cell, value and label for period {index}',
 
   /* --------------------------------- the guidance rules L1-L10 */

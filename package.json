@@ -10,6 +10,7 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs --serve",
     "package": "node scripts/build.mjs && node scripts/package.mjs",
+    "package:html": "node scripts/build.mjs && node scripts/single-file.mjs",
     "c8y:typecheck": "ngc -p tsconfig.app.json --noEmit",
     "c8y:start": "ng serve",
     "c8y:build": "ng build",

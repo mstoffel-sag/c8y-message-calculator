@@ -53,8 +53,7 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
   const t = useT();
   // The library, and which of it is open. One estimate per customer, kept side
   // by side rather than overwritten -- the Web SDK build lists them in the
-  // shell's navigator, and this build has no navigator to list them in, so the
-  // picker sits in the top bar beside the name.
+  // shell's navigator, and this build draws its own rail beside the page.
   const [openId, setOpenId] = useState<string>(() => {
     migrate();
     const recent = mostRecent(listScenarios());
@@ -119,36 +118,6 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
               aria-label={t('app.scenarioName')}
               onInput={(e) => setScenario({ ...scenario, name: (e.target as HTMLInputElement).value })}
             />
-            {/* The library, where this build has no navigator to put it in.
-                A select rather than a list of tabs: the top bar is capped at
-                1240 px and already wrapped once, and a customer with a dozen
-                estimates would push the stat block off the end of it. */}
-            <div class="library">
-              <select
-                aria-label={t('library.label')}
-                value={openId}
-                onChange={(e) => open((e.target as HTMLSelectElement).value)}
-              >
-                {library.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name.trim() || t('library.untitled')}
-                  </option>
-                ))}
-              </select>
-              {library.length > 1 && (
-                <button
-                  class="ghost"
-                  title={t('library.delete')}
-                  aria-label={t('library.delete')}
-                  onClick={() => {
-                    const name = scenario.name.trim() || t('library.untitled');
-                    if (confirm(t('library.confirmDelete', { name }))) dropScenario(openId);
-                  }}
-                >
-                  &times;
-                </button>
-              )}
-            </div>
             <small>{t('app.tagline')}</small>
           </div>
           <div class="runner">
@@ -182,10 +151,21 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
             {t('app.expert')}
           </label>
 
-          {/* Creating a scenario is a header action, not a row inside the
-              picker. The picker is for choosing among what exists; making
-              another is a different verb and belongs with the other verbs. */}
+          {/* Creating and deleting are header actions, not rows in the rail.
+              The rail is for choosing among what exists; making another one,
+              or ending one, are different verbs and belong with the verbs. */}
           <button class="ghost" onClick={addScenario}>+ {t('library.add')}</button>
+          {library.length > 1 && (
+            <button
+              class="ghost"
+              onClick={() => {
+                const name = scenario.name.trim() || t('library.untitled');
+                if (confirm(t('library.confirmDelete', { name }))) dropScenario(openId);
+              }}
+            >
+              {t('library.delete')}
+            </button>
+          )}
 
           <LocaleSwitch locale={locale} onChange={onLocale} />
         </div>
@@ -204,48 +184,68 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
         </div>
       </div>
 
-      <div class="shell">
-        <div class="step-head">
-          <h1>{t(def.titleKey)}</h1>
-          <p>{t(def.leadKey)}</p>
-        </div>
-
-        {def.key === 'fleet' && <StepFleet {...props} />}
-        {def.key === 'series' && <StepTimeSeries {...props} />}
-        {def.key === 'discrete' && <StepDiscrete {...props} />}
-        {def.key === 'contract' && <StepContract {...props} result={result} />}
-        {def.key === 'results' && (
-          <StepResults scenario={scenario} result={result} expert={expert} />
-        )}
-
-        {/* Guidance follows the customer through every step, because a warning
-            is worth far more while the input that caused it is still on screen. */}
-        {def.key !== 'results' && result.findings.length > 0 && (
-          <Findings findings={result.findings} />
-        )}
-
-        <div class="nav">
-          <button disabled={step === 0} onClick={() => setStep(step - 1)}>
-            &larr; {t('nav.back')}
-          </button>
-          <span class="hint" style="margin:0">
-            {t('nav.progress', { step: step + 1, total: STEPS.length })}
-          </span>
-          <span class="spacer" />
-          {step === 0 && (
-            <>
-              <button onClick={() => setScenario(conceptSection9Scenario())}>
-                {t('nav.loadExample')}
-              </button>
-              <button onClick={() => setScenario(blankScenario())}>{t('nav.reset')}</button>
-            </>
-          )}
-          {!last && (
-            <button class="primary" onClick={() => setStep(step + 1)}>
-              {t(STEPS[step + 1]!.titleKey)} &rarr;
+      {/* The library as a rail, the way the Web SDK build lists it in the
+          shell's navigator. This build has no navigator, so it grows one: a
+          scenario you can see is a scenario you switch to, where a collapsed
+          <select> made you open it first to remember what was in there. */}
+      <div class="page">
+        <nav class="library-rail" aria-label={t('library.label')}>
+          {library.map((entry) => (
+            <button
+              key={entry.id}
+              class={`library-tab ${entry.id === openId ? 'on' : ''}`}
+              aria-current={entry.id === openId ? 'page' : undefined}
+              title={entry.name.trim() || t('library.untitled')}
+              onClick={() => open(entry.id)}
+            >
+              {entry.name.trim() || t('library.untitled')}
             </button>
+          ))}
+        </nav>
+
+        <div class="shell">
+          <div class="step-head">
+            <h1>{t(def.titleKey)}</h1>
+            <p>{t(def.leadKey)}</p>
+          </div>
+
+          {def.key === 'fleet' && <StepFleet {...props} />}
+          {def.key === 'series' && <StepTimeSeries {...props} />}
+          {def.key === 'discrete' && <StepDiscrete {...props} />}
+          {def.key === 'contract' && <StepContract {...props} result={result} />}
+          {def.key === 'results' && (
+            <StepResults scenario={scenario} result={result} expert={expert} />
           )}
-          {last && <ScenarioIO scenario={scenario} onChange={setScenario} />}
+
+          {/* Guidance follows the customer through every step, because a warning
+              is worth far more while the input that caused it is still on screen. */}
+          {def.key !== 'results' && result.findings.length > 0 && (
+            <Findings findings={result.findings} />
+          )}
+
+          <div class="nav">
+            <button disabled={step === 0} onClick={() => setStep(step - 1)}>
+              &larr; {t('nav.back')}
+            </button>
+            <span class="hint" style="margin:0">
+              {t('nav.progress', { step: step + 1, total: STEPS.length })}
+            </span>
+            <span class="spacer" />
+            {step === 0 && (
+              <>
+                <button onClick={() => setScenario(conceptSection9Scenario())}>
+                  {t('nav.loadExample')}
+                </button>
+                <button onClick={() => setScenario(blankScenario())}>{t('nav.reset')}</button>
+              </>
+            )}
+            {!last && (
+              <button class="primary" onClick={() => setStep(step + 1)}>
+                {t(STEPS[step + 1]!.titleKey)} &rarr;
+              </button>
+            )}
+            {last && <ScenarioIO scenario={scenario} onChange={setScenario} />}
+          </div>
         </div>
       </div>
     </>

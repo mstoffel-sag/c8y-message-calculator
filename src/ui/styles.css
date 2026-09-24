@@ -232,7 +232,15 @@ h4 {
 p { margin: 0 0 calc(var(--u) * 1.25); }
 a { color: var(--accent); }
 
-.shell { max-width: 1240px; margin: 0 auto; padding: 0 calc(var(--u) * 2.5) calc(var(--u) * 2); }
+/* The page is the width; the shell is what is left of it beside the rail.
+   The cap and the side padding moved up here from `.shell` so the rail sits
+   inside the same 1240 px as the top bar and the step rail, rather than
+   pushing the content off-centre. */
+.page {
+  max-width: 1240px; margin: 0 auto; padding: 0 calc(var(--u) * 2.5) calc(var(--u) * 2);
+  display: flex; align-items: flex-start; gap: calc(var(--u) * 2);
+}
+.shell { flex: 1; min-width: 0; }
 
 /* ---------------------------------------------------------------- top bar */
 
@@ -744,12 +752,44 @@ label.locale select:hover { color: var(--ink); }
 .dg-legend i.key.shared { background: var(--accent-soft); border: 1.5px solid var(--brand); }
 .dg-legend i.key.solo { background: var(--panel-2); border: 1.5px solid var(--line); }
 
-/* The scenario picker, under the name it belongs to. Deliberately quiet: it is
-   navigation, not a figure, and the top bar's job is the running total. */
-.library { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
-.library select {
-  max-width: 260px; font-size: 12.5px; padding: 2px 4px;
-  background: transparent; color: var(--ink-mute);
-  border: 1px solid var(--line); border-radius: 4px;
+/* The scenario rail: this build's answer to the shell's navigator, which it
+   does not have. Quiet by design -- it is navigation, not a figure, and the
+   top bar's job is the running total. It only earns its width once there is
+   more than one scenario, so a single-scenario session looks as it always did. */
+.library-rail {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 160px; flex: none;
+  padding-right: calc(var(--u) * 2); border-right: 1px solid var(--line);
 }
-.library button { padding: 0 5px; line-height: 1.2; color: var(--ink-faint); }
+.library-rail:empty, .library-rail:has(> :only-child) { display: none; }
+.library-tab {
+  display: block; width: 100%; text-align: left;
+  padding: 7px 10px; border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--ink-mute);
+  font: inherit; font-size: var(--c8y-font-size-small); cursor: pointer;
+  /* One line each, because the name is the customer's and can be long; the
+     full text stays in the title attribute the button already carries. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.library-tab:hover { color: var(--ink); border-color: var(--line); }
+.library-tab.on {
+  background: var(--accent-soft); color: var(--accent);
+  border-color: transparent; font-weight: 600;
+}
+
+/* Measured, not guessed: at a shell of 833 px nothing on any step overflows,
+   and by 712 the diagrams are spilling out of their boxes. The rail costs the
+   shell 216 px -- its 160, the 16 of gap and the page's own 40 of padding --
+   so at about 1050 px of viewport the rail is what pushes the step under that
+   floor. Below it the rail stops being a column and lies down above the
+   content as a row of pills, giving the step back the full width. Move the
+   rail's width and this number moves with it. */
+@media (max-width: 1050px) {
+  .page { flex-direction: column; gap: var(--u); }
+  .library-rail {
+    flex-direction: row; flex-wrap: wrap; width: auto; align-self: stretch;
+    padding: 0 0 var(--u); border-right: none; border-bottom: 1px solid var(--line);
+  }
+  .library-tab { width: auto; max-width: 220px; border-radius: 16px; }
+  .shell { align-self: stretch; }
+}
