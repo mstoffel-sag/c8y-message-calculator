@@ -151,11 +151,15 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
             {t('app.expert')}
           </label>
 
-          {/* The scenario verbs, in one group. They are header actions, not
-              rows in the rail: the rail is for choosing among what exists, and
-              making, ending, loading or saving one are different verbs. Grouped
-              so the top bar breaks between the stats and the verbs rather than
-              through the middle of them. */}
+          {/* Every verb that acts on the scenario, in one group and on every
+              step -- which is where the Web SDK build has always had them, and
+              where the wizard's own bottom bar is the wrong home: it is for
+              moving between steps, and it put Load example and Reset on step
+              one only, so from step two on there was no way to start over.
+
+              Library, content, files -- that is the order. Grouped so the top
+              bar breaks between the stats and the verbs rather than through the
+              middle of them. */}
           <div class="verbs">
           <button class="ghost" onClick={addScenario}>+ {t('library.add')}</button>
           {library.length > 1 && (
@@ -175,6 +179,12 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
               only, which meant a scenario could not be loaded without first
               walking to the end of a wizard you were trying to skip -- and the
               Web SDK build has had them in its action bar all along. */}
+          <button onClick={() => setScenario(conceptSection9Scenario())} class="ghost">
+            {t('nav.loadExample')}
+          </button>
+          <button onClick={() => setScenario(blankScenario())} class="ghost danger">
+            {t('nav.reset')}
+          </button>
           <ScenarioIO scenario={scenario} onChange={setScenario} />
           </div>
 
@@ -242,14 +252,6 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
               {t('nav.progress', { step: step + 1, total: STEPS.length })}
             </span>
             <span class="spacer" />
-            {step === 0 && (
-              <>
-                <button onClick={() => setScenario(conceptSection9Scenario())}>
-                  {t('nav.loadExample')}
-                </button>
-                <button onClick={() => setScenario(blankScenario())}>{t('nav.reset')}</button>
-              </>
-            )}
             {!last && (
               <button class="primary" onClick={() => setStep(step + 1)}>
                 {t(STEPS[step + 1]!.titleKey)} &rarr;

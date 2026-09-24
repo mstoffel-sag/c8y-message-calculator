@@ -882,7 +882,7 @@ describe('the scenario library', () => {
       assert.match(html, new RegExp(verb), `${verb} is on the frame`);
     }
     // Two scenarios, so deleting the open one leaves somewhere to land.
-    assert.match(html, /class="ghost danger"/);
+    assert.match(html, />Delete</);
   });
 
   test('one scenario cannot be deleted, because nothing would be left open', async () => {
@@ -890,7 +890,11 @@ describe('the scenario library', () => {
       save(id(), { ...blankScenario(), name: 'Only one' });
     });
     assert.match(html, /Only one/);
-    assert.doesNotMatch(html, /class="ghost danger"/);
+    assert.doesNotMatch(html, />Delete</);
+    // Reset is a different verb and is always there: it empties the scenario,
+    // it does not remove it from the library, so there is always somewhere to
+    // land afterwards.
+    assert.match(html, />\s*Reset\s*</);
   });
 
   test('import and export are on the first step, not only the last', async () => {
@@ -905,5 +909,9 @@ describe('the scenario library', () => {
     assert.match(html, /<h1>Machines<\/h1>/, 'the frame opens on step one');
     assert.match(html, /type="file" accept="application\/json"/, 'import is here');
     assert.match(html, />Export</, 'and so is export');
+    // Same for the two that empty or fill the scenario: they were on step one
+    // only, so from step two on there was no way to start over.
+    assert.match(html, />\s*Reset\s*</);
+    assert.match(html, />\s*Load example\s*</);
   });
 });

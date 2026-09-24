@@ -351,7 +351,10 @@ button.primary:hover { background: var(--panel); color: var(--accent); }
 }
 .ghost:hover { color: var(--accent); background: transparent; border-color: transparent; }
 .ghost.danger:hover { color: var(--error); }
-.verbs { display: flex; align-items: center; gap: 2px; }
+/* Six verbs now. They wrap inside the group rather than splitting across the
+   bar, so a narrow window gets two tidy rows of verbs instead of four of them
+   on one line and two stranded under the scenario name. */
+.verbs { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
 label.ghost.file input { display: none; }
 button:disabled { opacity: .65; cursor: default; }
 .row { display: flex; gap: calc(var(--u) * 1.5); align-items: flex-end; flex-wrap: wrap; }
