@@ -41,7 +41,19 @@ The standalone build:
 npm run dev      # http://127.0.0.1:5173  -- rebuilds on save
 npm run build    # static bundle in dist/
 npm run package  # dist-package/message-calculator-standalone-<version>.zip
+npm run package:html   # the same thing as one .html file -- no server, no install
 ```
+
+`package:html` inlines the stylesheet, the fonts and the bundle into a single page that runs
+from a double-click. It is the build for someone who wants the calculator on a laptop and has
+no tenant, no Node and no appetite for a ticket; mail it, and it works where it lands.
+
+One thing is known to differ from a served copy: `navigator.clipboard` does not exist outside
+a secure context, so every copy button takes the `document.execCommand` path instead
+(`src/ui/format.ts` says why). The saved-scenario library is the open question -- it is
+browser storage, and browsers disagree about what a `file://` page may keep. Nothing breaks
+either way, because every read and write is already wrapped and a refusal just means the
+session is not remembered, but **which browsers remember it has not been tested.**
 
 The Web SDK build:
 
