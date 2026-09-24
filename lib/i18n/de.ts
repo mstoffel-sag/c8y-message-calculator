@@ -27,7 +27,7 @@ export const de: Record<Key, string> = {
   'app.language': 'Sprache',
   'library.label': 'Szenario',
   'library.add': 'Neues Szenario',
-  'library.delete': 'Dieses Szenario löschen',
+  'library.delete': 'Löschen',
   'library.untitled': 'Unbenanntes Szenario',
   'library.confirmDelete': '„{name}“ löschen? Das kann nicht rückgängig gemacht werden.',
 
@@ -36,7 +36,7 @@ export const de: Record<Key, string> = {
   'nav.loadExample': 'Beispiel laden',
   'nav.reset': 'Zurücksetzen',
   'io.import': 'Importieren',
-  'io.export': 'Szenario exportieren',
+  'io.export': 'Exportieren',
   'io.unreadable': 'Diese Datei ist kein Szenario, das dieses Werkzeug lesen kann.',
 
   /* ------------------------------------------------------- the wizard */

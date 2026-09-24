@@ -87,7 +87,9 @@ const topbar = `<div class="topbar-inner">
   </div>
   <label class="expert on"><input type="checkbox" checked />${t('app.expert')}</label>
   <button class="ghost">+ ${t('library.add')}</button>
-  <button class="ghost">${t('library.delete')}</button>
+  <button class="ghost danger">${t('library.delete')}</button>
+  <label class="ghost file">${t('io.import')}</label>
+  <button class="ghost">${t('io.export')}</button>
   <label class="locale"><select><option>${locale.toUpperCase()}</option></select></label>
 </div>`;
 

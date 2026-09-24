@@ -856,22 +856,28 @@ describe('the scenario library', () => {
     return render(<App />);
   }
 
-  test('the picker lists every saved scenario and offers another', async () => {
+  /** The rail, from its <nav> to the end of it. */
+  function rail(html: string): string {
+    const from = html.indexOf('aria-label="Scenario"');
+    assert.notEqual(from, -1, 'the rail is on the frame');
+    return html.slice(from, html.indexOf('</nav>', from));
+  }
+
+  test('the rail lists every saved scenario, and the verbs are not in it', async () => {
     const html = await frame((save, id) => {
       save(id(), { ...conceptSection9Scenario(), name: 'Acme rooftop HVAC' });
       save(id(), { ...blankScenario(), name: 'Northwind meters' });
     });
-    assert.match(html, /aria-label="Scenario"/, 'the picker is on the frame');
-    assert.match(html, /Acme rooftop HVAC/);
-    assert.match(html, /Northwind meters/);
-    // Creating one is a header action now, not a row inside the picker: the
-    // picker chooses among what exists, and making another is a different verb.
-    const picker = html.slice(html.indexOf('aria-label="Scenario"'));
-    const options = picker.slice(0, picker.indexOf('</select>'));
-    assert.doesNotMatch(options, /New scenario/, 'not an option in the list');
-    assert.match(html, /New scenario/, 'but present on the frame');
+    assert.match(rail(html), /Acme rooftop HVAC/);
+    assert.match(rail(html), /Northwind meters/);
+    // The rail chooses among what exists. Making another, ending one, loading
+    // one and saving one are different verbs and live in the header.
+    for (const verb of ['New scenario', 'Delete', 'Import', 'Export']) {
+      assert.doesNotMatch(rail(html), new RegExp(verb), `${verb} is not a row in the rail`);
+      assert.match(html, new RegExp(verb), `${verb} is on the frame`);
+    }
     // Two scenarios, so deleting the open one leaves somewhere to land.
-    assert.match(html, /Delete this scenario/);
+    assert.match(html, /class="ghost danger"/);
   });
 
   test('one scenario cannot be deleted, because nothing would be left open', async () => {
@@ -879,6 +885,20 @@ describe('the scenario library', () => {
       save(id(), { ...blankScenario(), name: 'Only one' });
     });
     assert.match(html, /Only one/);
-    assert.doesNotMatch(html, /Delete this scenario/);
+    assert.doesNotMatch(html, /class="ghost danger"/);
+  });
+
+  test('import and export are on the first step, not only the last', async () => {
+    // They used to render in the bottom bar of the results step alone, so a
+    // scenario could not be loaded without first walking to the end of the
+    // wizard you were trying to skip. The Web SDK build never had that problem
+    // -- its action bar carries both on every step -- and this is the test that
+    // keeps the two builds saying the same thing.
+    const html = await frame((save, id) => {
+      save(id(), { ...blankScenario(), name: 'Only one' });
+    });
+    assert.match(html, /<h1>Machines<\/h1>/, 'the frame opens on step one');
+    assert.match(html, /type="file" accept="application\/json"/, 'import is here');
+    assert.match(html, />Export</, 'and so is export');
   });
 });

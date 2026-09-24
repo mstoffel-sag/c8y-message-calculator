@@ -28,7 +28,7 @@ export const en = {
   'app.language': 'Language',
   'library.label': 'Scenario',
   'library.add': 'New scenario',
-  'library.delete': 'Delete this scenario',
+  'library.delete': 'Delete',
   'library.untitled': 'Untitled scenario',
   'library.confirmDelete': 'Delete “{name}”? This cannot be undone.',
 
@@ -37,7 +37,7 @@ export const en = {
   'nav.loadExample': 'Load example',
   'nav.reset': 'Reset',
   'io.import': 'Import',
-  'io.export': 'Export scenario',
+  'io.export': 'Export',
   'io.unreadable': 'That file is not a scenario this tool can read.',
 
   /* ------------------------------------------------------- the wizard */

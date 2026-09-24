@@ -338,11 +338,21 @@ button:hover { color: var(--accent); background: var(--accent-soft); }
 button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-brand); }
 button.primary:hover { background: var(--panel); color: var(--accent); }
-button.ghost {
-  background: transparent; border-color: transparent; color: var(--ink-faint);
-  padding: 4px 6px; min-height: 0;
+/* The header verbs: quiet until pointed at. `.file` carries the same look on a
+   <label>, which is the only way to front a file input without the browser's
+   own button. Only `.danger` goes red -- four header buttons all turning the
+   colour of a delete made every one of them read as one. */
+.ghost, label.ghost.file {
+  font: var(--c8y-font-weight-base) var(--c8y-font-size-base) / var(--c8y-line-height-base) var(--sans);
+  background: transparent; border: 1px solid transparent; color: var(--ink-faint);
+  border-radius: var(--radius-btn);
+  padding: 4px 6px; min-height: 0; cursor: pointer;
+  display: inline-flex; align-items: center;
 }
-button.ghost:hover { color: var(--error); background: transparent; border-color: transparent; }
+.ghost:hover { color: var(--accent); background: transparent; border-color: transparent; }
+.ghost.danger:hover { color: var(--error); }
+.verbs { display: flex; align-items: center; gap: 2px; }
+label.ghost.file input { display: none; }
 button:disabled { opacity: .65; cursor: default; }
 .row { display: flex; gap: calc(var(--u) * 1.5); align-items: flex-end; flex-wrap: wrap; }
 .spacer { margin-left: auto; }
@@ -626,18 +636,6 @@ table.dp tr:not(:last-child) td { border-bottom: 1px solid var(--line-soft); }
 
 .delta.saves { color: var(--good); }
 .delta.costs { color: var(--warn); }
-
-label.import {
-  font: var(--c8y-font-weight-base) var(--c8y-font-size-base) / var(--c8y-line-height-base) var(--sans);
-  color: var(--c8y-brand-dark);
-  background: var(--panel); border: 1px solid var(--brand);
-  border-radius: var(--radius-btn);
-  min-height: var(--c8y-form-control-height-base);
-  display: inline-flex; align-items: center;
-  padding: 5px calc(var(--u) * 1.5); cursor: pointer;
-}
-label.import:hover { color: var(--accent); background: var(--accent-soft); }
-label.import input { display: none; }
 
 /* The shared Choice control: a dropdown, with a free field when "Other" is picked. */
 .field select + span input { border-color: var(--brand); }

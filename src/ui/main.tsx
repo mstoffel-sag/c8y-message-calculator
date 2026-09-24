@@ -151,13 +151,16 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
             {t('app.expert')}
           </label>
 
-          {/* Creating and deleting are header actions, not rows in the rail.
-              The rail is for choosing among what exists; making another one,
-              or ending one, are different verbs and belong with the verbs. */}
+          {/* The scenario verbs, in one group. They are header actions, not
+              rows in the rail: the rail is for choosing among what exists, and
+              making, ending, loading or saving one are different verbs. Grouped
+              so the top bar breaks between the stats and the verbs rather than
+              through the middle of them. */}
+          <div class="verbs">
           <button class="ghost" onClick={addScenario}>+ {t('library.add')}</button>
           {library.length > 1 && (
             <button
-              class="ghost"
+              class="ghost danger"
               onClick={() => {
                 const name = scenario.name.trim() || t('library.untitled');
                 if (confirm(t('library.confirmDelete', { name }))) dropScenario(openId);
@@ -166,6 +169,14 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
               {t('library.delete')}
             </button>
           )}
+
+          {/* Import and export belong with the other scenario-level verbs, and
+              on every step. They used to sit in the bottom bar of the last step
+              only, which meant a scenario could not be loaded without first
+              walking to the end of a wizard you were trying to skip -- and the
+              Web SDK build has had them in its action bar all along. */}
+          <ScenarioIO scenario={scenario} onChange={setScenario} />
+          </div>
 
           <LocaleSwitch locale={locale} onChange={onLocale} />
         </div>
@@ -244,8 +255,7 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
                 {t(STEPS[step + 1]!.titleKey)} &rarr;
               </button>
             )}
-            {last && <ScenarioIO scenario={scenario} onChange={setScenario} />}
-          </div>
+            </div>
         </div>
       </div>
     </>
@@ -272,7 +282,7 @@ function ScenarioIO({
 
   return (
     <>
-      <label class="import">
+      <label class="ghost file">
         {t('io.import')}
         <input
           type="file"
@@ -289,10 +299,13 @@ function ScenarioIO({
                 alert(t('io.unreadable'));
               }
             });
+            // The same file twice in a row is the commonest retry there is, and
+            // without this the input holds the old value and fires nothing.
+            (e.target as HTMLInputElement).value = '';
           }}
         />
       </label>
-      <button class="primary" onClick={download}>
+      <button class="ghost" onClick={download}>
         {t('io.export')}
       </button>
     </>
