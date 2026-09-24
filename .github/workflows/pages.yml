@@ -1,0 +1,61 @@
+# Publishes the standalone build to GitHub Pages on every push to main.
+#
+# The standalone build is the one that can be served: it draws its own frame and
+# needs no backend, where the Web SDK build cannot start without a Cumulocity
+# tenant to fetch its options from. So this is the demo link, and dist/ goes up
+# exactly as `npm run build` leaves it -- index.html, the bundle, the stylesheet
+# and the self-hosted fonts.
+#
+# The site is public. That is fine for this app and load-bearing for the one
+# hard constraint: the tool ships quantities only, the workbook's price column
+# is empty, and tests grep the rendered UI and the workbook XML to keep it that
+# way. If that ever stops being true, this workflow is the thing to delete.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time, and let a newer push win rather than queue behind an
+# older one that is about to be replaced anyway.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Angular 21 wants ^20.19 || ^22.12 || >=24, and the tests build the
+          # whole repo, not only the standalone half.
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # The gate, not just the build: a green page that reports wrong numbers is
+      # worse than no page.
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

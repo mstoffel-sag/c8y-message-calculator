@@ -15,6 +15,11 @@ Everything that decides a number is in `lib/` and is shared: the engine, the str
 scenario edits, the formatters, the diagram geometry, the workbook writer. The two `src/` folders
 are the drawing, and nothing else.
 
+**Try it without installing anything:** <https://mstoffel-sag.github.io/c8y-message-calculator/> —
+the standalone build, published from `main` by `.github/workflows/pages.yml`. The Web SDK build
+cannot be published that way: it fetches a tenant's options before Angular starts, so it has
+nothing to boot against outside Cumulocity.
+
 ## Run it
 
 **Node 20.19 or newer** -- Angular 21 will not start on anything older, and the repo's own default
