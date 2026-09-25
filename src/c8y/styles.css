@@ -172,12 +172,39 @@
 .mc-body.mc-tight { padding: 0; }
 .mc-panel.mc-sub { background: transparent; }
 
-/* The explainer is a <details>, so it can be folded away once it has landed. */
-.mc-explain > summary {
-  padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
-  cursor: pointer;
-  font-weight: 600;
+/* The explainer opens in the top layer instead of sitting in the step. One line
+   invites it; what it opens gets the window. Same arrangement as the standalone
+   build, down to the <dialog>. */
+.mc-explain-launch { margin: calc(var(--u) * -1) 0 calc(var(--u) * 2); text-align: right; }
+.mc-explain-launch .btn-link { padding: 0; }
+
+dialog.mc-explain {
+  /* At least as wide as the panel it replaced, or the slider and the two
+     figures beside it wrap onto separate lines. */
+  width: min(1060px, calc(100vw - var(--u) * 6));
+  max-height: calc(100vh - var(--u) * 6);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .38);
+  overflow: auto;
 }
+dialog.mc-explain::backdrop { background: rgba(0, 0, 0, .55); }
+dialog.mc-explain > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 1.5);
+  padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line-soft);
+}
+dialog.mc-explain > header h4 { margin: 0; }
+dialog.mc-explain > header .btn-link { margin-left: auto; }
 
 /* --------------------------------------------------------- teach/empty */
 

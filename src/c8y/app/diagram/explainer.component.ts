@@ -11,7 +11,15 @@
  * before they have entered anything.
  */
 
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 
 import {
   CANVAS_HEIGHT,
@@ -46,8 +54,26 @@ interface Envelope {
   imports: [RichComponent, ProseComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <details class="mc-panel mc-explain" open>
-      <summary>{{ label('explain.summary') }}</summary>
+    <p class="mc-explain-launch">
+      <button type="button" class="btn btn-link btn-sm" (click)="open()">
+        {{ label('explain.open') }} <span aria-hidden="true">&#8599;</span>
+      </button>
+    </p>
+
+    <!-- The backdrop is the dialog's own box, so a click lands on the element
+         itself only when it missed everything inside it. -->
+    <dialog #box class="mc-explain" (click)="$event.target === box ? box.close() : null">
+      <header>
+        <h4>{{ label('explain.summary') }}</h4>
+        <button
+          type="button"
+          class="btn btn-link btn-sm"
+          [attr.aria-label]="label('explain.close')"
+          (click)="box.close()"
+        >
+          &#10005;
+        </button>
+      </header>
       <div class="mc-body">
         <p class="mc-note"><c8y-mc-rich k="explain.note" /></p>
 
@@ -166,11 +192,23 @@ interface Envelope {
           </div>
         </div>
       </div>
-    </details>
+    </dialog>
   `,
 })
 export class ExplainerComponent {
   private readonly locales = inject(LocaleService);
+
+  private readonly box = viewChild<ElementRef<HTMLDialogElement>>('box');
+
+  /**
+   * `showModal`, not the `open` attribute: only the modal form puts the dialog
+   * in the top layer and brings Escape, the backdrop and the focus trap with
+   * it. Optional-chained because a template reference is not resolved until
+   * the view exists, and nothing here is worth an exception if it is not.
+   */
+  open(): void {
+    this.box()?.nativeElement.showModal();
+  }
 
   protected readonly LAYOUT = LAYOUT;
   protected readonly height = CANVAS_HEIGHT;

@@ -505,6 +505,8 @@ export const de: Record<Key, string> = {
 
   /* --------------------------------- the interactive explainer */
   'explain.summary': 'Wie Volumen wirklich entsteht — 90 Sekunden',
+  'explain.open': 'Wie Volumen entsteht',
+  'explain.close': 'Schließen',
   'explain.note': 'Eine Messung trägt **einen Zeitstempel** und beliebig viele Werte darunter. Ein Request ist **eine Nachricht**, egal wie viele Werte er trägt. Die Frage ist also nie „wie viele Daten“ — sondern **über wie viele Requests dieselben Daten verteilt werden**.',
   'explain.slider': 'Werte pro Messung — zum Bündeln ziehen',
   'explain.messages': 'Nachrichten / Monat',

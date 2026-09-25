@@ -9,9 +9,21 @@
  *
  * Interactive on purpose: the message count drops in front of the customer,
  * before they have entered anything.
+ *
+ * It opens in a dialog rather than sitting in the page. Expanded it is 683 px,
+ * which with the teaching panel above it put the first field anyone came to
+ * this step to edit at y=1176 -- below the fold on any laptop, on every visit,
+ * forever, because a `<details open>` in JSX reopens itself every time the step
+ * is mounted. So the lesson is a thing you ask for now: a line under the
+ * heading costs nothing, and what it opens gets the whole window, which is a
+ * better version of the demo than a panel competing with a form.
+ *
+ * `<dialog>` rather than a hand-built overlay: Escape, the backdrop, the focus
+ * trap and the top layer all come with it, in both builds, with no modal
+ * machinery to get wrong in the one that cannot be rendered here.
  */
 
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { compact, n } from './format.js';
 import { Prose, Rich, useT } from './i18n.js';
 import type { T } from '../../lib/i18n/index.js';
@@ -48,43 +60,70 @@ export function Explainer() {
   const messages = SENDS * groups.length;
   const storedValues = SENDS * SERIES.length;
 
-  return (
-    <details class="panel explain" open>
-      <summary>{t('explain.summary')}</summary>
-      <div class="body">
-        <p class="note">
-          <Rich k="explain.note" />
-        </p>
+  const dialog = useRef<HTMLDialogElement>(null);
 
-        <div class="row" style="margin-bottom:6px;align-items:center">
-          <label class="field" style="max-width:320px">
-            <span>{t('explain.slider')}</span>
-            <input
-              type="range"
-              min={1}
-              max={4}
-              step={1}
-              value={perMessage}
-              onInput={(e) => setPerMessage(Number((e.target as HTMLInputElement).value))}
-            />
-          </label>
-          <div class="spacer" />
-          <div class="stat" style="min-width:200px">
-            <span>{t('explain.messages')}</span>
-            <b style="color:var(--accent)">{compact(messages)}</b>
-            <small>
-              {t('explain.messages.sub', {
-                machines: n(MACHINES),
-                interval: INTERVAL,
-                days: DAYS,
-              })}
-            </small>
-          </div>
-          <div class="stat" style="min-width:200px">
-            <span>{t('explain.stored')}</span>
-            <b>{compact(storedValues)}</b>
-            <small>{t('explain.stored.sub')}</small>
-          </div>
+  return (
+    <>
+      <p class="explain-launch">
+        <button type="button" class="linkish" onClick={() => dialog.current?.showModal()}>
+          {t('explain.open')} <span aria-hidden="true">&#8599;</span>
+        </button>
+      </p>
+
+      <dialog
+        class="explain"
+        ref={dialog}
+        // The backdrop is the dialog's own box, so a click lands on the element
+        // itself only when it missed everything inside it.
+        onClick={(e) => {
+          if (e.target === dialog.current) dialog.current?.close();
+        }}
+      >
+        <header>
+          <h2>{t('explain.summary')}</h2>
+          <button
+            type="button"
+            class="ghost"
+            aria-label={t('explain.close')}
+            onClick={() => dialog.current?.close()}
+          >
+            &#10005;
+          </button>
+        </header>
+        <div class="body">
+          <p class="note">
+            <Rich k="explain.note" />
+          </p>
+
+          <div class="row" style="margin-bottom:6px;align-items:center">
+            <label class="field" style="max-width:320px">
+              <span>{t('explain.slider')}</span>
+              <input
+                type="range"
+                min={1}
+                max={4}
+                step={1}
+                value={perMessage}
+                onInput={(e) => setPerMessage(Number((e.target as HTMLInputElement).value))}
+              />
+            </label>
+            <div class="spacer" />
+            <div class="stat" style="min-width:200px">
+              <span>{t('explain.messages')}</span>
+              <b style="color:var(--accent)">{compact(messages)}</b>
+              <small>
+                {t('explain.messages.sub', {
+                  machines: n(MACHINES),
+                  interval: INTERVAL,
+                  days: DAYS,
+                })}
+              </small>
+            </div>
+            <div class="stat" style="min-width:200px">
+              <span>{t('explain.stored')}</span>
+              <b>{compact(storedValues)}</b>
+              <small>{t('explain.stored.sub')}</small>
+            </div>
         </div>
 
         <Diagram groups={groups} t={t} />
@@ -103,8 +142,9 @@ export function Explainer() {
             </div>
           </div>
         </div>
-      </div>
-    </details>
+        </div>
+      </dialog>
+    </>
   );
 }
 

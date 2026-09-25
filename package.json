@@ -1,6 +1,6 @@
 {
   "name": "c8y-message-calculator",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "description": "Estimates Cumulocity messages per calendar month from a fleet description. Volume only - never prices.",
   "type": "module",

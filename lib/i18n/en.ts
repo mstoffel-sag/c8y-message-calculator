@@ -554,6 +554,8 @@ export const en = {
 
   /* --------------------------------- the interactive explainer */
   'explain.summary': 'How volume actually works — 90 seconds',
+  'explain.open': 'How volume works',
+  'explain.close': 'Close',
   'explain.note': 'A measurement carries **one timestamp** and any number of readings underneath it. One request is **one message** however many readings it carries. So the question is never “how much data” — it is **how many requests the same data is spread across**.',
   'explain.slider': 'Readings per measurement — drag right to bundle',
   'explain.messages': 'Messages / month',

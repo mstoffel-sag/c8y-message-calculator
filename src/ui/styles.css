@@ -543,9 +543,39 @@ code.frag {
   border-top: 1px solid var(--line); padding-top: calc(var(--u) * 2); margin-top: 6px;
 }
 
-details.explain summary { cursor: pointer; font-weight: 600; padding: calc(var(--u) * 2); }
-details.explain summary::marker { color: var(--brand); }
-details.explain[open] summary { border-bottom: 1px solid var(--line-soft); }
+/* The explainer's launcher: one line, right where the panel used to start, and
+   quiet enough that nobody reading the step has to step over it. */
+.explain-launch { margin: calc(var(--u) * -1) 0 calc(var(--u) * 2); text-align: right; }
+.linkish {
+  background: none; border: 0; padding: 0; min-height: 0;
+  color: var(--accent); font: inherit; font-size: var(--c8y-font-size-small);
+  cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.linkish:hover { background: none; color: var(--c8y-brand-dark); }
+
+/* The explainer itself, in the top layer. Sized to the diagram rather than to
+   the window: the drawing is 648 units wide and stops being legible stretched
+   across a 27-inch screen, so it takes the width it needs and no more. */
+dialog.explain {
+  /* The body has to be at least as wide as the panel it replaced (~984 px in
+     a 1240 px shell), or the slider and the two figures beside it wrap. */
+  width: min(1060px, calc(100vw - var(--u) * 6));
+  max-height: calc(100vh - var(--u) * 6);
+  padding: 0; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink);
+  box-shadow: var(--c8y-elevation-lg, 0 18px 48px rgba(0, 0, 0, .38));
+  overflow: auto;
+}
+dialog.explain::backdrop { background: rgba(0, 0, 0, .55); }
+dialog.explain > header {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: calc(var(--u) * 1.5);
+  padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
+  background: var(--panel); border-bottom: 1px solid var(--line-soft);
+}
+dialog.explain > header h2 { margin: 0; font-size: var(--c8y-font-size-base); }
+dialog.explain > header .ghost { margin-left: auto; font-size: 15px; line-height: 1; }
+dialog.explain .body { padding: calc(var(--u) * 2); }
 
 /* Segmented control, built from Cumulocity's button geometry. */
 .toggle { display: inline-flex; border: 1px solid var(--brand); border-radius: var(--radius-btn); overflow: hidden; }
