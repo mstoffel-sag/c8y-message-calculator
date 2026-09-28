@@ -276,28 +276,24 @@ describe('Configurator cells', () => {
 });
 
 describe('scenario normalisation', () => {
-  test('a scenario saved with bytesPerValue keeps its figure under the new name', async () => {
+  test('a byte figure saved by an older build is dropped, not carried', async () => {
+    // The tool used to ask for bytes per stored value, because it had one
+    // unverified number to offer and a reader might have a better one. Storage
+    // is measured now, so the question is gone and so is the setting: a
+    // scenario saved with either name loses it rather than quietly steering an
+    // estimate with a figure nothing on screen admits to using.
     const { normalise } = await import('../src/ui/store.js');
-    // The setting was renamed when storage stopped being priced per stored
-    // value and started being priced per document. It means what it always
-    // meant -- how big one measurement is -- so a saved override has to survive
-    // the rename, or a reloaded scenario is quoted on the measured default
-    // instead of the number somebody put in.
-    const saved = { ...blankScenario(), settings: { ...blankScenario().settings, bytesPerValue: 250 } };
-    const fixed = normalise(saved);
-    assert.equal(fixed.settings.bytesPerMeasurement, 250);
-    assert.equal('bytesPerValue' in fixed.settings, false, 'and the old name does not come back out');
-    // And it reaches the arithmetic, not just the object.
-    const hvac = { ...conceptSection9Scenario(), settings: { ...fixed.settings, startYear: 2027, startMonth: 1 } };
-    assert.equal(computeScenario(hvac).storage[0]?.bytesPerMeasurement, 250);
-  });
-
-  test('a scenario with no override is quoted on the measured figure', async () => {
-    const { normalise } = await import('../src/ui/store.js');
-    const { BYTES_PER_DOCUMENT } = await import('../lib/engine/index.js');
-    const fresh = normalise(conceptSection9Scenario());
-    assert.equal(fresh.settings.bytesPerMeasurement, undefined);
-    assert.equal(computeScenario(fresh).storage[0]?.bytesPerMeasurement, BYTES_PER_DOCUMENT.measurement);
+    const saved = {
+      ...blankScenario(),
+      settings: { ...blankScenario().settings, bytesPerValue: 250, bytesPerMeasurement: 250 },
+    };
+    const fixed = normalise(saved).settings as unknown as Record<string, unknown>;
+    assert.equal('bytesPerValue' in fixed, false);
+    assert.equal('bytesPerMeasurement' in fixed, false);
+    // And the estimate is the measured one, whatever was saved.
+    const both = normalise(saved);
+    const clean = normalise(blankScenario());
+    assert.deepEqual(computeScenario(both).storage, computeScenario(clean).storage);
   });
 
   test('a scenario from the pre-wizard build loads instead of throwing', async () => {

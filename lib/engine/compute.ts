@@ -424,7 +424,6 @@ export function computeScenario(scenario: Scenario): ScenarioResult {
   const storage = storageByMonth(
     months,
     scenario.settings.retentionDays,
-    scenario.settings.bytesPerMeasurement,
   );
   return {
     scenarioName: scenario.name,

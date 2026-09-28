@@ -243,8 +243,6 @@ export const de: Record<Key, string> = {
   'contract.retention': 'Aufbewahrung, Standard',
   'contract.retention.suffix': 'Tage',
   'contract.retention.title': 'Tage, die der Tenant die Daten standardmäßig hält. Ein Messtyp mit eigener Aufbewahrungsregel — im Schritt Messungen gesetzt — überschreibt diesen Wert. Bestimmt die Schätzung des operativen Speichers im Schritt Ergebnisse; die Zahl der Nachrichten ändert sich dadurch nicht.',
-  'contract.bytesPerMeasurement': 'Bytes / Messung',
-  'contract.bytesPerMeasurement.title': 'Bytes je gespeicherter Messung, für die Speicherzahl in der ODS-Zelle des Configurators. Über siebentausend Tenants hinweg bei rund 95 B gemessen, mit großer Streuung, deshalb zeigen der Schritt Ergebnisse und die Arbeitsmappe immer die Spanne neben dem hier eingestellten Wert.',
   'contract.col.period': 'Periode',
   'contract.col.months': 'Monate',
   'contract.periodN': 'Periode {index}',

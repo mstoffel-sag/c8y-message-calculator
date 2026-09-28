@@ -116,15 +116,6 @@ export function bytesFor(kind: StorageKind, end: 'low' | 'mid' | 'high'): number
   return end === 'mid' ? mid : mid * (end === 'low' ? SPREAD_LOW : SPREAD_HIGH);
 }
 
-/**
- * The rule-of-thumb range this model replaced: 100-400 bytes per stored
- * *value*, from a proof of concept and a rule of thumb, both marked "to be
- * verified" at source. Kept only so a scenario saved against it can be read,
- * and so the one place that still shows a default has a number to show.
- */
-export const LEGACY_BYTES_PER_VALUE_LOW = 100;
-export const LEGACY_BYTES_PER_VALUE_HIGH = 400;
-
 /** A DataHub extract is this share of the same data in MongoDB. */
 export const DATAHUB_SHARE_LOW = 0.2;
 export const DATAHUB_SHARE_HIGH = 0.25;
@@ -263,20 +254,8 @@ function spanOf(...sets: number[][]): { longest: number; shortest: number } | un
 export function storageByMonth(
   months: MonthResult[],
   defaultRetentionDays = DEFAULT_RETENTION_DAYS,
-  bytesPerMeasurement?: number,
 ): StorageMonth[] {
   const fallback = Math.max(defaultRetentionDays, 0);
-  // Outside the measured range is allowed -- somebody may have verified their
-  // own tenant -- but a nonsensical figure is not, and absent means absent
-  // rather than a sentinel that happens to equal the old default.
-  const override =
-    typeof bytesPerMeasurement === 'number' && bytesPerMeasurement > 0
-      ? bytesPerMeasurement
-      : undefined;
-  const measurementBytes = (end: 'low' | 'mid' | 'high') =>
-    override === undefined
-      ? bytesFor('measurement', end)
-      : override * (end === 'mid' ? 1 : end === 'low' ? SPREAD_LOW : SPREAD_HIGH);
 
   const series = windowsOf(months, fallback, (m) => m.storedByRetention, (m) => m.storedValues);
   // No stand-in for documents: a month with no document buckets wrote none, and
@@ -326,7 +305,7 @@ export function storageByMonth(
       let bytes = 0;
       for (const kind of STORAGE_KINDS) {
         const stream = byKind.get(kind)!;
-        const perDoc = kind === 'measurement' ? measurementBytes(end) : bytesFor(kind, end);
+        const perDoc = bytesFor(kind, end);
         for (const window of stream.windows) {
           bytes += walkBack(months, i, window, stream.valuesIn).retained * perDoc;
         }
@@ -361,7 +340,6 @@ export function storageByMonth(
       // A fleet holding 150 MiB is billed one unit, not 0.15, and twelve months
       // of it is twelve units rather than 1.8 (CTC Metrics Dashboard).
       unitsGiB: Math.ceil(quotedBytes / BYTES_PER_GIB),
-      bytesPerMeasurement: measurementBytes('mid'),
       dataHubLowGiB: (bytesAt('low') / BYTES_PER_GIB) * DATAHUB_SHARE_LOW,
       dataHubHighGiB: (bytesAt('high') / BYTES_PER_GIB) * DATAHUB_SHARE_HIGH,
       valuesPerMeasurement: measurements > 0 ? month.storedValues / measurements : 0,

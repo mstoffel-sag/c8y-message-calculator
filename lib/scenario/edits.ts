@@ -500,16 +500,15 @@ export function normalise(input: unknown): Scenario {
   delete rawSettings.peakFactor;
   const settings = { ...fallback.settings, ...rawSettings } as Scenario['settings'] & {
     bytesPerValue?: number;
+    bytesPerMeasurement?: number;
   };
-  // `bytesPerValue` became `bytesPerMeasurement` when storage stopped being
-  // priced per stored value and started being priced per document. The figure
-  // means the same thing it always meant -- how big one measurement is -- so a
-  // scenario saved under the old name keeps its number rather than silently
-  // falling back to the measured default and quoting a different fleet.
-  if (settings.bytesPerMeasurement === undefined && typeof settings.bytesPerValue === 'number') {
-    settings.bytesPerMeasurement = settings.bytesPerValue;
-  }
+  // Both are gone. The tool asked for a byte figure while it had one unverified
+  // number to offer; storage is measured now, so there is nothing for a reader
+  // to improve by typing over it, and the estimate does not pretend otherwise.
+  // A scenario saved with either simply loses it -- the figure it would have
+  // carried is the one the tool would compute anyway, within the spread.
   delete settings.bytesPerValue;
+  delete settings.bytesPerMeasurement;
 
   const periods = (Array.isArray(raw.periods) && raw.periods.length > 0 ? raw.periods : fallback.periods)
     .map((period, i) => ({

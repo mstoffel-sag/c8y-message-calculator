@@ -218,17 +218,6 @@ export interface ScenarioSettings {
    * Absent means DEFAULT_RETENTION_DAYS.
    */
   retentionDays?: number;
-  /**
-   * Bytes per stored value, for the single figure the Configurator's ODS cell
-   * needs. The evidence is a range (100-400 B, unverified) and the Storage sheet
-   * always reports both ends; this is the one number picked out of it to quote.
-   *
-   * Absent means the measured central figure. Present, it is read as the size
-   * of a measurement document -- which is what this setting was always about --
-   * and the other document kinds keep their own measured figures rather than
-   * being scaled by a guess about this one.
-   */
-  bytesPerMeasurement?: number;
 }
 
 export interface Scenario {
@@ -551,8 +540,8 @@ export interface StorageMonth {
   lowGiB: number;
   highGiB: number;
   /**
-   * The figure that goes in the quote, at the scenario's assumed bytes per
-   * value. Somewhere in [lowGiB, highGiB]; the range stays reported beside it.
+   * The figure that goes in the quote, at the measured bytes per document.
+   * Somewhere in [lowGiB, highGiB]; the range stays reported beside it.
    */
   quotedGiB: number;
   /**
@@ -562,8 +551,6 @@ export interface StorageMonth {
    * 0.15 -- so for anything small this, and not `quotedGiB`, is the quantity.
    */
   unitsGiB: number;
-  /** The assumption behind quotedGiB, so it can be stated wherever it appears. */
-  bytesPerMeasurement: number;
   dataHubLowGiB: number;
   dataHubHighGiB: number;
   /**

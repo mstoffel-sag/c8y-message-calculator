@@ -13,7 +13,6 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { CoreModule } from '@c8y/ngx-components';
 
 import {
-  BYTES_PER_DOCUMENT,
   DEFAULT_RETENTION_DAYS,
   type Scenario,
 } from '../../../../lib/engine/index.js';
@@ -91,18 +90,6 @@ const MAX_PERIODS = 5;
             (valueChange)="setSetting({ retentionDays: $event })"
           />
 
-          <!-- The one number picked out of the 100-400 B range to quote. It
-               starts at the top of it, because under-stating usage on a
-               commit-to-consume contract depletes the commitment early rather
-               than saving anything. -->
-          <c8y-mc-num
-            [label]="'contract.bytesPerMeasurement' | t"
-            [min]="1"
-            suffix="B"
-            [title]="'contract.bytesPerMeasurement.title' | t"
-            [value]="settings().bytesPerMeasurement ?? defaultBytes"
-            (valueChange)="setSetting({ bytesPerMeasurement: $event })"
-          />
         </div>
 
         @if (machineTypes().length === 0) {
@@ -179,7 +166,6 @@ export class StepContractComponent {
 
   protected readonly maxPeriods = MAX_PERIODS;
   protected readonly defaultRetention = DEFAULT_RETENTION_DAYS;
-  protected readonly defaultBytes = BYTES_PER_DOCUMENT.measurement;
 
   readonly settings = computed(() => this.store.scenario().settings);
   readonly machineTypes = computed(() => this.store.scenario().machineTypes);

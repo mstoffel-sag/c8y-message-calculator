@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 39 — storage is measured: bytes per **document** by kind, and ODS rounds up to whole GiB · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-28
+**Status:** draft for review, rev 40 — storage is measured, so the byte figure is no longer asked for · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-28
 
 ---
 
@@ -570,7 +570,7 @@ fall out directly.
 ```
 Scenario
   name, notes
-  settings:    startYear, startMonth, retentionDays, bytesPerValue, fragmentPrefix
+  settings:    startYear, startMonth, retentionDays, fragmentPrefix
                // retentionDays here is the tenant default; a measurement type overrides it
   periods:     Period[]                  // 1-5, mirrors the Configurator
   machineTypes: MachineType[]
@@ -636,7 +636,7 @@ docs[w]     = event + alarm + operation documents likewise -- from the CREATES o
               since a clear or a transition updates the document it belongs to
 objects     = machines registered so far          // no retention rule removes one
 retained    = Σ over w of walkBack(values[w]) + Σ over w of walkBack(docs[w]) + objects
-period ODS  = Σ over the period's months of retained, at bytesPerValue   // GiB-months
+period ODS  = Σ over the period's months of CEILING(retained bytes / GiB)  // whole units
 
 counters[9]        = each counter summed independently, for one calendar month
 messagesInMonth    = Σ counters
@@ -677,7 +677,7 @@ every input visibly moves the number.
 | 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
 | 2 | `series` | **Measurements** | One table, one row per **series** — or, where a customer has a tag count rather than a list, one row standing for a count of them (§4.2) — and one question about each: how often it is read. The interactive explainer sits here. The tool groups series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). A status flag is a row like any other — the interval a customer gives it is the rate they intend to read it at, and L2 is what catches one left on the fleet's tick (§4.4). |
 | 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. Events, alarms and commands each carry a **retention** column, since each row is a type of its own; inventory carries none, and says why (§4.6). |
-| 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs — the default retention and the bytes per measurement. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
+| 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the one tenant fact the storage estimate needs — the default retention. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
 | 5 | `results` | **Results** | §7. |
 
 **An input is asked once, in the place it is used.** Deployment & add-ons and Rollout were two

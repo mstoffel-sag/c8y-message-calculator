@@ -10,7 +10,6 @@
  */
 
 import {
-  BYTES_PER_DOCUMENT,
   DEFAULT_RETENTION_DAYS,
   type Scenario,
   type ScenarioResult,
@@ -77,20 +76,6 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
               value={scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS}
               onChange={(retentionDays) =>
                 onChange({ ...scenario, settings: { ...scenario.settings, retentionDays } })
-              }
-            />
-            {/* The one number picked out of the 100-400 B range to quote. It starts
-                at the top of it, because under-stating usage on a commit-to-consume
-                contract depletes the commitment early rather than saving anything. */}
-            <Num
-              label={t('contract.bytesPerMeasurement')}
-              width="160px"
-              min={1}
-              suffix="B"
-              title={t('contract.bytesPerMeasurement.title')}
-              value={scenario.settings.bytesPerMeasurement ?? BYTES_PER_DOCUMENT.measurement}
-              onChange={(bytesPerMeasurement) =>
-                onChange({ ...scenario, settings: { ...scenario.settings, bytesPerMeasurement } })
               }
             />
           </div>
