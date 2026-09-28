@@ -17,14 +17,14 @@ export const en = {
   // The page's own title, shown by the shell's `c8y-title` in the Web SDK
   // build. The standalone build has no header to put it in -- it is the browser
   // tab there -- so this key belongs to one of the two apps.
-  'app.tagline': 'Message calculator — a volume estimate, never a quote',
+  'app.tagline': 'Message calculator — estimate message volume',
   'app.scenarioName': 'Scenario name',
   'app.stat.peakMonth': 'messages / peak month',
   'app.stat.vsUnbundled': 'vs unbundled',
   'app.stat.findings': 'findings',
   'app.stat.toFix': '{count} to fix',
   'app.expert': 'Expert mode',
-  'app.expert.title': 'Shows the raw JSON payloads for whoever writes the device code.',
+  'app.expert.title': 'Shows the raw JSON payloads for messages sent to the cumulocity platform.',
   'app.language': 'Language',
   'library.label': 'Scenario',
   'library.add': 'New scenario',
@@ -48,10 +48,9 @@ export const en = {
   'steps.series.lead': 'What does each machine measure, and how often?',
   'steps.discrete.title': 'Events, alarms, inventory & commands',
   'steps.discrete.lead':
-    'What else does a machine report, what is simply true about it, and what gets sent back to it?',
+  'What else does a machine report, and what gets sent back to it?',
   'steps.contract.title': 'Contract & deployment',
-  'steps.contract.lead':
-    'How long each period is, how the fleet ramps across them, and what is deployed in each.',
+  'steps.contract.lead': 'How long each period is, how the fleet ramps across them, and what is deployed in each.',
   'steps.results.title': 'Results',
   'steps.results.lead': 'Messages per calendar month, and where each number goes.',
 
@@ -94,7 +93,7 @@ export const en = {
 
   /* ------------------------------------------------- the metric kinds */
   // The words each screen uses for what a customer added. A state is a series
-  // too -- one sent when the value moves rather than on a tick -- so it is named
+  // too -- one sent when the value moves rather than on a timestamp -- so it is named
   // as one.
   'kind.continuous.one': 'time series',
   'kind.continuous.other': 'time series',
@@ -110,7 +109,7 @@ export const en = {
   'measurementType.other': 'measurement types',
 
   /* -------------------------------------- machine-type presets */
-  'preset.hvac.blurb': 'Four climate readings on one tick, two states that sit still for hours.',
+  'preset.hvac.blurb': 'Four climate readings on one timestamp, two states that sit still for hours.',
   'preset.meter.blurb': 'Register reads on a 15-minute interval; almost nothing else.',
   'preset.tracker.blurb': 'Position and battery together; movement start and stop as events.',
   'preset.gateway.blurb': 'Aggregates a line and forwards a summary — the biggest volume lever there is.',
@@ -245,10 +244,10 @@ export const en = {
   'commands.transitionsSuffix': 'transitions',
 
   /* ----------------------------- contract periods and the ramp */
-  'contract.ramp.heading': 'Periods and the ramp',
-  'contract.ramp.sub': 'Months → D21 · machines per period',
+  'contract.ramp.heading': 'Periods',
+  'contract.ramp.sub': 'How long each period runs, and how many machines are live in it',
   'contract.teach.title': 'Billing runs on real calendar months',
-  'contract.teach.body': 'February is 28 days and January is 31 — an **11 % swing** for a fleet doing exactly the same thing. The tool works in real month lengths and names the peak month. A single number would be wrong eleven months out of twelve.\n\n**Registration follows the ramp.** Each period contributes *Inventories Created* only for the machines it *adds*, once, in its first month. Putting onboarding into the monthly rate overstates every later period.',
+  'contract.teach.body': 'February is 28 days and January is 31 — an **11 % swing** for a fleet doing exactly the same thing. The tool works in real month lengths and names the peak month.\n\n**Registration follows the ramp.** Each period contributes *Inventories Created* only for the machines it *adds*, once, in its first month. Putting onboarding into the monthly rate overstates every later period.',
   'contract.rampStarts': 'Ramp starts',
   'contract.year': 'Year',
   'contract.retention': 'Data kept, default',
@@ -268,14 +267,13 @@ export const en = {
 
   /* ------------------------------------ deployment and add-ons */
   'deployment.heading': 'Deployment & add-ons',
-  'deployment.sub': 'One column per period → Configurator rows 23–26',
-  'deployment.teach.title': 'The parts of the quote the fleet cannot tell you',
-  'deployment.teach.body': 'Message volume comes out of the machines. Nothing in this section does: how many deployments, which add-ons, how many tenants. Somebody has to state them, so the wizard asks.\n\nCumulocity is **commit-to-consume**: a customer commits to a spend amount, not to quantities. So nothing here is an order; it is the shape of the estimate.\n\n**This tool shows no prices.** It collects the quantities and names the cell each one belongs in.',
+  'deployment.sub': 'One column per period',
+  'deployment.teach.title': 'Fixed deployments',
+  'deployment.teach.body': 'Message volume comes out of the machines. Nothing in this section does: how many deployments, which add-ons, how many tenants.\n\nCumulocity is **commit-to-consume**: a customer commits to a spend amount, not to quantities.\n\n**This tool shows no prices.** It collects the quantities.',
   'deployment.col.item': 'Line item',
   'deployment.col.unit': 'Unit',
   'deployment.copyAcross': 'Copy period 1 across all periods',
-  'deployment.copyAcross.hint': 'Most quotes repeat the same deployment every period; the fleet is what ramps.',
-  'deployment.notAsked': '**Not asked for, deliberately:** discounts, currency, minimum commitments and approval thresholds. Those live in the Configurator and are nobody’s business inside a tool that may be shown to a customer.',
+  'deployment.copyAcross.hint': 'Most quotes repeat the same deployment every period.',
   'deployment.yes': 'Yes',
   'deployment.no': 'No',
   'deployment.estimate': 'estimate {value} GiB-months',
@@ -286,7 +284,7 @@ export const en = {
   'series.count.other': '{count} series',
   'series.empty': 'Add a machine type first — a series belongs to a machine.',
   'series.teach.title': 'One measurement, one timestamp, one message',
-  'series.teach.body': 'A measurement carries **one timestamp** and any number of series. Creating one is **one message**, whether it carries one series or forty — so what decides your volume is not how much data you send, but how many requests you spread it across.\n\nThe interval does the grouping: everything read on the same tick can share a measurement. Readings on *different* intervals never can.\n\n**A flag is a series too**, and the interval you give it is the interval you pay for. Say how often each row is read; the *Measurement type* column is where you rename or split what the tool designs.',
+  'series.teach.body': 'A measurement carries **one timestamp** and any number of series. Creating one is **one message**, whether it carries one series or forty — so what decides your volume is not how much data you send, but how many requests you spread it across.\n\nThe interval does the grouping: everything read on the same timestamp can share a measurement. Readings on *different* intervals never can.\n\nSay how often each row is read; the *Measurement type* column is where you rename or split what the tool designs.',
   'series.choose': 'Choose a series…',
   'series.heading': 'Series — what this machine measures',
   'series.none': 'None yet. A series is one named value over time — a temperature, a pressure, a compressor on/off.',
@@ -323,7 +321,7 @@ export const en = {
   'series.oneMessageForAll': 'one message for all {count} series',
   'series.oneMessagePerSample': 'one message per sample',
   'series.sameMessage': 'in that same message',
-  'series.countNote': 'A row can stand for **more than one series** — 450 PLC tags on one scan is one row reading *450*, not 450 rows. The platform recommends at most **{max} series per measurement**, so a larger count travels in several, each one a message per sample.',
+  'series.countNote': 'A row can stand for **more than one series** — 450 PLC tags on one scan is one row reading *450*, not 450 rows. The platform recommends at most **{max} series per measurement**',
   'series.namingNote': 'A measurement type is the fragment your device sends, so pick a name a dashboard builder will recognise. **Do not change the series inside it afterwards** — a fragment whose shape varies degrades write and query performance.',
   'series.add': '+ Series',
   'series.whatItSends': 'What one of these machines sends',
@@ -354,9 +352,9 @@ export const en = {
   'payload.title.raiseAndClear': '{name} — raise and clear',
   'payload.note.bundle': 'One message, one timestamp — regardless of how many series it carries. Send exactly this series set every time: a fragment whose shape varies from message to message is what degrades write and query performance.',
   'payload.note.smartrest': 'Over MQTT, the JSON above goes to the topic shown. The SmartREST static measurement template carries one series per row, so bundling several series into one measurement needs a custom SmartREST 2.0 template that renders this whole fragment in a single request.',
-  'payload.note.perSeries': 'One series, one measurement, one message — and {count} of these go out on every tick, named {name}1 to {name}{count}. This is the shape the tool measures its baseline against: the same readings on one timestamp would be {types} messages a tick instead of {count}. Send it this way only if the device genuinely cannot batch the series into one request.',
+  'payload.note.perSeries': 'One series, one measurement, one message — and {count} of these go out on every timestamp, named {name}1 to {name}{count}. This is the shape the tool measures its baseline against: the same readings on one timestamp would be {types} messages a timestamp instead of {count}. Send it this way only if the device genuinely cannot batch the series into one request.',
   'payload.note.overRecommended': '{count} series in one measurement is over the {max} the platform recommends. It is still one message — the cost is that a very wide measurement is slower to write and to query. Split it if the dashboards suffer; the message count is what goes up when you do.',
-  'payload.note.alone': 'This reading travels alone, so it costs one message per sample on its own. If anything else is sampled on the same tick, they belong in one measurement.',
+  'payload.note.alone': 'This reading travels alone, so it costs one message per sample on its own. If anything else is sampled on the same timestamp, they belong in one measurement.',
   'payload.note.event': 'Events hold non-numeric data. A number buried in an event body cannot be aggregated or plotted the way a series can.',
   'payload.note.alarm': 'Two messages per incident: the raise creates and the clear updates, and both count. Raising an alarm type that is already active updates the existing alarm rather than creating a duplicate — which still counts.',
   'payload.note.inventory': 'Send this when it changes, not on a timer. The platform does not compare payloads, so an update that changes nothing still counts.',
@@ -375,8 +373,8 @@ export const en = {
   'payload.hidden': 'The exact JSON each machine should send — one example per measurement, event, alarm and inventory write — is ready for whoever writes the device code. Turn on **Expert mode** in the header to see it.',
 
   /* --------------------------------- engine prose the UI shows */
-  'engine.naiveBaselineRule': 'Every series in its own measurement, at the interval it was given, instead of sharing one with everything on the same tick. Events, alarms, inventory writes and operations are identical in both models — the whole difference is in the Measurement API.',
-  'engine.storageSourceNote': 'About 95 bytes a measurement, 1.7 kB an event, 2.7 kB an alarm — measured across 7,472 tenants, and the spread either side of it is wide. The range is the evidence, not a rounding.',
+  'engine.naiveBaselineRule': 'Every series in its own measurement, at the interval it was given, instead of sharing one with everything on the same timestamp. Events, alarms, inventory writes and operations are identical in both models — the whole difference is in the Measurement API.',
+  'engine.storageSourceNote': 'About 95 bytes a measurement, 1.7 kB an event, 2.7 kB an alarm.',
 
   /* -------------------------------------- results: the figures */
   'results.stat.peakMonth': 'Peak month',
@@ -408,7 +406,7 @@ export const en = {
   'findings.suggestions.other': '{count} suggestions',
   'findings.clean': 'Nothing to flag. Continuous readings are bundled by interval and semantics, states are sent on change, and no fragment carries a varying series set.',
   'findings.perMonth': 'msg / month',
-  'results.disclaimer': 'This is a **volume estimate**, not a quote. It reports messages per calendar month and nothing else: no prices, no billable units, no commitment sizing. Usage is metered by the platform and drawn down by the billing system — what these numbers cost is for the Configurator and the commercial terms to settle.',
+  'results.disclaimer': 'This is a **volume estimate**, not a quote. It reports messages per calendar month: no prices, no billable units, no commitment sizing. Usage is metered by the platform and drawn down by the billing system — what these numbers cost is for the Configurator and the commercial terms to settle.',
 
   /* ----------------------- results: storage and the commitment */
   'storage.heading': 'Operational storage',
@@ -425,11 +423,11 @@ export const en = {
   'storage.stat.perMeasurement.alone': 'one envelope per value: nothing shared',
   'storage.stat.dataHub': 'DataHub extract, period {index} · GiB-months',
   'storage.stat.dataHub.sub': '20–25 % of the same data',
-  'storage.odsCell': '**{amount}** goes in the ODS cell for period {index}: each month’s storage rounded **up** to a whole GiB, then added up — which is how it is billed, so a fleet holding 150 MiB pays for a GiB every month. On disk it is {note} Override it in the deployment panel.',
-  'storage.bundlingHelps': 'Bytes follow the document, not the reading: a measurement carrying {count} values is stored once, not {count} times. So bundling cuts this figure as well as the message count — the same edit, twice over.',
-  'storage.retentionDecides': '**Retention decides the size, not the traffic.** Kept **{kept}**{note} — a rule per type, over the default on the Contract step.',
+  'storage.odsCell': '**{amount}** is what storage bills for: each month’s figure rounded **up** to a whole GiB, then added up — a fleet holding 150 MiB pays for a GiB every month. On disk it is {note} Override it in the deployment panel if you have other estimates.',
+  'storage.bundlingHelps': 'Bytes follow the document, not the reading: a measurement carrying {count} values is stored once, not {count} times. So bundling cuts this figure as well as the message count.',
+  'storage.retentionDecides': '**Retention decides the size, not the traffic.** Kept **{kept}**{note} — a rule per type, over the default on the Contract step. Define how long you would like to keep the data in the hot storage layer.',
   'storage.retentionDefault': ' (the starting assumption)',
-  'storage.documentsToo': 'Events, alarms, operations and every registered device count too: **{share}** of what is kept. Their byte figures are single measured numbers with no spread of their own, and operations have no measurement at all, so that share is the weaker half.',
+  'storage.documentsToo': 'Events, alarms, operations and every registered device count too: **{share}** of what is kept.',
   'storage.kept.uniform': 'for {days} days',
   'storage.kept.mixed': 'for {from} to {to} days, by measurement type',
   'storage.perPeriod': 'By period:',
@@ -479,10 +477,10 @@ export const en = {
   'handoff.unused.show': 'Show',
   'handoff.unused.hide': 'Hide',
   'handoff.counters': 'Counters',
-  'handoff.counters.explain': '**Counters** copies the nine numbers above as one column. Paste it into `{range}` of the Sales Configurator. Each later period goes {stride} rows further down.',
-  'handoff.counters.title': 'Nine counters for period {index}, ready to paste at {cell}',
+  'handoff.counters.explain': '**Counters** copies the nine billable metrics above as one column, in the order they are listed, ready to paste into the Sales Configurator.',
+  'handoff.counters.title': 'Nine counters for period {index}, as one column ready to paste',
   'handoff.all': 'All',
-  'handoff.all.explain': '**All** copies every row as *cell, value, label*. These cells are spread around the sheet, so it is a list to work through rather than something to paste.',
+  'handoff.all.explain': '**All** copies every row as *value, label*, including the ones the nine counters leave out — a list to work through rather than something to paste in one go.',
   'handoff.all.title': 'Every cell, value and label for period {index}',
 
   /* --------------------------------- the guidance rules L1-L10 */
@@ -491,25 +489,25 @@ export const en = {
   // placeholder read as “share 1 s and “(none)””, which claims a shared group
   // called none rather than no group at all.
   'lint.L1.titleNoGroup': '{count} series share {interval} s but travel in {containers} measurements',
-  // The shared tick is the claim; whether they also share a semantic group is
+  // The shared timestamp is the claim; whether they also share a semantic group is
   // the title's business, and repeating it here overclaimed for series nobody
   // put in a group at all.
   //
   // The series are the subject, not the row names. "{names} are read…" was
   // right only while L1 needed two rows to fire; one row sending a measurement
   // type per series now trips it too, and a single name read as "Reading are
-  // read on the same tick".
-  'lint.L1.detail': '{count} series on the same tick, spread across {containers} measurements: {names}. They can share one timestamp — one message instead of {containers}, for identical information.',
+  // read on the same timestamp".
+  'lint.L1.detail': '{count} series on the same timestamp, spread across {containers} measurements: {names}. They can share one timestamp — one message instead of {containers}, for identical information.',
   'lint.L3.title': '“{name}” is a {kind} metric inside interval bundle {fragment}',
   'lint.L3.detail': 'Only continuous readings belong in an interval bundle. Anything sent on change makes the bundle send a different set of series from one message to the next, and a fragment whose shape varies is what degrades write and query performance. Give it its own measurement.',
   'lint.L2.title': '“{name}” reads like a status, sampled every {interval} s',
-  'lint.L2.detail': 'A two-state value on a fast tick pays for every identical reading: **{sends} messages per machine per month** to learn something that may change a handful of times a day. Set its interval to how often it actually moves — a flag that changes twenty times a day is one reading every 72 minutes, and the message count falls in the same proportion.',
+  'lint.L2.detail': 'A two-state value on a fast timestamp pays for every identical reading: **{sends} messages per machine per month** to learn something that may change a handful of times a day. Set its interval to how often it actually moves — a flag that changes twenty times a day is one reading every 72 minutes, and the message count falls in the same proportion.',
   'lint.L4.title': 'Bundle {fragment} is sampled faster than once a second',
   'lint.L4.detail': 'At {interval} s this is {messages} messages a month from {machines} machines. Sub-second sampling almost always belongs on an edge gateway that aggregates and forwards a summary; a gateway sending one message a second instead of sixty carries the same signal for a sixtieth of the volume.',
   'lint.L6.size.title': '{fragment} carries {count} series, over the {max} recommended',
   'lint.L6.size.detail': 'The platform recommends at most {max} series in one measurement. It accepts more, and this estimate counts it as you described it — one message per sample. The cost is document shape rather than volume: a very wide measurement is slower to write and to query, and it gets worse over the tenant’s life. Splitting it into {types} would fix that and add a message per sample for each one.',
   'lint.L6.mixed.title': 'Bundle {fragment} mixes {count} unrelated groups of readings',
-  'lint.L6.mixed.detail': 'It holds {semantics} together across {units} units. Bundling purely for volume produces fragments that make no sense to whoever builds the dashboard. Sharing a tick is necessary but not sufficient — the series should also belong together.',
+  'lint.L6.mixed.detail': 'It holds {semantics} together across {units} units. Bundling purely for volume produces fragments that make no sense to whoever builds the dashboard. Sharing a timestamp is necessary but not sufficient — the series should also belong together.',
   'lint.L5.title': '“{name}” updates the managed object more than once a minute',
   'lint.L5.detail': 'Inventory is not a time series store. Each update bills, overwrites the previous value and leaves nothing to chart. If it changes this often and the history matters, it is a measurement or an event.',
   'lint.L10.title': '“{name}” is re-sent on a timer or at every boot',
@@ -530,9 +528,9 @@ export const en = {
   'item.ods.help': 'Storage, in billable GiB-months: what the database holds at the end of each calendar month, rounded up to a whole GiB — which is how it bills — and added up over the period. Filled in from the storage estimate, and overridable here. The bytes behind it were measured across 7,472 tenants, and the spread either side is wide, so the Storage sheet carries the whole range beside whatever number lands in the cell.',
   'item.streamingAnalytics.help': 'The per-tenant edition. Note the multi-tenant Analytics Builder is already included with a deployment, and EPL Apps come with Dedicated.',
   'item.dataHubStandard.help': 'Answering yes applies an uplift to the message rate in the Configurator. It does not change the message count, so it does not change anything the calculator computes — it is carried through so the quote is complete.',
-  'item.microserviceCcu.help': 'One CCU is 1 CPU and 4 GiB of RAM. Custom microservices only — the calculator itself runs entirely in the browser and needs none.',
+  'item.microserviceCcu.help': 'One CCU is 1 CPU or 4 GiB of RAM depending on which is greater. Example: a microservice with 2 CCUs can have 2 CPUs and 8 GiB of RAM or 1 CPU and 5 GiB of RAM — always rounding up to the next whole 4GB.',
   'item.enterpriseFunctions.help': 'Custom branding, custom domains and the user hierarchy.',
-  'item.tenants.help': 'Additional tenants beyond the one the deployment includes. With the Multi-Tenancy add-on a customer can create these themselves. Tenants that have child tenants used to be called Enterprise Tenants; that name is no longer used for billing.',
+  'item.tenants.help': 'Additional tenants beyond the one the deployment includes. With the Multi-Tenancy add-on a customer can create these themselves.',
 
   /* ----------------------------------- the measurement diagram */
   'diagram.alt': '{measurements} measurements carrying {readings} readings a month in {messages} messages, per machine.',
@@ -547,7 +545,7 @@ export const en = {
   'diagram.splitTimestamp': '{cadence} · {count} readings in {types} measurements',
   'diagram.times': '× {count}',
   'diagram.msgPerMonth': 'msg / month',
-  'diagram.legend.shared': 'shared — readings on the same tick, one message',
+  'diagram.legend.shared': 'shared — readings on the same timestamp, one message',
   'diagram.legend.alone': 'alone — one message all to itself',
   'diagram.legend.total': '**{messages}** messages per machine per month, carrying **{readings}** readings',
   'diagram.onChange': 'on change',
@@ -556,16 +554,16 @@ export const en = {
   'explain.summary': 'How volume actually works — 90 seconds',
   'explain.open': 'How volume works',
   'explain.close': 'Close',
-  'explain.note': 'A measurement carries **one timestamp** and any number of readings underneath it. One request is **one message** however many readings it carries. So the question is never “how much data” — it is **how many requests the same data is spread across**.',
+  'explain.note': 'A measurement carries **one timestamp** and any number of readings underneath it. One request is **one message** however many readings it carries. So the question is **how many requests the same data is spread across**.',
   'explain.slider': 'Readings per measurement — drag right to bundle',
   'explain.messages': 'Messages / month',
   'explain.messages.sub': '{machines} machines, every {interval} s, {days}-day month',
   'explain.stored': 'Readings stored',
   'explain.stored.sub': 'the same at every setting — the information never changes',
   'explain.picture.heading': 'What the picture says',
-  'explain.picture.body': 'The dots never change. Drag the slider and the same four readings, on the same tick, arrive at the same platform — but the number of envelopes goes from one to four, and **you are billed per envelope**.\n\nThis is not compression and it is not batching. Putting ten measurements in one request is still ten messages: **batch for the network, bundle for the count.**',
+  'explain.picture.body': 'The dots never change. Drag the slider and the same four readings, on the same timestamp, arrive at the same platform — but the number of envelopes goes from one to four, and **you are billed per envelope**.\n\nThis is not compression and it is not batching. Putting ten measurements in one request is still ten messages: **batch for the network, bundle for the count.**',
   'explain.rule.heading': 'The one rule that comes with it',
-  'explain.rule.body': '**Send the same readings every time.** An envelope whose contents change from one send to the next is what degrades write and query performance later.\n\nWhich is why a series read every 72 minutes does not belong in a bundle sampled every minute — it would force the envelope to change shape. Readings share a message only when they share a tick.',
+  'explain.rule.body': '**Send the same readings every time.** An envelope whose contents change from one send to the next is what degrades write and query performance later.\n\nWhich is why a series read every 72 minutes does not belong in a bundle sampled every minute — it would force the envelope to change shape. Readings share a message only when they share a timestamp.',
   'explain.onTheMachine': 'ON THE MACHINE',
   'explain.sentTo': 'SENT TO CUMULOCITY',
   'explain.oneMessage': '1 message',
@@ -575,9 +573,9 @@ export const en = {
   'explain.readings.other': '{count} readings',
   'explain.tally.one': 'message',
   'explain.tally.other': 'messages',
-  'explain.perTick': 'per tick',
-  'explain.alt.one': 'Four sensor readings on the same tick, travelling in {count} measurement, costing {count} message.',
-  'explain.alt.other': 'Four sensor readings on the same tick, travelling in {count} measurements, costing {count} messages.',
+  'explain.perTimestamp': 'per timestamp',
+  'explain.alt.one': 'Four sensor readings on the same timestamp, travelling in {count} measurement, costing {count} message.',
+  'explain.alt.other': 'Four sensor readings on the same timestamp, travelling in {count} measurements, costing {count} messages.',
 
   /* --------------------------------- the diagram’s saving line */
   'diagram.legend.saving': '— **{count} fewer** than one measurement per reading',

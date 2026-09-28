@@ -1,19 +1,18 @@
 /**
- * The hand-off: every number this tool produces, next to the Configurator cell
- * it belongs in.
+ * The hand-off: every number this tool produces, one column per period, in the
+ * order the Sales Configurator lists them.
  *
- * The Configurator repeats an identical block per period offset by 30 rows, so
- * the cell references below are exact for each period rather than "row 28-ish".
+ * It used to print the Configurator cell beside every figure -- D21, D27, D28
+ * and so on, offset per period. Those are gone: the table is read by somebody
+ * filling the Configurator in, who has it open beside them, and a column of
+ * spreadsheet coordinates is noise to everyone else who sees this screen.
+ * The order is the hand-off now, and Counters copies the nine in it.
  */
 
 import {
-  COUNTER_BASE_ROWS,
-  PERIOD_ROW_STRIDE,
   COUNTER_KEYS,
   COUNTER_LABELS,
   LINE_ITEMS,
-  cellFor,
-  periodMonthsCell,
   storageGiBMonthsForPeriod,
   type PeriodResult,
   type Scenario,
@@ -117,19 +116,16 @@ export function Handoff({ scenario, result }: Props) {
   const tsvFor = (periodResult: PeriodResult): string => {
     const period = scenario.periods.find((p) => p.index === periodResult.index);
     const lines: string[] = [
-      `${periodMonthsCell(periodResult.index)}	${period?.months ?? ''}	${t('handoff.lengthLabel', {
-        index: periodResult.index,
-      })}`,
+      `${period?.months ?? ''}\t${t('handoff.lengthLabel', { index: periodResult.index })}`,
     ];
     for (const item of LINE_ITEMS) {
-      if (item.key === 'messages') continue; // D27 is a formula in the workbook.
+      // Messages is a formula in the workbook, not a value to paste.
+      if (item.key === 'messages') continue;
       const { text } = valueFor(t, scenario, result, periodResult, item.key);
-      if (text !== '—') lines.push(`${cellFor(item.baseRow, periodResult.index)}\t${text.replace(/,/g, '')}\t${item.label}`);
+      if (text !== '—') lines.push(`${text.replace(/,/g, '')}\t${item.label}`);
     }
     COUNTER_KEYS.forEach((key, i) => {
-      lines.push(
-        `${cellFor(COUNTER_BASE_ROWS[i]!, periodResult.index)}\t${Math.round(periodResult.peak.counters[key])}\t${COUNTER_LABELS[key]}`,
-      );
+      lines.push(`${Math.round(periodResult.peak.counters[key])}\t${COUNTER_LABELS[key]}`);
     });
     return lines.join('\n');
   };
@@ -182,7 +178,6 @@ export function Handoff({ scenario, result }: Props) {
                 return (
                   <td class="num" key={p.index}>
                     {period?.months ?? '—'}
-                    <div class="cell">{periodMonthsCell(p.index)}</div>
                   </td>
                 );
               })}
@@ -223,7 +218,6 @@ export function Handoff({ scenario, result }: Props) {
                         >
                           {text}
                         </span>
-                        <div class="cell">{cellFor(item.baseRow, p.index)}</div>
                       </td>
                     );
                   })}
@@ -243,7 +237,6 @@ export function Handoff({ scenario, result }: Props) {
                           <span style={p.peak.counters[key] === 0 ? 'color:var(--ink-faint)' : ''}>
                             {n(p.peak.counters[key])}
                           </span>
-                          <div class="cell">{cellFor(COUNTER_BASE_ROWS[i]!, p.index)}</div>
                         </td>
                       ))}
                     </tr>
@@ -277,13 +270,7 @@ export function Handoff({ scenario, result }: Props) {
                   used to be labelled "Counters" and "All" against one run-on
                   sentence, which is not an explanation of either. */}
               <td class="hint">
-                <Rich
-                  k="handoff.counters.explain"
-                  p={{
-                    range: `${cellFor(COUNTER_BASE_ROWS[0]!, 1)}:${cellFor(COUNTER_BASE_ROWS[8]!, 1)}`,
-                    stride: PERIOD_ROW_STRIDE,
-                  }}
-                />
+                <Rich k="handoff.counters.explain" />
                 <div style="margin-top:5px">
                   <Rich k="handoff.all.explain" />
                 </div>
@@ -292,10 +279,7 @@ export function Handoff({ scenario, result }: Props) {
                 <td class="num" key={p.index}>
                   <CopyButton
                     label={t('handoff.counters')}
-                    title={t('handoff.counters.title', {
-                      index: p.index,
-                      cell: cellFor(COUNTER_BASE_ROWS[0]!, p.index),
-                    })}
+                    title={t('handoff.counters.title', { index: p.index })}
                     text={() => COUNTER_KEYS.map((k) => Math.round(p.peak.counters[k])).join('\n')}
                   />{' '}
                   <CopyButton

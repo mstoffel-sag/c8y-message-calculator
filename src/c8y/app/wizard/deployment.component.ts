@@ -15,7 +15,6 @@ import { CoreModule } from '@c8y/ngx-components';
 
 import {
   ASKED_LINE_ITEMS,
-  cellFor,
   storageForPeriod,
   type LineItem,
 } from '../../../../lib/engine/index.js';
@@ -36,7 +35,6 @@ const GROUPS = ['Deployment', 'Core Metrics', 'Add-Ons', 'Support'] as const;
 /** One line item in one period, with everything the cell needs to draw itself. */
 interface Cell {
   periodIndex: number;
-  reference: string;
   checked: boolean;
   checkLabel: string;
   /** What is typed in the box. Empty where the estimate is showing through. */
@@ -119,7 +117,6 @@ interface Row {
                             <div class="mc-hint m-t-4">{{ cell.hint }}</div>
                           }
                         }
-                        <div class="mc-cell">{{ cell.reference }}</div>
                       </td>
                     }
                   </tr>
@@ -138,7 +135,6 @@ interface Row {
           </div>
         }
 
-        <p class="mc-hint m-t-16"><c8y-mc-rich k="deployment.notAsked" /></p>
       </div>
     </div>
   `,
@@ -176,7 +172,6 @@ export class DeploymentComponent {
 
           return {
             periodIndex: period.index,
-            reference: cellFor(item.baseRow, period.index),
             checked: commercialBool(period, item.key),
             checkLabel: commercialBool(period, item.key)
               ? t('deployment.yes')

@@ -14,7 +14,6 @@
 
 import {
   ASKED_LINE_ITEMS,
-  cellFor,
   storageForPeriod,
   type LineItem,
   type Scenario,
@@ -96,9 +95,6 @@ export function Deployment({ scenario, onChange, result }: Props & { result: Sce
           </div>
         )}
 
-        <p class="hint" style="margin-top:16px">
-          <Rich k="deployment.notAsked" />
-        </p>
       </div>
     </section>
   );
@@ -131,7 +127,6 @@ function Row({ item, scenario, onChange, result }: RowProps) {
           ) : (
             <Quantity item={item} scenario={scenario} onChange={onChange} result={result} period={p.index} />
           )}
-          <div class="cell" style="text-align:right;margin-top:3px">{cellFor(item.baseRow, p.index)}</div>
         </td>
       ))}
     </tr>

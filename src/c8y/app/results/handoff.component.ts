@@ -2,20 +2,18 @@
  * The hand-off: every number this tool produces, next to the Configurator cell
  * it belongs in.
  *
- * The Configurator repeats an identical block per period offset by 30 rows, so
- * the cell references below are exact for each period rather than "row 28-ish".
+ * It used to print the Configurator cell beside every figure. Those are gone:
+ * the table is read by somebody filling the Configurator in, who has it open
+ * beside them, and a column of spreadsheet coordinates is noise to everyone
+ * else who sees this screen. The order is the hand-off now.
  */
 
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
 import {
-  COUNTER_BASE_ROWS,
   COUNTER_KEYS,
   COUNTER_LABELS,
   LINE_ITEMS,
-  PERIOD_ROW_STRIDE,
-  cellFor,
-  periodMonthsCell,
   storageGiBMonthsForPeriod,
   type PeriodResult,
   type Scenario,
@@ -110,7 +108,6 @@ function valueFor(
               @for (cell of lengthRow(); track cell.index) {
                 <td class="text-right">
                   {{ cell.months }}
-                  <div class="mc-cell">{{ cell.reference }}</div>
                 </td>
               }
             </tr>
@@ -124,7 +121,6 @@ function valueFor(
                 @for (cell of row.cells; track cell.index) {
                   <td class="text-right">
                     <span [class]="cell.originClass" [title]="cell.title">{{ cell.text }}</span>
-                    <div class="mc-cell">{{ cell.reference }}</div>
                   </td>
                 }
               </tr>
@@ -137,7 +133,6 @@ function valueFor(
                     @for (cell of counter.cells; track cell.index) {
                       <td class="text-right">
                         <span [class.mc-faint]="cell.zero">{{ cell.text }}</span>
-                        <div class="mc-cell">{{ cell.reference }}</div>
                       </td>
                     }
                   </tr>
@@ -255,7 +250,6 @@ export class HandoffComponent {
       }),
       countersTitle: t('handoff.counters.title', {
         index: period.index,
-        cell: cellFor(COUNTER_BASE_ROWS[0]!, period.index),
       }),
       allTitle: t('handoff.all.title', { index: period.index }),
       countersText: () =>
@@ -268,7 +262,6 @@ export class HandoffComponent {
     this.store.result().periods.map(period => ({
       index: period.index,
       months: this.store.scenario().periods.find(p => p.index === period.index)?.months ?? '—',
-      reference: periodMonthsCell(period.index),
     })),
   );
 
@@ -293,7 +286,6 @@ export class HandoffComponent {
         return {
           index: period.index,
           text,
-          reference: cellFor(item.baseRow, period.index),
           originClass: `mc-origin-${origin}`,
           title: origin === 'estimated' ? t('handoff.estimateTitle') : '',
         };
@@ -316,7 +308,6 @@ export class HandoffComponent {
         index: period.index,
         text: n(period.peak.counters[key]),
         zero: period.peak.counters[key] === 0,
-        reference: cellFor(COUNTER_BASE_ROWS[i]!, period.index),
       })),
     }));
   });
@@ -326,11 +317,9 @@ export class HandoffComponent {
   );
 
   readonly explainParams = computed(() => ({
-    range: `${cellFor(COUNTER_BASE_ROWS[0]!, 1)}:${cellFor(COUNTER_BASE_ROWS[8]!, 1)}`,
-    stride: PERIOD_ROW_STRIDE,
   }));
 
-  /** Cell reference, value and label per line -- pasteable straight into a sheet. */
+  /** Value and label per line -- pasteable straight into a sheet. */
   private tsvFor(periodResult: PeriodResult): string {
     const t = this.locales.t();
     const scenario = this.store.scenario();
@@ -338,28 +327,18 @@ export class HandoffComponent {
     const period = scenario.periods.find(p => p.index === periodResult.index);
 
     const lines: string[] = [
-      [
-        periodMonthsCell(periodResult.index),
-        period?.months ?? '',
-        t('handoff.lengthLabel', { index: periodResult.index }),
-      ].join('\t'),
+      [period?.months ?? '', t('handoff.lengthLabel', { index: periodResult.index })].join('\t'),
     ];
 
     for (const item of LINE_ITEMS) {
-      if (item.key === 'messages') continue; // D27 is a formula in the workbook.
+      // Messages is a formula in the workbook, not a value to paste.
+      if (item.key === 'messages') continue;
       const { text } = valueFor(t, scenario, result, periodResult, item.key);
-      if (text !== '—') {
-        lines.push(
-          `${cellFor(item.baseRow, periodResult.index)}\t${text.replace(/,/g, '')}\t${item.label}`,
-        );
-      }
+      if (text !== '—') lines.push(`${text.replace(/,/g, '')}\t${item.label}`);
     }
 
     COUNTER_KEYS.forEach((key, i) => {
-      lines.push(
-        `${cellFor(COUNTER_BASE_ROWS[i]!, periodResult.index)}\t` +
-          `${Math.round(periodResult.peak.counters[key])}\t${COUNTER_LABELS[key]}`,
-      );
+      lines.push(`${Math.round(periodResult.peak.counters[key])}\t${COUNTER_LABELS[key]}`);
     });
 
     return lines.join('\n');

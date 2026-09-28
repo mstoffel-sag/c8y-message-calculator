@@ -250,7 +250,7 @@ function Diagram({ groups, t }: { groups: number[][]; t: T }) {
           {t.plural('explain.tally', groups.length)}
         </text>
         <text x={TALLY_X} y={TOP + 54} class="dg-msg-sub">
-          {t('explain.perTick')}
+          {t('explain.perTimestamp')}
         </text>
       </svg>
     </div>

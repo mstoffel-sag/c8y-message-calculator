@@ -12,7 +12,6 @@
 import {
   BYTES_PER_VALUE_HIGH,
   DEFAULT_RETENTION_DAYS,
-  periodMonthsCell,
   type Scenario,
   type ScenarioResult,
 } from '../../../lib/engine/index.js';
@@ -116,7 +115,6 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
                     <tr key={period.index}>
                       <td>
                         {t('contract.periodN', { index: period.index })}
-                        <div class="cell">{periodMonthsCell(period.index)}</div>
                       </td>
                       <td class="num">
                         <Num

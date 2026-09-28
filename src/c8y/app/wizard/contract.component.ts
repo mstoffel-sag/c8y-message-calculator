@@ -15,7 +15,6 @@ import { CoreModule } from '@c8y/ngx-components';
 import {
   BYTES_PER_VALUE_HIGH,
   DEFAULT_RETENTION_DAYS,
-  periodMonthsCell,
   type Scenario,
 } from '../../../../lib/engine/index.js';
 import { monthLabel } from '../../../../lib/format/index.js';
@@ -126,7 +125,6 @@ const MAX_PERIODS = 5;
                   <tr>
                     <td>
                       {{ row.label }}
-                      <div class="mc-cell">{{ row.monthsCell }}</div>
                     </td>
                     <td class="text-right">
                       <c8y-mc-num
@@ -205,7 +203,6 @@ export class StepContractComponent {
     return this.store.scenario().periods.map(period => ({
       index: period.index,
       label: t('contract.periodN', { index: period.index }),
-      monthsCell: periodMonthsCell(period.index),
       months: period.months,
       counts: machineTypes.map(mt => ({
         machineTypeId: mt.id,

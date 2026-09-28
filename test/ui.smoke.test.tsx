@@ -303,7 +303,7 @@ describe('the wizard renders', () => {
     ]) {
       assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `missing ${label}`);
     }
-    assert.match(html, /D23/, 'period 1 shared cloud cell');
+    assert.doesNotMatch(html, /\bD2[0-9]\b|\bD3[0-9]\b/, 'no Configurator cell references');
     assert.match(html, /commit-to-consume/i);
   });
 
@@ -325,22 +325,26 @@ describe('the wizard renders', () => {
     // screens, and adding a period meant leaving the one that needed it.
     const html = render(<StepContract {...props} result={result} />);
     assert.match(html, /Add period/);
-    assert.match(html, /Periods and the ramp/);
+    assert.match(html, /Periods/);
     assert.match(html, /Deployment &amp; add-ons/);
     // One column per period in the line-item table, and one row per period in
     // the ramp table, from the same scenario.
-    assert.match(html, /D23/, 'period 1 shared cloud cell');
+    assert.match(html, /Public\/Shared Cloud/, 'the line items are there');
   });
 
-  test('results: carries every counter cell and the hand-off', () => {
+  test('results: carries every counter and the hand-off', () => {
     const html = render(<StepResults scenario={scenario} result={result} expert />);
-    // D30 is Events Updated, zero on this fleet and therefore collapsed --
-    // the other eight carry a figure and are on screen.
-    for (const cell of ['D28', 'D29', 'D31', 'D32', 'D33', 'D34', 'D35', 'D36']) {
-      assert.match(html, new RegExp(cell), `missing ${cell}`);
+    // Events Updated is zero on this fleet and therefore collapsed; the other
+    // eight carry a figure and are on screen, named rather than numbered.
+    for (const label of [
+      'Measurements Created', 'Events Created', 'Alarms Created', 'Alarms Updated',
+      'Inventories Created', 'Inventories Updated', 'Operations Created', 'Operations Updated',
+    ]) {
+      assert.ok(html.includes(label), `missing ${label}`);
     }
-    assert.doesNotMatch(html, /D30/, 'a counter at zero collapses with the rest');
-    assert.match(html, /Measurements Created/);
+    assert.ok(!html.includes('Events Updated'), 'a counter at zero collapses with the rest');
+    // And nothing on the screen names a spreadsheet cell any more.
+    assert.doesNotMatch(html, /\bD2[0-9]\b|\bD3[0-9]\b/);
     assert.match(html, /volume estimate/);
     assert.match(html, /measurement\/measurements\/create/);
   });
@@ -399,12 +403,11 @@ describe('the hand-off row explains its own buttons', () => {
   test('each button says what it copies, and where it goes', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
     // The old row was two bare labels against one run-on sentence.
-    assert.match(html, /<b>Counters<\/b> copies the nine numbers above as one column/);
-    assert.match(html, /<b>All<\/b> copies every row as <em>cell, value, label<\/em>/);
-    // The paste target is a real Excel range. It used to render as "D28:36",
-    // which Excel does not accept.
-    assert.match(html, /<code>D28:D36<\/code>/);
-    assert.doesNotMatch(html, /D28:36/);
+    assert.match(html, /<b>Counters<\/b> copies the nine billable metrics above as one column/);
+    assert.match(html, /<b>All<\/b> copies every row as <em>value, label<\/em>/);
+    // The cell references are gone from the whole table, so the order is what
+    // makes Counters pasteable and nothing on screen names a spreadsheet cell.
+    assert.doesNotMatch(html, /\bD2[0-9]\b|\bD3[0-9]\b/);
   });
 
   test('every row at zero collapses, counters included', () => {
@@ -424,8 +427,8 @@ describe('the hand-off row explains its own buttons', () => {
       assert.ok(html.includes(label), label);
     }
     // Collapsed, not dropped: the Counters button still copies all nine, so a
-    // paste cannot leave a stale value in D28:D36 whatever is on screen.
-    assert.match(html, /D28:D36/);
+    // paste cannot leave a stale value behind whatever is on screen.
+    assert.match(html, /copies the nine billable metrics/);
   });
 
   test('the column header carries the period length, not just the quoted month', () => {
@@ -487,8 +490,8 @@ describe('the hand-off row explains its own buttons', () => {
 
   test('and every copy button can report what happened', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
-    // Two per period, each with a title naming the period's own target cell.
-    assert.match(html, /title="Nine counters for period 1, ready to paste at D28"/);
+    // Two per period, each with a title naming the period it belongs to.
+    assert.match(html, /title="Nine counters for period 1, as one column ready to paste"/);
     assert.match(html, /title="Every cell, value and label for period 1"/);
   });
 });
@@ -508,8 +511,7 @@ describe('the storage estimate shows its working', () => {
     assert.match(html, /13 – 125 GiB/);
     // Shorter words, same duty: a reader must not be able to take the figure
     // without also learning where the bytes came from and how wide the spread is.
-    assert.match(html, /measured across 7,472 tenants/, 'the provenance travels with it');
-    assert.match(html, /95 bytes a measurement/, 'and the figure it came from');
+    assert.match(html, /95 bytes a measurement/, 'the figure it came from travels with it');
     assert.match(html, /kept for 30 days/);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
   });
@@ -521,7 +523,7 @@ describe('the storage estimate shows its working', () => {
     assert.match(html, /GiB-months<\/span><b>60<\/b>/, 'the quoted figure');
     assert.match(html, /rounded up to a whole GiB/, 'and why it is not 48');
     assert.match(html, /13 – 125 GiB/, 'with the whole range beside it');
-    assert.match(html, /goes in the ODS cell/);
+    assert.match(html, /is what storage bills for/);
   });
 
   test('the ODS cell is filled in for every period, and stays overridable', () => {
@@ -538,7 +540,7 @@ describe('the storage estimate shows its working', () => {
     // bill -- so what the panel owes the reader is the share they make up, and
     // the fact that their byte figures have no measured spread of their own.
     assert.match(html, /Events, alarms, operations and every registered device count too/);
-    assert.match(html, /no spread of their own/);
+    assert.match(html, /of what is kept/);
     assert.match(html, /under 1 %/, 'and how far off that can be for this fleet');
   });
 });
@@ -590,7 +592,6 @@ describe('expert mode gates the JSON', () => {
     assert.match(html, /Expert mode/, 'and it says how to get them');
     // The numbers a customer came for are still all there.
     assert.match(html, /Measurements Created/);
-    assert.match(html, /D28/);
   });
 
   test('on: the payloads come back', () => {

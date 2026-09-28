@@ -176,7 +176,7 @@ interface Envelope {
             <text [attr.x]="LAYOUT.tallyX" [attr.y]="LAYOUT.top + 24" class="dg-total">{{ groups().length }}</text>
             <text [attr.x]="LAYOUT.tallyX" [attr.y]="LAYOUT.top + 40" class="dg-msg-sub">{{ tally() }}</text>
             <text [attr.x]="LAYOUT.tallyX" [attr.y]="LAYOUT.top + 54" class="dg-msg-sub">
-              {{ label('explain.perTick') }}
+              {{ label('explain.perTimestamp') }}
             </text>
           </svg>
         </div>
