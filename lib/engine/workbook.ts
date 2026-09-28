@@ -24,7 +24,7 @@ import { formatDuration } from './duration.js';
 import { formatMonth } from './calendar.js';
 import { measurementView } from './diagram.js';
 import { machineCountIn } from './compute.js';
-import { BYTES_PER_VALUE_HIGH, DEFAULT_RETENTION_DAYS, storageForPeriod } from './storage.js';
+import { DEFAULT_RETENTION_DAYS, storageForPeriod } from './storage.js';
 import { en, translate } from '../i18n/index.js';
 import type { MetricKind, Period, PeriodStorage, Scenario, ScenarioResult } from './types.js';
 import { colName } from '../xlsx/writer.js';
@@ -522,6 +522,13 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         'note',
       ),
     ]),
+    // Row 10, the last free one before the period table, so the scenario's own
+    // description reads as a caption for the numbers rather than as another
+    // note about the file. Omitted entirely when nobody wrote one -- an empty
+    // labelled row is worse than no row.
+    ...(scenario.notes.trim()
+      ? [row(10, [text(LABEL, 'About this estimate', 'label'), text(UNIT, scenario.notes.trim(), 'note')])]
+      : []),
     row(MONTHS_ROW, [
       text(LABEL, 'Months in period', 'label'),
       ...periods.map((p, i) =>

@@ -498,7 +498,18 @@ export function normalise(input: unknown): Scenario {
   // dropping the key here stops an old save from writing it out again forever.
   const rawSettings = { ...(raw.settings ?? {}) } as Record<string, unknown>;
   delete rawSettings.peakFactor;
-  const settings = { ...fallback.settings, ...rawSettings } as Scenario['settings'];
+  const settings = { ...fallback.settings, ...rawSettings } as Scenario['settings'] & {
+    bytesPerValue?: number;
+  };
+  // `bytesPerValue` became `bytesPerMeasurement` when storage stopped being
+  // priced per stored value and started being priced per document. The figure
+  // means the same thing it always meant -- how big one measurement is -- so a
+  // scenario saved under the old name keeps its number rather than silently
+  // falling back to the measured default and quoting a different fleet.
+  if (settings.bytesPerMeasurement === undefined && typeof settings.bytesPerValue === 'number') {
+    settings.bytesPerMeasurement = settings.bytesPerValue;
+  }
+  delete settings.bytesPerValue;
 
   const periods = (Array.isArray(raw.periods) && raw.periods.length > 0 ? raw.periods : fallback.periods)
     .map((period, i) => ({

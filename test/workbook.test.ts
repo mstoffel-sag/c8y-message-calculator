@@ -586,4 +586,26 @@ describe('the Quote sheet', () => {
     // calcPr must follow sheets, per the schema.
     assert.ok(xml.indexOf('<sheets>') < xml.indexOf('<calcPr'));
   });
+  test('the scenario description travels into the workbook', () => {
+    // It is the one thing on the Quote sheet that cannot be reconstructed from
+    // the numbers: whose fleet, whose figures, what was assumed. The file is
+    // what gets emailed, so it has to carry it.
+    const described = {
+      ...conceptSection9Scenario(),
+      notes: 'Rooftop HVAC across 12 sites. Counts from the 2026 audit.',
+    };
+    const quote = workbookSheets(described, computeScenario(described)).find((s0) => s0.name === 'Quote')!;
+    const text = quote.rows.flatMap((r) => r.cells).map((c) => String(c.value ?? ''));
+    assert.ok(text.some((v) => v === 'About this estimate'), 'the row is labelled');
+    assert.ok(text.some((v) => v.includes('Counts from the 2026 audit')), 'and carries the words');
+
+    // And no empty labelled row when nobody wrote one.
+    const blank = { ...described, notes: '   ' };
+    const quiet = workbookSheets(blank, computeScenario(blank)).find((s0) => s0.name === 'Quote')!;
+    assert.ok(
+      !quiet.rows.flatMap((r) => r.cells).some((c) => c.value === 'About this estimate'),
+      'an empty description writes no row at all',
+    );
+  });
+
 });

@@ -223,11 +223,12 @@ export interface ScenarioSettings {
    * needs. The evidence is a range (100-400 B, unverified) and the Storage sheet
    * always reports both ends; this is the one number picked out of it to quote.
    *
-   * Absent means BYTES_PER_VALUE_HIGH, the top of the range -- because under-
-   * stating usage on a commit-to-consume contract does not save the customer
-   * anything, it just depletes the commitment early and triggers a top-up.
+   * Absent means the measured central figure. Present, it is read as the size
+   * of a measurement document -- which is what this setting was always about --
+   * and the other document kinds keep their own measured figures rather than
+   * being scaled by a guess about this one.
    */
-  bytesPerValue?: number;
+  bytesPerMeasurement?: number;
 }
 
 export interface Scenario {
@@ -562,7 +563,7 @@ export interface StorageMonth {
    */
   unitsGiB: number;
   /** The assumption behind quotedGiB, so it can be stated wherever it appears. */
-  bytesPerValue: number;
+  bytesPerMeasurement: number;
   dataHubLowGiB: number;
   dataHubHighGiB: number;
   /**

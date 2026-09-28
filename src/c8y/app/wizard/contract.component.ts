@@ -13,7 +13,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { CoreModule } from '@c8y/ngx-components';
 
 import {
-  BYTES_PER_VALUE_HIGH,
+  BYTES_PER_DOCUMENT,
   DEFAULT_RETENTION_DAYS,
   type Scenario,
 } from '../../../../lib/engine/index.js';
@@ -96,12 +96,12 @@ const MAX_PERIODS = 5;
                commit-to-consume contract depletes the commitment early rather
                than saving anything. -->
           <c8y-mc-num
-            [label]="'contract.bytesPerValue' | t"
+            [label]="'contract.bytesPerMeasurement' | t"
             [min]="1"
             suffix="B"
-            [title]="'contract.bytesPerValue.title' | t"
-            [value]="settings().bytesPerValue ?? defaultBytes"
-            (valueChange)="setSetting({ bytesPerValue: $event })"
+            [title]="'contract.bytesPerMeasurement.title' | t"
+            [value]="settings().bytesPerMeasurement ?? defaultBytes"
+            (valueChange)="setSetting({ bytesPerMeasurement: $event })"
           />
         </div>
 
@@ -179,7 +179,7 @@ export class StepContractComponent {
 
   protected readonly maxPeriods = MAX_PERIODS;
   protected readonly defaultRetention = DEFAULT_RETENTION_DAYS;
-  protected readonly defaultBytes = BYTES_PER_VALUE_HIGH;
+  protected readonly defaultBytes = BYTES_PER_DOCUMENT.measurement;
 
   readonly settings = computed(() => this.store.scenario().settings);
   readonly machineTypes = computed(() => this.store.scenario().machineTypes);

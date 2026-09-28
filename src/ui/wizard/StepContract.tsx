@@ -10,7 +10,7 @@
  */
 
 import {
-  BYTES_PER_VALUE_HIGH,
+  BYTES_PER_DOCUMENT,
   DEFAULT_RETENTION_DAYS,
   type Scenario,
   type ScenarioResult,
@@ -83,14 +83,14 @@ export function StepContract({ scenario, onChange, result }: Props & { result: S
                 at the top of it, because under-stating usage on a commit-to-consume
                 contract depletes the commitment early rather than saving anything. */}
             <Num
-              label={t('contract.bytesPerValue')}
+              label={t('contract.bytesPerMeasurement')}
               width="160px"
               min={1}
               suffix="B"
-              title={t('contract.bytesPerValue.title')}
-              value={scenario.settings.bytesPerValue ?? BYTES_PER_VALUE_HIGH}
-              onChange={(bytesPerValue) =>
-                onChange({ ...scenario, settings: { ...scenario.settings, bytesPerValue } })
+              title={t('contract.bytesPerMeasurement.title')}
+              value={scenario.settings.bytesPerMeasurement ?? BYTES_PER_DOCUMENT.measurement}
+              onChange={(bytesPerMeasurement) =>
+                onChange({ ...scenario, settings: { ...scenario.settings, bytesPerMeasurement } })
               }
             />
           </div>

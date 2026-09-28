@@ -13,8 +13,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   BYTES_PER_GIB,
-  BYTES_PER_VALUE_HIGH,
-  BYTES_PER_VALUE_LOW,
   SPREAD_HIGH,
   SPREAD_LOW,
   COUNTER_KEYS,
