@@ -197,13 +197,14 @@ describe('the workbook content', () => {
     const result = computeScenario(conceptSection9Scenario());
     const period = result.storageByPeriod[0]!;
 
-    // D37 carries the quantity storage is billed on: the month-end snapshots
-    // added up. The fullest month is a stat, not the cell -- quoting it would
-    // charge twelve full months for a year spent filling up.
+    // D37 carries the quantity storage is billed on: the month-end snapshots,
+    // each rounded up to a whole GiB, added up. The fullest month is a stat,
+    // not the cell -- quoting it would charge twelve full months for a year
+    // spent filling up.
     const d37 = sheet('Quote')
       .rows.find((row) => row.cells.some((c) => c.value === 'Operational Data Store'))
       ?.cells.find((c) => typeof c.value === 'number')?.value;
-    assert.equal(d37, Number(period.giBMonths.toFixed(2)));
+    assert.equal(d37, period.unitMonths);
     assert.notEqual(d37, Number(period.peak!.quotedGiB.toFixed(2)));
 
     // And the sheet behind it carries one row per month plus the total, so the

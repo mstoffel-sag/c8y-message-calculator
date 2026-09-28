@@ -274,11 +274,10 @@ export function Storage({ result }: { result: ScenarioResult }) {
                 unit in small caps above the number is where a reader looks for
                 one anyway. */}
             <span>{t('storage.stat.ods', { index: n(first.periodIndex) })}</span>
-            <b>{n(first.giBMonths)}</b>
+            <b>{n(first.unitMonths)}</b>
             <small>
               {t('storage.stat.ods.sub', {
                 months: n(first.monthsCounted),
-                bytes: n(peak.bytesPerValue),
                 range: gibRange(first.lowGiBMonths, first.highGiBMonths),
               })}
             </small>
@@ -336,12 +335,11 @@ export function Storage({ result }: { result: ScenarioResult }) {
               <Rich
                 k="storage.odsCell"
                 p={{
-                  amount: gibMonths(first.giBMonths),
+                  amount: n(first.unitMonths),
                   index: n(first.periodIndex),
                   months: n(first.monthsCounted),
                   average: gib(first.averageGiB),
-                  bytes: n(peak.bytesPerValue),
-                  note: t('engine.storageSourceNote'),
+                  note: gibMonths(first.giBMonths) + '. ' + t('engine.storageSourceNote'),
                 }}
               />
             </p>

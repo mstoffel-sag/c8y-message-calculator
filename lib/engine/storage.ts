@@ -47,11 +47,81 @@
  * reports how much of the total they are.
  */
 
-import type { MonthResult, PeriodStorage, RetentionBucket, StorageMonth } from './types.js';
+import type {
+  DocumentBucket,
+  MonthResult,
+  PeriodStorage,
+  RetentionBucket,
+  StorageKind,
+  StorageMonth,
+} from './types.js';
 
-/** Bytes per stored value, low end: independent tests on Edge, and a rule of thumb. */
+/**
+ * Bytes per stored **document**, by kind.
+ *
+ * Measured 2026-09-28 against the billing warehouse behind the "Monthly Usage
+ * per Customer" dashboard: 39,889 tenant-months, 7,472 tenants, six month-end
+ * snapshots. Storage there is a stock under a retention window and document
+ * counts are a monthly flow, and the warehouse holds no retention column -- so
+ * the estimator is the change in storage between consecutive snapshots divided
+ * by the documents written that month, over tenant-months where storage grew.
+ * That cancels retention.
+ *
+ * Outliers rejected at p1/p99 of the ratio. IQR fences looked tidier and were
+ * wrong: they dropped a tenth of the rows carrying three fifths of the volume
+ * and moved the answer from 125 to 56 B, which is deleting the signal. p1-p99
+ * moves the coefficients by under 1 % against no rejection at all, and that
+ * agreement is the reason to believe them.
+ *
+ * Least squares through the origin, stable to three significant figures across
+ * subsets of 3,373 / 3,307 / 1,688 tenant-months:
+ *
+ *     measurement   22.9 B        event   1,737 B        alarm   2,669 B
+ *
+ * The old model was 100-400 bytes per stored *value*, from a proof of concept
+ * and a rule of thumb, both marked "to be verified". Two things were wrong with
+ * it beyond the number. It charged per value, so a fleet bundling ten series
+ * into one measurement paid ten times for one document -- the tool's whole
+ * argument about bundling, absent from its own storage figure. And it charged
+ * an alarm the same as a measurement, where the measurement says an alarm is
+ * about a hundred times heavier.
+ */
+export const BYTES_PER_DOCUMENT: Record<StorageKind, number> = {
+  measurement: 95,
+  event: 1_700,
+  alarm: 2_700,
+  // No measurement of its own: operations are absent from the billing
+  // warehouse entirely. Priced as an alarm, which is the nearest thing to it --
+  // a document with a lifecycle and a status history.
+  operation: 2_700,
+};
+
+/**
+ * How far either end of the range sits from the central figure.
+ *
+ * The per-tenant scatter is enormous -- predicting one tenant's storage growth
+ * from its document counts is out by 89 % at the median -- so this supports a
+ * range and never a point, which is what it always did. The multipliers are the
+ * quartiles of the measurement-dominated population (p25 26 B, p50 95 B,
+ * p75 244 B, n = 2,391) expressed as a ratio, and the same spread is borrowed
+ * for events and alarms because their own quartiles have not been measured.
+ */
+export const STORAGE_KINDS: StorageKind[] = ['measurement', 'event', 'alarm', 'operation'];
+
+export const SPREAD_LOW = 0.27;
+export const SPREAD_HIGH = 2.6;
+
+export function bytesFor(kind: StorageKind, end: 'low' | 'mid' | 'high'): number {
+  const mid = BYTES_PER_DOCUMENT[kind];
+  return end === 'mid' ? mid : mid * (end === 'low' ? SPREAD_LOW : SPREAD_HIGH);
+}
+
+/**
+ * The old per-value constants, kept because `ScenarioSettings.bytesPerValue`
+ * is part of every saved scenario and the workbook still names a figure.
+ * Nothing in the estimate multiplies by them any more.
+ */
 export const BYTES_PER_VALUE_LOW = 100;
-/** Bytes per stored value, high end: measured in a proof of concept. */
 export const BYTES_PER_VALUE_HIGH = 400;
 
 /** A DataHub extract is this share of the same data in MongoDB. */
@@ -198,12 +268,37 @@ export function storageByMonth(
   // Outside the measured range is allowed -- somebody may have verified it -- but
   // a nonsensical figure is not.
   const perValue = bytesPerValue > 0 ? bytesPerValue : BYTES_PER_VALUE_HIGH;
+  // `settings.bytesPerValue` was the one figure this model had, so an override
+  // is read as what it was always about: the size of a measurement. The other
+  // kinds are measured separately and are not scaled by a guess about this one.
+  const measurementBytes = (end: 'low' | 'mid' | 'high') =>
+    bytesPerValue > 0 && bytesPerValue !== BYTES_PER_VALUE_HIGH
+      ? bytesPerValue * (end === 'mid' ? 1 : end === 'low' ? SPREAD_LOW : SPREAD_HIGH)
+      : bytesFor('measurement', end);
 
   const series = windowsOf(months, fallback, (m) => m.storedByRetention, (m) => m.storedValues);
   // No stand-in for documents: a month with no document buckets wrote none, and
   // there is no single total to fall back to that would not double-count the
   // measurement stream.
-  const docs = windowsOf(months, fallback, (m) => m.documentsByRetention, () => 0);
+  // `retainedOther` is the display figure for everything that is not a
+  // measurement, so it has to skip the measurement buckets that now live in the
+  // same list -- otherwise every measurement is counted twice, once as a value
+  // and once as a document.
+  const docs = windowsOf(
+    months,
+    fallback,
+    (m) => m.documentsByRetention?.filter((b) => b.kind !== 'measurement'),
+    () => 0,
+  );
+  // And once per kind, because that is what the bytes depend on. Same walk, one
+  // stream each, so a tenant keeping alarms for five years and measurements for
+  // a week is priced on both windows rather than on an average of them.
+  const byKind = new Map(
+    STORAGE_KINDS.map((kind) => [
+      kind,
+      windowsOf(months, fallback, (m) => m.documentsByRetention?.filter((b) => b.kind === kind), () => 0),
+    ]),
+  );
 
   // The longest window decides how long storage keeps climbing, and the pair is
   // what the UI reports when a tenant keeps its types for different times.
@@ -224,6 +319,22 @@ export function storageByMonth(
     }
     const retained = retainedMeasurements + retainedOther;
 
+    /** What is on disk at the end of this month, in bytes, at one end of the range. */
+    const bytesAt = (end: 'low' | 'mid' | 'high') => {
+      let bytes = 0;
+      for (const kind of STORAGE_KINDS) {
+        const stream = byKind.get(kind)!;
+        const perDoc = kind === 'measurement' ? measurementBytes(end) : bytesFor(kind, end);
+        for (const window of stream.windows) {
+          bytes += walkBack(months, i, window, stream.valuesIn).retained * perDoc;
+        }
+      }
+      // Registered devices never age out and have no measurement of their own.
+      // Priced as a generic document, which is what a managed object is.
+      return bytes + permanentBy[i]! * bytesFor('event', end);
+    };
+    const quotedBytes = bytesAt('mid');
+
     const measurements = month.counters.measurementsCreated;
 
     return {
@@ -232,20 +343,25 @@ export function storageByMonth(
       periodIndex: month.periodIndex,
       written: month.storedValues,
       writtenOther:
-        (month.documentsByRetention?.reduce((sum, b) => sum + b.values, 0) ?? 0) +
-        (month.permanentDocuments ?? 0),
+        (month.documentsByRetention
+          ?.filter((b) => b.kind !== 'measurement')
+          .reduce((sum, b) => sum + b.values, 0) ?? 0) + (month.permanentDocuments ?? 0),
       retained,
       retainedMeasurements,
       retainedOther,
       retentionDays: span.longest,
       retentionDaysShortest: span.shortest,
       daysCovered: walkBack(months, i, span.longest, series.valuesIn).daysCovered,
-      lowGiB: gib(retained, BYTES_PER_VALUE_LOW),
-      highGiB: gib(retained, BYTES_PER_VALUE_HIGH),
-      quotedGiB: gib(retained, perValue),
+      lowGiB: bytesAt('low') / BYTES_PER_GIB,
+      highGiB: bytesAt('high') / BYTES_PER_GIB,
+      quotedGiB: quotedBytes / BYTES_PER_GIB,
+      // What the platform actually bills for this month: whole GiB, rounded up.
+      // A fleet holding 150 MiB is billed one unit, not 0.15, and twelve months
+      // of it is twelve units rather than 1.8 (CTC Metrics Dashboard).
+      unitsGiB: Math.ceil(quotedBytes / BYTES_PER_GIB),
       bytesPerValue: perValue,
-      dataHubLowGiB: gib(retained, BYTES_PER_VALUE_LOW) * DATAHUB_SHARE_LOW,
-      dataHubHighGiB: gib(retained, BYTES_PER_VALUE_HIGH) * DATAHUB_SHARE_HIGH,
+      dataHubLowGiB: (bytesAt('low') / BYTES_PER_GIB) * DATAHUB_SHARE_LOW,
+      dataHubHighGiB: (bytesAt('high') / BYTES_PER_GIB) * DATAHUB_SHARE_HIGH,
       valuesPerMeasurement: measurements > 0 ? month.storedValues / measurements : 0,
     };
   });
@@ -327,6 +443,7 @@ export function storageForPeriod(
     periodIndex,
     monthsCounted: own.length,
     giBMonths,
+    unitMonths: sum((m) => m.unitsGiB),
     lowGiBMonths: sum((m) => m.lowGiB),
     highGiBMonths: sum((m) => m.highGiB),
     dataHubLowGiBMonths: sum((m) => m.dataHubLowGiB),
@@ -345,16 +462,21 @@ export function storagePerPeriod(storage: StorageMonth[]): PeriodStorage[] {
 }
 
 /**
- * The quantity a period's Operational Data Store line is filled in with:
- * GiB-months at the assumed bytes per value.
+ * The quantity a period's Operational Data Store line is filled in with: whole
+ * GiB units, one month at a time, added up over the period.
  *
  * Named for what it is rather than "GiB", because it is not a GiB figure and a
  * reader who treats it as one will wonder why a year reads twelve times too
  * high.
+ *
+ * It rounds each month up before adding, because that is what is billed. The
+ * unrounded sum is still there as `giBMonths` and is the honest answer to "how
+ * much is on disk"; it is not the answer to "what goes in D37", and for a small
+ * fleet the two differ by most of the figure.
  */
 export function storageGiBMonthsForPeriod(
   result: { storageByPeriod: PeriodStorage[] },
   periodIndex: number,
 ): number {
-  return result.storageByPeriod.find((p) => p.periodIndex === periodIndex)?.giBMonths ?? 0;
+  return result.storageByPeriod.find((p) => p.periodIndex === periodIndex)?.unitMonths ?? 0;
 }

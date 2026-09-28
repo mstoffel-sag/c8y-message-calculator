@@ -172,7 +172,7 @@ export class DeploymentComponent {
             item.source === 'estimated'
               ? storageForPeriod(result.storage, period.index)
               : undefined;
-          const estimate = storage === undefined ? undefined : Number(storage.giBMonths.toFixed(2));
+          const estimate = storage === undefined ? undefined : storage.unitMonths;
 
           return {
             periodIndex: period.index,
@@ -189,7 +189,6 @@ export class DeploymentComponent {
                 : stated > 0
                   ? t('deployment.estimate', { value: estimate })
                   : t('deployment.estimatedAt', {
-                      bytes: storage.peak?.bytesPerValue ?? 0,
                       low: storage.lowGiBMonths.toFixed(1),
                       high: storage.highGiBMonths.toFixed(1),
                     }),

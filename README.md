@@ -199,10 +199,14 @@ workbook** itself. Numbers and month names come from `Intl`.
 ### Operational storage is a range, not a number
 
 The Results step and a `Storage` sheet in the workbook estimate the Operational Data Store from the
-values the fleet writes: **100–400 bytes per stored value** in MongoDB, kept for as long as the
-tenant's **retention rules** keep them, plus a **DataHub extract at 20–25 %** of that. Both figures
-come from `StorageCalculation.txt` and both are marked "to be verified" at source, so both ends of the
-range are always shown and no midpoint ever is.
+**documents** the fleet writes, kept for as long as the tenant's **retention rules** keep them:
+**95 bytes a measurement, 1.7 kB an event, 2.7 kB an alarm**, plus a **DataHub extract at 20–25 %**
+of that. The byte figures were measured across 7,472 tenants and 39,889 tenant-months; the DataHub
+share is still a rule of thumb. The per-tenant spread around the bytes is wide — a quarter to two
+and a half times — so both ends of the range are always shown.
+
+**Bytes follow the document, not the reading.** A measurement carrying ten series is stored once, not
+ten times, so bundling cuts this figure as well as the message count.
 
 **Storage is billed on what the database holds at the end of each calendar month, captured every
 month and added up over the contract period** — so the quantity is in **GiB-months**, and a
@@ -223,10 +227,11 @@ all**: a write overwrites the managed object in place, so nothing accumulates to
 managed object is not one of the types a retention rule covers — every device registered counts
 towards storage until somebody deletes it.
 
-The Configurator's ODS cell (`D37`) is filled in from all of this, at the assumed bytes per value —
-**400 B by default, the top of the range**, because under-stating usage on a commit-to-consume
-contract depletes the commitment early rather than saving anything. The note beside the cell carries
-the whole range, and typing a figure in the deployment panel overrides it.
+The Configurator's ODS cell (`D37`) carries the **billable** quantity: each month's storage rounded
+**up to a whole GiB**, then added up, which is what the platform bills. A fleet holding 150 MiB pays
+for a GiB every month, so a year is twelve units and not 1.8 — for a small fleet the rounding is most
+of the figure. The unrounded GiB-months sit beside it as the honest answer to how much is on disk,
+the note carries the whole range, and typing a figure in the deployment panel overrides it.
 
 Each retention window is walked backwards through the months the ramp produced, so a fleet three
 months into a rollout is not credited with a full window of history, and storage keeps climbing after
@@ -350,6 +355,9 @@ point of writing them down is that nobody has to guess which.
   browser rather than to a tenant, and cannot be shared by sending a link.
 - No A/B scenario comparison, and no pre-fill from tenant statistics. The Web SDK build is where
   that becomes possible, because it has an authenticated `@c8y/client` to hand; it does not use it.
-- One open question, which the engine cannot answer for itself: **where does a live tenant report
-  these nine counters for a past calendar month?** Until that is known, the arithmetic is unvalidated
-  against reality -- it is only validated against the concept.
+- The nine counters are no longer an open question: billable **Messages** is the sum of seven tenant
+  statistics -- measurements created, events created and updated, alarms created and updated,
+  inventories created and inventory requests -- rounded up to whole 100K units per tenant per month.
+  Operations belong to the definition but are not currently collected, and are under 1 % of messages.
+  What is still unvalidated is a whole scenario end to end: no modelled fleet has been compared with
+  the same fleet's real counters.

@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 38 — the workbook is five sheets: no Configurator, and Design is Machine Data · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-23
+**Status:** draft for review, rev 39 — storage is measured: bytes per **document** by kind, and ODS rounds up to whole GiB · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-28
 
 ---
 
@@ -407,29 +407,52 @@ sum is neither, and it is what is billed.
 
 | Assumption | Value | Provenance |
 |---|---|---|
-| Bytes per stored value in MongoDB | **100–400 B** | 100 B from independent tests on Edge and a rule of thumb; 400 B from one proof of concept. Marked *"needs to be verified"* at source. |
-| DataHub extract, relative to MongoDB | **20–25 %** | Rule of thumb, tested on Edge. Also *"to be verified"*. |
+| Bytes per **measurement document** | **95 B** (25–245) | Measured, 2026-09-28. |
+| Bytes per **event document** | **1.7 kB** | Same fit. No spread of its own. |
+| Bytes per **alarm document** | **2.7 kB** | Same fit. No spread of its own. |
+| Bytes per **operation document** | **2.7 kB** | No measurement: operations are absent from the billing warehouse. Priced as an alarm. |
+| DataHub extract, relative to MongoDB | **20–25 %** | Rule of thumb, tested on Edge. Still *"to be verified"*. |
 | Retention | **asked**, per measurement type, over a scenario default (30 days to start) | Not in the source at all. Retention rules are a tenant setting, and the tool cannot read them. |
+
+**Where the bytes come from.** 39,889 tenant-months across 7,472 tenants, six month-end snapshots.
+Storage there is a stock under a retention window and document counts are a monthly flow, and the
+warehouse holds no retention column — so the estimator is the change in storage between consecutive
+snapshots over the documents written that month, on tenant-months where storage grew, which cancels
+retention. Outliers rejected at p1/p99 of the ratio; IQR fences were tried and rejected, because they
+dropped a tenth of the rows carrying three fifths of the volume and moved the answer from 125 to
+56 B. Least squares through the origin, stable to three significant figures across subsets of
+3,373 / 3,307 / 1,688.
+
+**This replaced 100–400 B per stored *value*,** which was wrong in two ways beyond the number. It
+charged per value, so a fleet bundling ten series into one measurement paid ten times for one
+document — the tool's own argument about bundling, absent from its own storage figure. And it
+charged an alarm the same as a measurement, where an alarm is about a hundred times heavier.
 
 **Both ends are always reported, and no midpoint is ever computed.** Averaging two unverified figures
 produces something that looks like a measurement. A fourfold spread *is* the finding, and the tool
 hands it over intact — summed the same way as the quoted figure, so the range arrives at the period
 as a range rather than being re-derived from a total that has already lost it.
 
-**But a cell needs one number, so the tool writes one.** `D37` is filled in from the month-end values
-at the assumed **bytes per value**, which defaults to **400 B — the top of the range**. Not a midpoint,
-and not the bottom: on a commit-to-consume contract, under-stating usage saves the customer nothing,
-it depletes the commitment early and triggers an automatic top-up. The assumption is a scenario
-setting beside the default retention, the whole range travels in the note column next to the cell, and
-a customer who has measured their own tenant overrides it in the deployment panel — their figure wins.
+**But a cell needs one number, so the tool writes one.** `D37` is the **billable** quantity: each
+month's storage rounded **up to a whole GiB**, then added up. That is what the CTC Metrics Dashboard
+bills — `CEILING(GiB)` per month — and it is not a detail. A fleet holding 150 MiB pays for a GiB
+every month, so a year is twelve units and not 1.8, and for anything small the rounding *is* most of
+the figure. The unrounded GiB-months stay beside it as the honest answer to "how much is on disk".
+
+The central figure is written, not the top of the range. The old model wrote the top on the grounds
+that under-stating a commit-to-consume contract depletes it early; measured against real tenants the
+top was about the 85th percentile *and* was being multiplied by the bundle factor on top, so writing
+it was over-stating by three or four times rather than being careful. The whole range travels in the
+note column next to the cell, and a customer who has measured their own tenant overrides it in the
+deployment panel — their figure wins.
 
 That makes storage the tool's only `estimated` line item, a third kind alongside `calculated` and
 `asked`: derived, but on assumptions worth overriding. `calculated` would claim the fleet implies it;
 `asked` would waste a figure the tool can produce.
 
-A well-bundled fleet has room *below* the quoted figure and none above it: the 100–400 B was measured
-on values stored one per measurement, and a measurement carrying four values pays for its envelope
-once rather than four times. That is another reason the top of the range is the safe end to write.
+**Bundling now shows up here too.** Bytes follow the document: a measurement carrying four values is
+stored once, not four times. So the same edit that cuts the message count cuts the storage figure,
+which is what the old per-value model could not express.
 
 #### Retention is a rule per type
 
@@ -482,7 +505,8 @@ magnitude — under 1 % of documents for the §9 fleet. **Per-type retention des
 The ratio held only while everything was kept for the same time; a tenant keeping measurements for a
 week and alarms for five years has an ODS bill the alarms dominate, and no fleet-wide document ratio
 would have predicted it. So documents are counted, and the estimate reports how much of itself they
-are. The 100–400 B was measured on datapoints, so applying it to a document is the weaker half of
+are. Events and alarms have a measured figure but no measured spread, and operations have no
+measurement at all, so applying one to a document is the weaker half of
 the assumption — but leaving them out is a silent understatement, and on a commit-to-consume contract
 understating is the expensive direction (§6.6).
 
@@ -653,7 +677,7 @@ every input visibly moves the number.
 | 1 | `fleet` | **Machines** | Machine types, counts, online %, and what each one **talks** — a catalogue of shop-floor protocols that can always be escaped. A type is a group that behaves identically; split only where the *data* differs. |
 | 2 | `series` | **Measurements** | One table, one row per **series** — or, where a customer has a tag count rather than a list, one row standing for a count of them (§4.2) — and one question about each: how often it is read. The interactive explainer sits here. The tool groups series by interval and puts each group in one **measurement type**, automatically, under a suggested fragment name the customer can overwrite in the row. A **retention** column sits beside it, asked once per measurement type rather than once per row, because that is what a retention rule attaches to (§4.6). A status flag is a row like any other — the interval a customer gives it is the rate they intend to read it at, and L2 is what catches one left on the fleet's tick (§4.4). |
 | 3 | `discrete` | **Events, alarms, inventory & commands** | Everything that is not a measurement, one panel each, with the mistake each one invites. An event is something that happened; an alarm is something that is wrong; inventory is something true about the machine right now; a command is something you want the machine to do. Commands come last and state the status-transition count, because one command is three or four messages — and because putting them beside the three inbound elements is what makes the direction the point. Events, alarms and commands each carry a **retention** column, since each row is a type of its own; inventory carries none, and says why (§4.6). |
-| 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs — the default retention and the bytes per value. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
+| 4 | `contract` | **Contract & deployment** | Two panels, in dependency order. **Periods and the ramp:** how many periods, how long each is, how many machines are live in each, where the term starts on the calendar, and the two tenant facts the storage estimate needs — the default retention and the bytes per measurement. Then **Deployment & add-ons:** every Configurator line item the fleet cannot imply, one column per period, with its cell reference. Quantities only. |
 | 5 | `results` | **Results** | §7. |
 
 **An input is asked once, in the place it is used.** Deployment & add-ons and Rollout were two
@@ -1238,7 +1262,7 @@ the invoice does, because it buys query latency, headroom and a database that st
 | **Does a batch help?** | **No.** Ten measurements in one batch request counts as **ten messages**. | Removed the `bulkCounting` switch. Added the *batch for the network, bundle for the count* rule (§2) |
 | **What is a month?** | **Calendar month.** | Removed the month-basis setting; the engine works in real month lengths and sizes on the longest month (§2, §9) |
 | **Do no-op `PUT`s count?** | **Yes. Every `PUT` counts.** | New guard-rail (§3) and lint rule L10 |
-| **Bytes per stored value?** | **100–400 B in MongoDB, unverified** (StorageCalculation.txt). | §4.6 reports the full range and its provenance, and writes the top of it into the ODS cell where a single number is required; §4.4 still rests on message count and transition timing, not on a storage saving, because a 4x spread cannot carry an argument |
+| **Bytes per stored document?** | **Measured 2026-09-28**: 95 B a measurement, 1.7 kB an event, 2.7 kB an alarm, across 7,472 tenants. The per-tenant spread is wide. | §4.6 reports the range and its provenance and writes the central figure into the ODS cell; §4.4 still rests on message count and transition timing rather than on a storage saving, because the spread is too wide to carry an argument |
 | **Maximum series per measurement?** | **Do not exceed 100** — a recommendation about document shape, not a limit the platform enforces. | L6 warns above 100 and prices what splitting would add. The engine counts the design as described: one measurement, one message, however wide (§4.2). It briefly enforced the ceiling instead, which over-stated by 5× every fleet whose agent really does post one fat measurement |
 | **Do failed requests count?** | **No.** Only successful writes. | A retry loop costs network, not messages (§2). The no-op `PUT` rule stands — a *successful* write that changes nothing still counts |
 | **Reads?** | **Confirmed not counted.** | — |

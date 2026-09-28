@@ -243,7 +243,7 @@ export const de: Record<Key, string> = {
   'contract.retention.suffix': 'Tage',
   'contract.retention.title': 'Tage, die der Tenant die Daten standardmäßig hält. Ein Messtyp mit eigener Aufbewahrungsregel — im Schritt Messungen gesetzt — überschreibt diesen Wert. Bestimmt die Schätzung des operativen Speichers im Schritt Ergebnisse; die Zahl der Nachrichten ändert sich dadurch nicht.',
   'contract.bytesPerValue': 'Bytes / Wert',
-  'contract.bytesPerValue.title': 'Bytes pro gespeicherten Wert, für die Speicherzahl in der ODS-Zelle des Configurators. Die Belege sagen 100-400 B und sind unbestätigt, deshalb zeigen der Schritt Ergebnisse und die Arbeitsmappe immer die ganze Spanne neben dem hier eingestellten Wert.',
+  'contract.bytesPerValue.title': 'Bytes je gespeicherter Messung, für die Speicherzahl in der ODS-Zelle des Configurators. Über siebentausend Tenants hinweg bei rund 95 B gemessen, mit großer Streuung, deshalb zeigen der Schritt Ergebnisse und die Arbeitsmappe immer die Spanne neben dem hier eingestellten Wert.',
   'contract.col.period': 'Periode',
   'contract.col.months': 'Monate',
   'contract.periodN': 'Periode {index}',
@@ -267,7 +267,7 @@ export const de: Record<Key, string> = {
   'deployment.yes': 'Ja',
   'deployment.no': 'Nein',
   'deployment.estimate': 'Schätzung {value} GiB-Monate',
-  'deployment.estimatedAt': 'geschätzt mit {bytes} B / Wert · {low}–{high} GiB-Monate über die Spanne',
+  'deployment.estimatedAt': 'geschätzt · {low}–{high} GiB-Monate auf der Platte über die Spanne',
 
   /* ---------------------------------------------- measurements */
   'series.count.one': '{count} Serie',
@@ -359,7 +359,7 @@ export const de: Record<Key, string> = {
 
   /* --------------------------------- engine prose the UI shows */
   'engine.naiveBaselineRule': 'Jede Messreihe in ihrer eigenen Messung, im angegebenen Intervall, statt sich eine mit allem auf demselben Takt zu teilen. Ereignisse, Alarme, Inventarschreibvorgänge und Operationen sind in beiden Modellen identisch — der ganze Unterschied liegt in der Measurement-API.',
-  'engine.storageSourceNote': '100–400 Bytes je gespeichertem Wert, an der Quelle unbestätigt. Die Spanne ist der Befund, keine Rundung.',
+  'engine.storageSourceNote': 'Rund 95 Bytes je Messung, 1,7 kB je Ereignis, 2,7 kB je Alarm — gemessen über 7.472 Tenants, mit großer Streuung nach beiden Seiten. Die Spanne ist der Befund, keine Rundung.',
 
   /* -------------------------------------- results: the figures */
   'results.stat.peakMonth': 'Spitzenmonat',
@@ -396,8 +396,8 @@ export const de: Record<Key, string> = {
   /* ----------------------- results: storage and the commitment */
   'storage.heading': 'Operativer Speicher',
   'storage.sub': 'Was die Datenbank zu jedem Monatsende hält, summiert — die Menge, die ODS abrechnet',
-  'storage.stat.ods': 'ODS, Periode {index} · GiB-Monate',
-  'storage.stat.ods.sub': '{months} Monatsenden summiert, bei {bytes} B / Wert · {range} über die Spanne',
+  'storage.stat.ods': 'ODS, Periode {index} · abrechenbare GiB-Monate',
+  'storage.stat.ods.sub': '{months} Monatsenden, jedes auf volle GiB aufgerundet · {range} auf der Platte über die Spanne',
   'storage.stat.fullest': 'Vollster Monat',
   'storage.stat.fullest.sub': 'aufbewahrt {kept}',
   'storage.stat.fullest.partial': ' · bisher nur {days} Tage Historie',
@@ -408,11 +408,11 @@ export const de: Record<Key, string> = {
   'storage.stat.perMeasurement.alone': 'ein Umschlag pro Wert: nichts geteilt',
   'storage.stat.dataHub': 'DataHub-Extrakt, Periode {index} · GiB-Monate',
   'storage.stat.dataHub.sub': '20–25 % derselben Daten',
-  'storage.odsCell': '**{amount}** kommt in die ODS-Zelle für Periode {index}: {months} Monatsenden addiert, bei {bytes} B je Wert. Eine Zahl aus einer Spanne — {note} Überschreiben Sie sie im Deployment-Bereich.',
-  'storage.bundlingHelps': 'Eine Messung mit {count} Werten zahlt ihren Umschlag einmal, nicht {count}-mal — ein gut gebündelter Maschinenpark liegt also unter der genannten Zahl, nicht darüber.',
+  'storage.odsCell': '**{amount}** kommt in die ODS-Zelle für Periode {index}: die Speichermenge jedes Monats **auf** volle GiB aufgerundet und dann addiert — so wird abgerechnet, ein Park mit 150 MiB zahlt also jeden Monat ein volles GiB. Auf der Platte sind es {note} Überschreiben Sie sie im Deployment-Bereich.',
+  'storage.bundlingHelps': 'Bytes folgen dem Dokument, nicht dem Messwert: eine Messung mit {count} Werten wird einmal gespeichert, nicht {count}-mal. Bündeln senkt also diese Zahl ebenso wie die Nachrichtenzahl — eine Änderung, doppelte Wirkung.',
   'storage.retentionDecides': '**Die Aufbewahrung entscheidet über die Größe, nicht über den Verkehr.** Gehalten **{kept}**{note} — eine Regel pro Typ, über dem Standardwert im Schritt Vertrag.',
   'storage.retentionDefault': ' (die Ausgangsannahme)',
-  'storage.documentsToo': 'Ereignisse, Alarme, Operationen und jedes registrierte Gerät zählen mit: **{share}** des Gehaltenen. Die Byte-Zahl wurde an Datenpunkten gemessen, dieser Anteil ist also die schwächere Hälfte.',
+  'storage.documentsToo': 'Ereignisse, Alarme, Operationen und jedes registrierte Gerät zählen mit: **{share}** des Gehaltenen. Ihre Byte-Zahlen sind einzelne Messwerte ohne eigene Streuung, und für Operationen gibt es gar keine Messung — dieser Anteil ist also die schwächere Hälfte.',
   'storage.kept.uniform': '{days} Tage',
   'storage.kept.mixed': '{from} bis {to} Tage, je Messtyp',
   'storage.perPeriod': 'Nach Periode:',
@@ -478,7 +478,7 @@ export const de: Record<Key, string> = {
   'item.sharedCloud.help': 'Ein Tenant in der Public Cloud, mit Device Management, Digital Twin Manager, Cockpit, Smart Rules, dem mandantenfähigen Analytics Builder und den Device-Agents. Shared-Cloud-Kunden erhalten einen Tier-2-Tenant.',
   'item.dedicatedProd.help': 'Eine dedizierte Umgebung mit einem Management-Tenant plus einem Produktions-Tenant mit hohem SLA. Dedicated-Kunden erhalten Zugang zum Management Tenant, der Spitze der dreistufigen Hierarchie.',
   'item.messages.help': 'Die Summe der neun Zähler darunter. Genau dafür existiert dieser Rechner.',
-  'item.ods.help': 'Speicher, in GiB-Monaten: was die Datenbank am Ende jedes Kalendermonats hält, monatlich erfasst und über die Periode summiert. Aus der Speicherschätzung gefüllt — die Werte, die zum Monatsschluss noch innerhalb ihrer Aufbewahrungsfenster liegen, bei den angenommenen Bytes pro Wert — und hier überschreibbar. Die zugrunde liegende Zahl ist eine Daumenregel von 100 bis 400 Bytes und an der Quelle als „zu verifizieren“ markiert, deshalb trägt das Storage-Blatt die ganze Spanne neben der Zahl, die in der Zelle landet.',
+  'item.ods.help': 'Speicher, in abrechenbaren GiB-Monaten: was die Datenbank am Ende jedes Kalendermonats hält, auf volle GiB aufgerundet — so wird abgerechnet — und über die Periode summiert. Aus der Speicherschätzung gefüllt und hier überschreibbar. Die zugrunde liegenden Bytes wurden über 7.472 Tenants gemessen, die Streuung nach beiden Seiten ist groß, deshalb trägt das Storage-Blatt die ganze Spanne neben der Zahl, die in der Zelle landet.',
   'item.streamingAnalytics.help': 'Die Edition pro Tenant. Beachten Sie: der mandantenfähige Analytics Builder ist bei einem Deployment schon enthalten, und EPL Apps kommen mit Dedicated.',
   'item.dataHubStandard.help': 'Ja anzukreuzen wendet im Configurator einen Aufschlag auf den Nachrichtenpreis an. Es ändert die Zahl der Nachrichten nicht und damit nichts, was dieser Rechner berechnet — es wird mitgeführt, damit das Angebot vollständig ist.',
   'item.microserviceCcu.help': 'Eine CCU ist 1 CPU und 4 GiB RAM. Nur für eigene Microservices — der Rechner selbst läuft vollständig im Browser und braucht keine.',

@@ -466,9 +466,10 @@ describe('the hand-off row explains its own buttons', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
     // The workbook fills D37 in from the storage estimate. This screen used to
     // show a dash there, which made the two disagree about the same cell.
-    // 64.8 GiB standing at every month end of a 12-month period: 778.1
-    // GiB-months, which is the quantity, not the 64.8 the fullest month holds.
-    assert.match(html, /778\.1/);
+    // 4.02 GiB standing at every month end of a 12-month period, each month
+    // rounded up to a whole billable GiB: 60 units, which is the quantity --
+    // not the 4.02 the fullest month holds, and not the 48.21 on disk.
+    assert.match(html, /\b60\b/);
     assert.match(html, /estimated, overridable/);
     // The catalogue writes punctuation literally, curly apostrophe included.
     assert.match(html, /title="the tool’s estimate; state a figure/);
@@ -500,29 +501,26 @@ describe('the storage estimate shows its working', () => {
     const html = render(<StoragePanel result={result} />);
     assert.match(html, /Operational storage/);
     // The §9 fleet holds 174 M values at every month end -- 30 days of writing
-    // at 5.8 M values a day -- which is 16.2 GiB at 100 bytes each and 64.8 at
-    // 400, plus 47.5 k documents a month and 1,000 managed objects. Twelve
-    // month-ends make the period's quantity: 195 to 778 GiB-months.
-    assert.match(html, /195 – 778 GiB/);
+    // at 5.8 M values a day -- but only 44.4 M measurement documents, because
+    // the four climate readings share one. At 95 B a document that is 3.93 GiB,
+    // 4.02 with the documents and devices, and the twelve month-ends make the
+    // period: 13.0 to 125.3 GiB-months across the measured spread.
+    assert.match(html, /13 – 125 GiB/);
     // Shorter words, same duty: a reader must not be able to take the figure
-    // without also learning that the bytes behind it are unconfirmed.
-    assert.match(html, /unverified at source/, 'the provenance travels with the number');
-    assert.match(html, /100–400 bytes/, 'and the range it came from');
+    // without also learning where the bytes came from and how wide the spread is.
+    assert.match(html, /measured across 7,472 tenants/, 'the provenance travels with it');
+    assert.match(html, /95 bytes a measurement/, 'and the figure it came from');
     assert.match(html, /kept for 30 days/);
     assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'a storage figure is not a price');
   });
 
-  test('the figure it quotes is one end of the range, and says so', () => {
+  test('the figure it quotes is what is billed, with what is on disk beside it', () => {
     const html = render(<StoragePanel result={result} />);
-    // 400 B per value is the default: the top of the range, because
-    // under-stating usage on a commit-to-consume contract depletes the
-    // commitment early rather than saving anybody anything.
-    // The figure, with its unit in the stat's label: 778 GiB-months.
-    assert.match(html, /GiB-months<\/span><b>778<\/b>/, 'the quoted figure');
-    assert.match(html, /at 400 B \/ value/);
-    assert.match(html, /195 – 778 GiB/, 'with the whole range beside it');
-    // Never a midpoint: no averaging of two unverified figures.
-    assert.doesNotMatch(html, /486/, 'the midpoint of 195 and 778');
+    // The quantity is the billable unit sum -- each month rounded up to a whole
+    // GiB, because that is what ODS bills -- with its unit in the stat's label.
+    assert.match(html, /GiB-months<\/span><b>60<\/b>/, 'the quoted figure');
+    assert.match(html, /rounded up to a whole GiB/, 'and why it is not 48');
+    assert.match(html, /13 – 125 GiB/, 'with the whole range beside it');
     assert.match(html, /goes in the ODS cell/);
   });
 
@@ -530,18 +528,17 @@ describe('the storage estimate shows its working', () => {
     const html = render(<StepContract scenario={scenario} result={result} onChange={noop} />);
     // Empty box, estimate as the placeholder: nobody has stated this, and this
     // is what the workbook will use if nobody does.
-    assert.match(html, /placeholder="778\.05"/);
-    assert.match(html, /estimated at 400 B \/ value/);
-    assert.match(html, /194\.5–778\.1 GiB-months across the range/);
+    assert.match(html, /placeholder="60"/);
+    assert.match(html, /13\.0–125\.3 GiB-months on disk across the range/);
   });
 
   test('it says which half of itself rests on the weaker assumption', () => {
     const html = render(<StoragePanel result={result} />);
     // Documents are counted in -- omitting them understates a commit-to-consume
     // bill -- so what the panel owes the reader is the share they make up, and
-    // the fact that the byte figure was measured on datapoints.
+    // the fact that their byte figures have no measured spread of their own.
     assert.match(html, /Events, alarms, operations and every registered device count too/);
-    assert.match(html, /measured on datapoints/);
+    assert.match(html, /no spread of their own/);
     assert.match(html, /under 1 %/, 'and how far off that can be for this fleet');
   });
 });

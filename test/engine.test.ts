@@ -15,6 +15,8 @@ import {
   BYTES_PER_GIB,
   BYTES_PER_VALUE_HIGH,
   BYTES_PER_VALUE_LOW,
+  SPREAD_HIGH,
+  SPREAD_LOW,
   COUNTER_KEYS,
   DATAHUB_SHARE_HIGH,
   DATAHUB_SHARE_LOW,
@@ -1011,14 +1013,54 @@ describe('operational storage', () => {
     assert.equal(first.retained, first.retainedMeasurements + first.retainedOther);
   });
 
-  test('GiB is the values on disk at 100 and at 400 bytes, and nothing in between', () => {
+  test('GiB follows the documents on disk, priced by what each one is', () => {
     const peak = computeScenario(flat()).peakStorage!;
-    assert.equal(peak.lowGiB, (peak.retained * BYTES_PER_VALUE_LOW) / BYTES_PER_GIB);
-    assert.equal(peak.highGiB, (peak.retained * BYTES_PER_VALUE_HIGH) / BYTES_PER_GIB);
-    assert.equal(peak.highGiB / peak.lowGiB, 4, 'the spread in the source, carried through');
+    // The spread is the measured quartiles either side of the central figure,
+    // and it is the same multiplier whatever the mix of kinds, so the ratio
+    // survives the addition.
+    assert.ok(
+      Math.abs(peak.highGiB / peak.lowGiB - SPREAD_HIGH / SPREAD_LOW) < 1e-9,
+      'the measured spread, carried through',
+    );
+    assert.ok(peak.quotedGiB > peak.lowGiB && peak.quotedGiB < peak.highGiB);
     // DataHub extracts are a fifth to a quarter of it.
     assert.equal(peak.dataHubLowGiB, peak.lowGiB * DATAHUB_SHARE_LOW);
     assert.equal(peak.dataHubHighGiB, peak.highGiB * DATAHUB_SHARE_HIGH);
+  });
+
+  test('bundling shows up in the bytes, because bytes follow the document', () => {
+    // The old model multiplied stored *values*, so ten series in one message
+    // cost exactly what ten messages cost -- the tool arguing for bundling
+    // everywhere except in its own storage figure.
+    const fleet = (mt: MachineType): Scenario => ({
+      ...blankScenario(),
+      settings: { ...blankScenario().settings, retentionDays: 30 },
+      periods: [{ index: 1, months: 1, machineCountOverrides: {}, commercial: {} }],
+      machineTypes: [mt],
+    });
+    const row = (perSeries: boolean): MachineType => ({
+      id: 'mt', name: 'PLC line', machineCount: 1_000, onlinePct: 100,
+      metrics: [{
+        id: 'tags', name: 'PLC tags', unit: '', kind: 'continuous',
+        cadence: { mode: 'interval', seconds: 60 }, semanticGroup: 'process',
+        seriesCount: 10,
+        ...(perSeries ? { typePerSeries: true, bundleId: null } : { bundleId: 'b' }),
+      }],
+      bundles: perSeries
+        ? []
+        : [{ id: 'b', fragmentName: 'acme_Plc60s', intervalSeconds: 60, metricIds: ['tags'] }],
+    });
+    const shared = computeScenario(fleet(row(false))).storage[0]!;
+    const apiece = computeScenario(fleet(row(true))).storage[0]!;
+
+    // Same information on disk either way: ten readings a tick is ten readings.
+    assert.ok(
+      Math.abs(shared.retainedMeasurements - apiece.retainedMeasurements) < 1,
+      'the values are the same',
+    );
+    // But ten documents instead of one, and the bytes say so.
+    const ratio = apiece.quotedGiB / shared.quotedGiB;
+    assert.ok(ratio > 9 && ratio <= 10, `ten times the documents, ${ratio.toFixed(2)}x the bytes`);
   });
 
   test('retention scales it, and the message count does not move', () => {
@@ -1123,7 +1165,7 @@ describe('operational storage', () => {
     assert.ok(feb.retainedOther > peak.retainedOther, 'February holds a few more documents');
     assert.ok(feb.retained > peak.retained, 'so it is fractionally fuller, and still not the label');
     // And the quantity is untouched by the ranking: it is a sum over months.
-    assert.ok(Math.abs(result.storageByPeriod[0]!.giBMonths - 778.05) < 0.01);
+    assert.ok(Math.abs(result.storageByPeriod[0]!.giBMonths - 48.21) < 0.01);
   });
 
   test('nothing to store, nothing to report', () => {
@@ -1148,23 +1190,30 @@ describe('operational storage', () => {
  * itself filling up, and the last month under-states one whose fleet shrank.
  */
 describe('storage is the month ends, added up', () => {
-  test('the §9 fleet: 64.8 GiB standing at every month end, twelve times', () => {
+  test('the §9 fleet: 4.0 GiB standing at every month end, billed as five', () => {
     const result = computeScenario(conceptSection9Scenario());
     const period = must(result.storageByPeriod[0], 'no period storage');
 
     // A constant fleet at 30 days' retention holds 30 days of writing whenever
-    // the month happens to close -- 5.8 M values a day, so 174 M, so 64.82 GiB
-    // at 400 B. Every month of the period is that same figure, and the quantity
-    // is the twelve of them added up.
+    // the month happens to close: 5.8 M values a day, so 174 M values -- in
+    // 44.4 M measurement documents, because the four climate readings share one.
+    // At 95 B a document that is 3.93 GiB, and the events, alarms, operations
+    // and registered devices take it to 4.02.
+    //
+    // The old model said 64.8 GiB: 400 B against every *value*. Both halves of
+    // that were wrong, and reality settles it -- a real customer holding 44.1
+    // GiB writes 430 M messages a month, which scaled to this fleet's 45.9 M is
+    // about 4.7 GiB, not 65.
     assert.equal(period.monthsCounted, 12);
     for (const month of result.storage) {
       assert.ok(Math.abs(month.retainedMeasurements - 174_000_000) < 500_000, `${month.retained}`);
     }
-    // Plus 47,500 documents a month on the same 30 days and 1,000 managed
-    // objects that never age out: 778.05 GiB-months rather than 777.84, and the
-    // 0.03 % gap is what "measurements dominate" means for this fleet.
-    assert.ok(Math.abs(period.giBMonths - 778.05) < 0.01, `${period.giBMonths}`);
-    assert.ok(Math.abs(period.averageGiB - 64.84) < 0.01, `${period.averageGiB}`);
+    assert.ok(Math.abs(period.giBMonths - 48.21) < 0.01, `${period.giBMonths}`);
+    assert.ok(Math.abs(period.averageGiB - 4.02) < 0.01, `${period.averageGiB}`);
+    // And what is billed is not that: every month rounds up to a whole GiB, so
+    // twelve months of 4.02 is sixty units, not 48.21.
+    assert.equal(period.unitMonths, 60);
+    assert.equal(result.storage[0]!.unitsGiB, 5);
     assert.equal(
       Number(period.giBMonths.toFixed(6)),
       Number(result.storage.reduce((sum, m) => sum + m.quotedGiB, 0).toFixed(6)),
@@ -1206,9 +1255,16 @@ describe('storage is the month ends, added up', () => {
     assert.ok(Math.abs(period.lowGiBMonths - sum((m) => m.lowGiB)) < 1e-9);
     assert.ok(Math.abs(period.highGiBMonths - sum((m) => m.highGiB)) < 1e-9);
     assert.ok(Math.abs(period.dataHubLowGiBMonths - sum((m) => m.dataHubLowGiB)) < 1e-9);
-    assert.equal(period.highGiBMonths / period.lowGiBMonths, 4, 'the 4x spread, intact');
-    // Never a midpoint: the quoted sum is one end of the range, not between them.
-    assert.equal(period.giBMonths, period.highGiBMonths);
+    assert.ok(
+      Math.abs(period.highGiBMonths / period.lowGiBMonths - SPREAD_HIGH / SPREAD_LOW) < 1e-9,
+      'the measured spread, intact',
+    );
+    // The quoted sum is the central figure now, not an end of the range. The
+    // old model quoted the top on the grounds that under-stating a
+    // commit-to-consume contract is the expensive direction; measured against
+    // real tenants the top was about the 85th percentile, so quoting it was
+    // over-stating by three or four times rather than being careful.
+    assert.ok(period.giBMonths > period.lowGiBMonths && period.giBMonths < period.highGiBMonths);
   });
 
   test('each period is added up on its own, because the Configurator asks per period', () => {
@@ -1237,9 +1293,15 @@ describe('storage is the month ends, added up', () => {
     // either one borrowing a month from the other.
     const ratio = result.storageByPeriod[1]!.giBMonths / result.storageByPeriod[0]!.giBMonths;
     assert.ok(Math.abs(ratio - 2) < 0.05, `${ratio}`);
+    // What the line item takes is the billable unit sum, not the raw GiB: the
+    // month is rounded up before it is added, because that is what is billed.
     assert.equal(
       storageGiBMonthsForPeriod(result, 2),
-      result.storageByPeriod[1]!.giBMonths,
+      result.storageByPeriod[1]!.unitMonths,
+    );
+    assert.ok(
+      result.storageByPeriod[1]!.unitMonths >= result.storageByPeriod[1]!.giBMonths,
+      'rounding up never quotes less than what is on disk',
     );
     assert.equal(storageGiBMonthsForPeriod(result, 9), 0, 'a period that does not exist');
   });
@@ -1434,11 +1496,11 @@ describe('retention is a rule per measurement type', () => {
     assert.deepEqual(
       month.documentsByRetention,
       [
-        { retentionDays: 7, values: 31 },
-        { retentionDays: 90, values: 31 },
-        { retentionDays: 365, values: 31 },
+        { kind: 'event', retentionDays: 7, values: 31 },
+        { kind: 'operation', retentionDays: 90, values: 31 },
+        { kind: 'alarm', retentionDays: 365, values: 31 },
       ],
-      'one document a day into each of three windows',
+      'one document a day into each of three windows, and each says what it is',
     );
   });
 

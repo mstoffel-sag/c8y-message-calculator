@@ -255,7 +255,7 @@ export const en = {
   'contract.retention.suffix': 'days',
   'contract.retention.title': 'Days of data the tenant keeps by default. A measurement type with a retention rule of its own — set on the Measurements step — overrides this. Decides the operational storage estimate on the Results step; it does not change the message count.',
   'contract.bytesPerValue': 'Bytes / value',
-  'contract.bytesPerValue.title': 'Bytes per stored value, for the storage figure that goes in the Configurator’s ODS cell. The evidence is 100-400 B and unverified, so the Results step and the workbook always show the whole range beside whatever this is set to.',
+  'contract.bytesPerValue.title': 'Bytes per stored measurement, for the storage figure that goes in the Configurator’s ODS cell. Measured at about 95 B across seven thousand tenants, with a wide spread, so the Results step and the workbook always show the range beside whatever this is set to.',
   'contract.col.period': 'Period',
   'contract.col.months': 'Months',
   'contract.periodN': 'Period {index}',
@@ -279,7 +279,7 @@ export const en = {
   'deployment.yes': 'Yes',
   'deployment.no': 'No',
   'deployment.estimate': 'estimate {value} GiB-months',
-  'deployment.estimatedAt': 'estimated at {bytes} B / value · {low}–{high} GiB-months across the range',
+  'deployment.estimatedAt': 'estimated · {low}–{high} GiB-months on disk across the range',
 
   /* ---------------------------------------------- measurements */
   'series.count.one': '{count} series',
@@ -376,7 +376,7 @@ export const en = {
 
   /* --------------------------------- engine prose the UI shows */
   'engine.naiveBaselineRule': 'Every series in its own measurement, at the interval it was given, instead of sharing one with everything on the same tick. Events, alarms, inventory writes and operations are identical in both models — the whole difference is in the Measurement API.',
-  'engine.storageSourceNote': '100–400 bytes a stored value, unverified at source. The spread is the evidence, not a rounding.',
+  'engine.storageSourceNote': 'About 95 bytes a measurement, 1.7 kB an event, 2.7 kB an alarm — measured across 7,472 tenants, and the spread either side of it is wide. The range is the evidence, not a rounding.',
 
   /* -------------------------------------- results: the figures */
   'results.stat.peakMonth': 'Peak month',
@@ -413,8 +413,8 @@ export const en = {
   /* ----------------------- results: storage and the commitment */
   'storage.heading': 'Operational storage',
   'storage.sub': 'What the database holds at each month’s end, added up — the quantity ODS bills',
-  'storage.stat.ods': 'ODS, period {index} · GiB-months',
-  'storage.stat.ods.sub': '{months} month-ends summed, at {bytes} B / value · {range} across the range',
+  'storage.stat.ods': 'ODS, period {index} · billable GiB-months',
+  'storage.stat.ods.sub': '{months} month-ends, each rounded up to a whole GiB · {range} on disk across the range',
   'storage.stat.fullest': 'Fullest month',
   'storage.stat.fullest.sub': 'kept {kept}',
   'storage.stat.fullest.partial': ' · only {days} days of history yet',
@@ -425,11 +425,11 @@ export const en = {
   'storage.stat.perMeasurement.alone': 'one envelope per value: nothing shared',
   'storage.stat.dataHub': 'DataHub extract, period {index} · GiB-months',
   'storage.stat.dataHub.sub': '20–25 % of the same data',
-  'storage.odsCell': '**{amount}** goes in the ODS cell for period {index}: {months} month-ends added up, at {bytes} B a value. One figure out of a range — {note} Override it in the deployment panel.',
-  'storage.bundlingHelps': 'A measurement carrying {count} values pays for its envelope once, not {count} times, so a well-bundled fleet sits below the quoted figure rather than above it.',
+  'storage.odsCell': '**{amount}** goes in the ODS cell for period {index}: each month’s storage rounded **up** to a whole GiB, then added up — which is how it is billed, so a fleet holding 150 MiB pays for a GiB every month. On disk it is {note} Override it in the deployment panel.',
+  'storage.bundlingHelps': 'Bytes follow the document, not the reading: a measurement carrying {count} values is stored once, not {count} times. So bundling cuts this figure as well as the message count — the same edit, twice over.',
   'storage.retentionDecides': '**Retention decides the size, not the traffic.** Kept **{kept}**{note} — a rule per type, over the default on the Contract step.',
   'storage.retentionDefault': ' (the starting assumption)',
-  'storage.documentsToo': 'Events, alarms, operations and every registered device count too: **{share}** of what is kept. The byte figure was measured on datapoints, so that share is the weaker half.',
+  'storage.documentsToo': 'Events, alarms, operations and every registered device count too: **{share}** of what is kept. Their byte figures are single measured numbers with no spread of their own, and operations have no measurement at all, so that share is the weaker half.',
   'storage.kept.uniform': 'for {days} days',
   'storage.kept.mixed': 'for {from} to {to} days, by measurement type',
   'storage.perPeriod': 'By period:',
@@ -527,7 +527,7 @@ export const en = {
   'item.sharedCloud.help': 'One tenant on public cloud, with Device Management, Digital Twin Manager, Cockpit, smart rules, the multi-tenant Analytics Builder and the device agents. Shared Cloud customers get a Tier 2 tenant.',
   'item.dedicatedProd.help': 'A dedicated environment with a management tenant plus one production tenant on a high SLA. Dedicated customers are granted access to the Management Tenant, the top of the three-level hierarchy.',
   'item.messages.help': 'The sum of the nine counters below. This is what the calculator exists to produce.',
-  'item.ods.help': 'Storage, in GiB-months: what the database holds at the end of each calendar month, captured every month and added up over the period. Filled in from the storage estimate — the values still inside their retention windows when each month closes, at the assumed bytes per value — and overridable here. The underlying figure is a rule of thumb spanning 100 to 400 bytes and marked “to be verified” at source, so the Storage sheet carries the whole range beside whatever number lands in the cell.',
+  'item.ods.help': 'Storage, in billable GiB-months: what the database holds at the end of each calendar month, rounded up to a whole GiB — which is how it bills — and added up over the period. Filled in from the storage estimate, and overridable here. The bytes behind it were measured across 7,472 tenants, and the spread either side is wide, so the Storage sheet carries the whole range beside whatever number lands in the cell.',
   'item.streamingAnalytics.help': 'The per-tenant edition. Note the multi-tenant Analytics Builder is already included with a deployment, and EPL Apps come with Dedicated.',
   'item.dataHubStandard.help': 'Answering yes applies an uplift to the message rate in the Configurator. It does not change the message count, so it does not change anything the calculator computes — it is carried through so the quote is complete.',
   'item.microserviceCcu.help': 'One CCU is 1 CPU and 4 GiB of RAM. Custom microservices only — the calculator itself runs entirely in the browser and needs none.',

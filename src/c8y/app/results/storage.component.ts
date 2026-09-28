@@ -104,10 +104,9 @@ export class StorageComponent {
           // GiB-months" breaks across its own hyphen at this size.
           key: 'ods',
           label: t('storage.stat.ods', { index: n(first.periodIndex) }),
-          value: n(first.giBMonths),
+          value: n(first.unitMonths),
           sub: t('storage.stat.ods.sub', {
             months: n(first.monthsCounted),
-            bytes: n(peak.bytesPerValue),
             range: gibRange(first.lowGiBMonths, first.highGiBMonths),
           }),
         },
@@ -153,12 +152,11 @@ export class StorageComponent {
               .join(' · ')
           : '',
       odsParams: {
-        amount: gibMonths(first.giBMonths),
+        amount: n(first.unitMonths),
         index: n(first.periodIndex),
         months: n(first.monthsCounted),
         average: gib(first.averageGiB),
-        bytes: n(peak.bytesPerValue),
-        note: t('engine.storageSourceNote'),
+        note: `${gibMonths(first.giBMonths)}. ${t('engine.storageSourceNote')}`,
       },
       bundlingHelps: t('storage.bundlingHelps', {
         count: nf1.format(peak.valuesPerMeasurement),

@@ -252,13 +252,15 @@ describe('Configurator cells', () => {
   test('storage is filled in, and stays overridable', () => {
     const ods = LINE_ITEMS.find((i) => i.key === 'ods');
     assert.ok(ods);
-    // 'estimated' rather than 'calculated': the tool has a figure, but it rests
-    // on an unverified rule of thumb, so it is offered and not imposed.
+    // 'estimated' rather than 'calculated': the bytes behind it are measured
+    // now, but the per-tenant spread around them is wide, so the figure is
+    // offered and not imposed.
     assert.equal(ods.source, 'estimated');
     // The sentence itself lives in the catalogue now; the item points at it.
     const help = ods.helpKey ? en[ods.helpKey] : '';
     assert.match(help, /overridable/);
-    assert.match(help, /to be verified/);
+    assert.match(help, /measured across 7,472 tenants/);
+    assert.match(help, /rounded up to a whole GiB/, 'and says why it is not the raw GiB');
     // Still asked-for in the wizard, so a customer with real numbers can say so.
     assert.ok(ASKED_LINE_ITEMS.some((i) => i.key === 'ods'));
   });

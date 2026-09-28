@@ -155,7 +155,7 @@ function Quantity({
   // GiB-months: the period's month-end snapshots added up, which is the
   // quantity this cell is billed on (storage.ts).
   const storage = item.source === 'estimated' ? storageForPeriod(result.storage, period) : undefined;
-  const estimate = storage === undefined ? undefined : Number(storage.giBMonths.toFixed(2));
+  const estimate = storage === undefined ? undefined : storage.unitMonths;
 
   return (
     <>
@@ -181,7 +181,6 @@ function Quantity({
           {stated > 0
             ? t('deployment.estimate', { value: estimate })
             : t('deployment.estimatedAt', {
-                bytes: storage.peak?.bytesPerValue ?? 0,
                 low: storage.lowGiBMonths.toFixed(1),
                 high: storage.highGiBMonths.toFixed(1),
               })}

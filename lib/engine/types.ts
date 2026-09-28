@@ -404,6 +404,22 @@ export interface RetentionBucket {
   values: number;
 }
 
+/**
+ * Which kind of document a bucket holds.
+ *
+ * Storage used to price every stored unit the same, on the grounds that the
+ * evidence behind the byte figure was a single "bytes per datapoint" number.
+ * Measured against real tenants an alarm is around a hundred times a
+ * measurement, so the kind has to survive as far as the byte arithmetic or the
+ * estimate is wrong in the direction of whichever fleet is alarm-heavy.
+ */
+export type StorageKind = 'measurement' | 'event' | 'alarm' | 'operation';
+
+/** A retention bucket that remembers what it is holding. */
+export interface DocumentBucket extends RetentionBucket {
+  kind: StorageKind;
+}
+
 export interface MonthResult {
   year: number;
   /** 1-12. */
@@ -430,9 +446,14 @@ export interface MonthResult {
    */
   storedByRetention: RetentionBucket[];
   /**
-   * Documents this month created outside the Measurement API -- one per event,
-   * one per alarm raised, one per operation -- split by the retention rule
-   * governing each type.
+   * Every document this month created, by kind and by the retention rule
+   * governing its type -- one per measurement created, one per event, one per
+   * alarm raised, one per operation.
+   *
+   * Measurements are in here as *documents*, which is not the same count as
+   * `storedByRetention`: one measurement carrying forty series is one document
+   * and forty values. Bytes follow the document, information follows the value,
+   * and the two only coincide on a fleet that bundles nothing.
    *
    * Counted from the *creates* only. An alarm clear and an operation's status
    * transitions bill as messages and update the document they belong to; they
@@ -440,7 +461,7 @@ export interface MonthResult {
    * the managed object in place, so it stores nothing new -- which is why an
    * inventory metric has no retention to speak of.
    */
-  documentsByRetention: RetentionBucket[];
+  documentsByRetention: DocumentBucket[];
   /**
    * Managed objects registered this month.
    *
@@ -533,6 +554,13 @@ export interface StorageMonth {
    * value. Somewhere in [lowGiB, highGiB]; the range stays reported beside it.
    */
   quotedGiB: number;
+  /**
+   * What the platform bills for this month: `quotedGiB` rounded **up** to whole
+   * GiB, which is what the CTC Metrics Dashboard's "Billable Operational Data
+   * Store Units (1 GiB)" does. A fleet holding 150 MiB is billed one unit, not
+   * 0.15 -- so for anything small this, and not `quotedGiB`, is the quantity.
+   */
+  unitsGiB: number;
   /** The assumption behind quotedGiB, so it can be stated wherever it appears. */
   bytesPerValue: number;
   dataHubLowGiB: number;
@@ -560,8 +588,15 @@ export interface PeriodStorage {
   periodIndex: number;
   /** Calendar months summed -- the period's length, and the divisor for `averageGiB`. */
   monthsCounted: number;
-  /** The quantity: month-end GiB added up, at the scenario's assumed bytes per value. */
+  /** Month-end GiB added up, unrounded. What is really on disk over the term. */
   giBMonths: number;
+  /**
+   * The quantity the Operational Data Store line is filled in with: each
+   * month's GiB rounded up to a whole unit, then added up. Always at least one
+   * per month a fleet exists, which is what billing does and what `giBMonths`
+   * silently did not.
+   */
+  unitMonths: number;
   /** The same sum at each end of the unverified byte range. */
   lowGiBMonths: number;
   highGiBMonths: number;
