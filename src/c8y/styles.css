@@ -208,6 +208,9 @@ dialog.mc-explain > header .btn-link { margin-left: auto; }
 
 /* --------------------------------------------------------- teach/empty */
 
+.mc-describe { margin-bottom: calc(var(--u) * 2); }
+.mc-describe textarea { resize: vertical; min-height: 44px; }
+
 .mc-teach {
   padding: calc(var(--u) * 1.5) calc(var(--u) * 2);
   margin-bottom: calc(var(--u) * 2);

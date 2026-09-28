@@ -19,6 +19,8 @@ export const en = {
   // tab there -- so this key belongs to one of the two apps.
   'app.tagline': 'Message calculator — estimate message volume',
   'app.scenarioName': 'Scenario name',
+  'app.description': 'Description',
+  'app.description.placeholder': 'What this estimate is for, and anything a reader would need to know about it — which fleet, whose numbers, what was assumed.',
   'app.stat.peakMonth': 'messages / peak month',
   'app.stat.vsUnbundled': 'vs unbundled',
   'app.stat.findings': 'findings',

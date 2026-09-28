@@ -36,6 +36,21 @@ import { ScenarioStore } from '../scenario.store.js';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
+    <!-- The scenario's own description, on the step where a scenario begins.
+         The name is in the page header because it labels the navigator entry;
+         this is the part nobody can reconstruct from the numbers, and it
+         travels in the exported JSON. -->
+    <div class="form-group mc-describe">
+      <label>{{ 'app.description' | t }}</label>
+      <textarea
+        class="form-control"
+        rows="2"
+        [value]="notes()"
+        [attr.placeholder]="'app.description.placeholder' | t"
+        (input)="describe($any($event.target).value)"
+      ></textarea>
+    </div>
+
     <c8y-mc-teach [title]="'fleet.teach.title' | t">
       <c8y-mc-prose k="fleet.teach.body" />
     </c8y-mc-teach>
@@ -135,6 +150,11 @@ export class StepFleetComponent {
   protected readonly protocols = PROTOCOLS;
 
   readonly machineTypes = computed(() => this.store.scenario().machineTypes);
+  readonly notes = computed(() => this.store.scenario().notes);
+
+  describe(notes: string): void {
+    this.store.patch(scenario => ({ ...scenario, notes }));
+  }
 
   readonly rows = computed(() => {
     const t = this.locales.t();

@@ -17,6 +17,7 @@ import {
   inject,
   input,
   output,
+  signal,
 } from '@angular/core';
 import { CoreModule } from '@c8y/ngx-components';
 
@@ -41,8 +42,9 @@ import { TPipe } from '../i18n/t.pipe.js';
           [min]="min()"
           [attr.max]="max() ?? null"
           [step]="step()"
-          [value]="value()"
-          (input)="emit($any($event.target).value)"
+          [value]="shown()"
+          (input)="typed($any($event.target).value)"
+          (blur)="settle()"
         />
         @if (suffix()) {
           <span class="input-group-addon">{{ suffix() }}</span>
@@ -62,10 +64,41 @@ export class NumComponent {
 
   readonly valueChange = output<number>();
 
-  emit(raw: string): void {
+  /**
+   * What is in the box while it is being typed in, which is not the same thing
+   * as the scenario's value until it parses inside the range.
+   *
+   * This control used to clamp every keystroke to the minimum, so a field with
+   * a four-digit floor -- the ramp's year -- could only be driven by the
+   * spinner: typing "2" became 2000 before the second digit arrived. It also
+   * meant no box could be cleared and retyped, because an empty string reads
+   * as zero and zero clamps to the floor.
+   */
+  private readonly draft = signal<string | undefined>(undefined);
+
+  readonly shown = computed(() => this.draft() ?? String(this.value()));
+
+  typed(raw: string): void {
+    this.draft.set(raw);
     const parsed = Number(raw);
-    const next = Number.isFinite(parsed) ? parsed : this.min();
-    this.valueChange.emit(Math.min(this.max() ?? Infinity, Math.max(this.min(), next)));
+    // A partial entry is not a value yet, so nothing goes out until it is one.
+    if (raw.trim() !== '' && Number.isFinite(parsed) && parsed >= this.min() && parsed <= (this.max() ?? Infinity)) {
+      this.valueChange.emit(parsed);
+    }
+  }
+
+  settle(): void {
+    // Focus leaving settles it: clamp what is there, and keep the last good
+    // value for a box left empty rather than inventing a floor.
+    const raw = this.draft();
+    if (raw === undefined) return;
+    const parsed = Number(raw);
+    const settled =
+      raw.trim() === '' || !Number.isFinite(parsed)
+        ? this.value()
+        : Math.min(this.max() ?? Infinity, Math.max(this.min(), parsed));
+    this.draft.set(undefined);
+    if (settled !== this.value()) this.valueChange.emit(settled);
   }
 }
 

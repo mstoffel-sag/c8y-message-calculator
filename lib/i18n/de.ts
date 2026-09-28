@@ -18,6 +18,8 @@ export const de: Record<Key, string> = {
   /* ------------------------------------------------------- app chrome */
   'app.tagline': 'Nachrichtenrechner — Nachrichtenvolumen schätzen',
   'app.scenarioName': 'Name des Szenarios',
+  'app.description': 'Beschreibung',
+  'app.description.placeholder': 'Wofür diese Schätzung ist und was ein Leser darüber wissen muss — welcher Maschinenpark, wessen Zahlen, welche Annahmen.',
   'app.stat.peakMonth': 'Nachrichten / Spitzenmonat',
   'app.stat.vsUnbundled': 'vs. ungebündelt',
   'app.stat.findings': 'Hinweise',

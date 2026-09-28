@@ -83,6 +83,10 @@ export function Num({
   title?: string;
   suffix?: string;
 }) {
+  // What is in the box while it is being typed in, which is not the same thing
+  // as the scenario's value until it parses inside the range.
+  const [draft, setDraft] = useState<string | undefined>(undefined);
+
   return (
     <label class="field" style={`width:${width}`} title={title}>
       {label && <span>{label}</span>}
@@ -92,11 +96,31 @@ export function Num({
           min={min}
           max={max}
           step={step}
-          value={value}
+          value={draft ?? String(value)}
           onInput={(e) => {
-            const raw = Number((e.target as HTMLInputElement).value);
-            const n = Number.isFinite(raw) ? raw : min;
-            onChange(Math.min(max ?? Infinity, Math.max(min, n)));
+            const next = (e.target as HTMLInputElement).value;
+            setDraft(next);
+            const parsed = Number(next);
+            // Only a value that is already inside the range goes out. A partial
+            // entry is not a value yet -- "2" on the way to "2027" is not a
+            // year -- and the old control clamped every keystroke to the
+            // minimum, so a field with a four-digit floor could only be driven
+            // by the spinner and no field could be cleared and retyped.
+            if (next.trim() !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= (max ?? Infinity)) {
+              onChange(parsed);
+            }
+          }}
+          onBlur={() => {
+            // Focus leaving settles it: clamp what is there, and keep the last
+            // good value for a box left empty rather than inventing a floor.
+            if (draft === undefined) return;
+            const parsed = Number(draft);
+            const settled =
+              draft.trim() === '' || !Number.isFinite(parsed)
+                ? value
+                : Math.min(max ?? Infinity, Math.max(min, parsed));
+            setDraft(undefined);
+            if (settled !== value) onChange(settled);
           }}
         />
         {suffix && <em style="font-style:normal;color:var(--ink-faint);font-size:12px">{suffix}</em>}

@@ -28,6 +28,12 @@ export interface ScenarioEntry {
   id: string;
   /** A copy of `Scenario.name`, kept in step by `touch`. */
   name: string;
+  /**
+   * A copy of `Scenario.notes`, for the same reason the name is here: the menu
+   * is drawn from the index, and a description nobody can read without opening
+   * the scenario is half a description.
+   */
+  notes?: string;
   /** Epoch millis of the last save, so the list can put recent work first. */
   savedAt: number;
 }
@@ -68,10 +74,11 @@ export function touch(
   entries: ScenarioEntry[],
   id: string,
   name: string,
+  notes = '',
   savedAt = Date.now(),
 ): ScenarioEntry[] {
   const without = entries.filter((entry) => entry.id !== id);
-  return sortedEntries([...without, { id, name, savedAt }]);
+  return sortedEntries([...without, { id, name, notes, savedAt }]);
 }
 
 export function removeEntry(entries: ScenarioEntry[], id: string): ScenarioEntry[] {
@@ -105,6 +112,7 @@ export function normaliseEntries(raw: unknown): ScenarioEntry[] {
     out.push({
       id: entry.id,
       name: typeof entry.name === 'string' ? entry.name : '',
+      notes: typeof entry.notes === 'string' ? entry.notes : '',
       savedAt:
         typeof entry.savedAt === 'number' && Number.isFinite(entry.savedAt) ? entry.savedAt : 0,
     });

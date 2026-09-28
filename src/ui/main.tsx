@@ -221,7 +221,9 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
               key={entry.id}
               class={`library-tab ${entry.id === openId ? 'on' : ''}`}
               aria-current={entry.id === openId ? 'page' : undefined}
-              title={entry.name.trim() || t('library.untitled')}
+              title={[entry.name.trim() || t('library.untitled'), entry.notes?.trim()]
+                .filter(Boolean)
+                .join(' — ')}
               onClick={() => open(entry.id)}
             >
               {entry.name.trim() || t('library.untitled')}

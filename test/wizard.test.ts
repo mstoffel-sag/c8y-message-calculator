@@ -1034,14 +1034,14 @@ describe('a library of scenarios', () => {
     const { normaliseEntries, sortedEntries, touch, removeEntry, mostRecent } =
       await import('../lib/scenario/library.js');
 
-    let entries = touch([], 'a', 'Acme', 1_000);
-    entries = touch(entries, 'b', 'Northwind', 2_000);
+    let entries = touch([], 'a', 'Acme', '', 1_000);
+    entries = touch(entries, 'b', 'Northwind', '', 2_000);
     assert.deepEqual(entries.map((e) => e.id), ['b', 'a'], 'newest first');
     assert.equal(mostRecent(entries)?.id, 'b');
 
     // Saving again moves it up and takes the new name with it -- the name is
     // copied from the scenario rather than being a second thing to keep in step.
-    entries = touch(entries, 'a', 'Acme GmbH', 3_000);
+    entries = touch(entries, 'a', 'Acme GmbH', '', 3_000);
     assert.deepEqual(entries.map((e) => e.id), ['a', 'b']);
     assert.equal(entries[0]?.name, 'Acme GmbH');
     assert.equal(entries.length, 2, 'touch updates, it does not duplicate');

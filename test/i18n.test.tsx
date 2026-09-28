@@ -222,7 +222,10 @@ describe('a German session is German', () => {
     const html = render(h(LocaleContext.Provider, { value: 'de' }, h(component, props)));
     setFormatLocale('en');
 
-    let text = html.replace(/<[^>]+>/g, ' ');
+    // The scenario's own description is the customer's words in whatever
+    // language they wrote them -- it is content, not catalogue -- so it is not
+    // this scan's business. Everything else a textarea holds is the same.
+    let text = html.replace(/<textarea[^>]*>[\s\S]*?<\/textarea>/g, ' ').replace(/<[^>]+>/g, ' ');
     // Longest first, or removing "Pressure" out of "Pressure out of range"
     // leaves "out of range" behind and the scan blames the catalogue.
     for (const phrase of [...english].sort((a, b) => b.length - a.length)) {

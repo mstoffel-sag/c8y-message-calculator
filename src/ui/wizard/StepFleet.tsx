@@ -20,6 +20,22 @@ export function StepFleet({ scenario, onChange }: Props) {
 
   return (
     <>
+      {/* The scenario's own description, on the step where a scenario begins.
+          The name is in the header because it labels the rail entry; this is
+          the part nobody can reconstruct from the numbers -- whose fleet, whose
+          figures, what was assumed -- and it travels in the exported JSON. */}
+      <label class="field describe">
+        <span>{t('app.description')}</span>
+        <textarea
+          rows={2}
+          value={scenario.notes}
+          placeholder={t('app.description.placeholder')}
+          onInput={(e) =>
+            onChange({ ...scenario, notes: (e.target as HTMLTextAreaElement).value })
+          }
+        />
+      </label>
+
       <Teach title={t('fleet.teach.title')}>
         <Prose k="fleet.teach.body" />
       </Teach>

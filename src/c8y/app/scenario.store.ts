@@ -91,7 +91,7 @@ export class ScenarioStore {
       const id = this.openId();
       const scenario = this.current();
       keep(scenarioKey(id), JSON.stringify(scenario));
-      const next = touch(readIndex(), id, scenario.name);
+      const next = touch(readIndex(), id, scenario.name, scenario.notes);
       keep(INDEX_KEY, JSON.stringify(next));
       this.setIndex(next);
     });

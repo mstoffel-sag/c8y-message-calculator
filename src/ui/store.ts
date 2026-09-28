@@ -67,7 +67,7 @@ export function loadScenario(id: string): Scenario | null {
 /** Writes the scenario and records it in the index under the same id. */
 export function saveScenario(id: string, scenario: Scenario): void {
   write(scenarioKey(id), scenario);
-  write(INDEX_KEY, touch(listScenarios(), id, scenario.name));
+  write(INDEX_KEY, touch(listScenarios(), id, scenario.name, scenario.notes));
 }
 
 export function deleteScenario(id: string): void {

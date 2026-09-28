@@ -242,6 +242,14 @@ a { color: var(--accent); }
 }
 .shell { flex: 1; min-width: 0; }
 
+/* The scenario's description: present but quiet, so it does not compete with
+   the step it sits above. It grows with what is typed in it. */
+.field.describe { margin-bottom: calc(var(--u) * 2); }
+.field.describe textarea {
+  width: 100%; resize: vertical; min-height: 44px;
+  font: inherit; font-size: var(--c8y-font-size-small);
+}
+
 /* ---------------------------------------------------------------- top bar */
 
 .topbar {
