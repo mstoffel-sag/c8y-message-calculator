@@ -10,6 +10,18 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <!-- Before first paint, so a dark reader never sees a white page while the
+         bundle loads. Duplicates three lines of theme.ts on purpose: the module
+         cannot run early enough to prevent the flash. -->
+    <script>
+      try {
+        var t = localStorage.getItem('c8y.message-calculator.theme') || 'system';
+        document.documentElement.dataset.theme =
+          t === 'system'
+            ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : t;
+      } catch (e) {}
+    </script>
     <div id="root"></div>
     <script type="module" src="app.js"></script>
   </body>

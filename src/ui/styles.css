@@ -159,50 +159,56 @@
   --radius: var(--c8y-border-radius-large);
   --radius-btn: var(--c8y-btn-border-radius);
   --u: var(--c8y-unit-base);
+
+  color-scheme: light;
 }
 
 /* Dark theme: the `.c8y-dark-theme` block's own values. The gray ramp
    inverts (gray-10 is the light end) and the brand steps up to green-60,
-   because green-40 on near-black is unreadable. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --c8y-palette-low: #141415;
-    --c8y-palette-gray-10: #f2f2f3;
-    --c8y-palette-gray-20: #ededee;
-    --c8y-palette-gray-30: #b9babc;
-    --c8y-palette-gray-40: #97999b;
-    --c8y-palette-gray-50: #7d7f82;
-    --c8y-palette-gray-60: #505253;
-    --c8y-palette-gray-70: #434546;
-    --c8y-palette-gray-80: #2d2e2f;
-    --c8y-palette-gray-90: #1e1f1f;
-    --c8y-palette-gray-100: #191a1a;
+   because green-40 on near-black is unreadable.
 
-    --c8y-brand-primary: var(--c8y-palette-green-60);
-    --c8y-elevation-color: 45, 46, 47;
+   Keyed on an attribute rather than on `prefers-color-scheme`, because the
+   header has a switch and a reader who picked one has to outrank the operating
+   system. `main.tsx` resolves "follow the system" to a concrete value and sets
+   the attribute, so there is one dark block here rather than two that drift. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c8y-palette-low: #141415;
+  --c8y-palette-gray-10: #f2f2f3;
+  --c8y-palette-gray-20: #ededee;
+  --c8y-palette-gray-30: #b9babc;
+  --c8y-palette-gray-40: #97999b;
+  --c8y-palette-gray-50: #7d7f82;
+  --c8y-palette-gray-60: #505253;
+  --c8y-palette-gray-70: #434546;
+  --c8y-palette-gray-80: #2d2e2f;
+  --c8y-palette-gray-90: #1e1f1f;
+  --c8y-palette-gray-100: #191a1a;
 
-    --bg: var(--c8y-palette-low);
-    --panel: var(--c8y-palette-gray-100);
-    --panel-2: var(--c8y-palette-gray-90);
-    --ink: var(--c8y-palette-gray-10);
-    --ink-mute: var(--c8y-palette-gray-30);
-    --ink-faint: var(--c8y-palette-gray-40);
-    --line: var(--c8y-palette-gray-70);
-    --line-soft: var(--c8y-palette-gray-80);
+  --c8y-brand-primary: var(--c8y-palette-green-60);
+  --c8y-elevation-color: 45, 46, 47;
 
-    --accent: var(--c8y-palette-green-60);
-    --on-brand: var(--c8y-palette-low);
-    --accent-soft: color-mix(in srgb, var(--c8y-palette-green-10) 55%, var(--c8y-palette-gray-100));
-    --accent-line: var(--c8y-palette-green-50);
+  --bg: var(--c8y-palette-low);
+  --panel: var(--c8y-palette-gray-100);
+  --panel-2: var(--c8y-palette-gray-90);
+  --ink: var(--c8y-palette-gray-10);
+  --ink-mute: var(--c8y-palette-gray-30);
+  --ink-faint: var(--c8y-palette-gray-40);
+  --line: var(--c8y-palette-gray-70);
+  --line-soft: var(--c8y-palette-gray-80);
 
-    --error: var(--c8y-palette-red-50);
-    --error-soft: color-mix(in srgb, var(--c8y-palette-red-10) 45%, var(--c8y-palette-gray-100));
-    --warn: var(--c8y-palette-orange-60);
-    --warn-soft: color-mix(in srgb, var(--c8y-palette-orange-20) 45%, var(--c8y-palette-gray-100));
-    --suggest: var(--c8y-palette-blue-60);
-    --suggest-soft: color-mix(in srgb, var(--c8y-palette-blue-10) 45%, var(--c8y-palette-gray-100));
-    --good: var(--c8y-palette-green-60);
-  }
+  --accent: var(--c8y-palette-green-60);
+  --on-brand: var(--c8y-palette-low);
+  --accent-soft: color-mix(in srgb, var(--c8y-palette-green-10) 55%, var(--c8y-palette-gray-100));
+  --accent-line: var(--c8y-palette-green-50);
+
+  --error: var(--c8y-palette-red-50);
+  --error-soft: color-mix(in srgb, var(--c8y-palette-red-10) 45%, var(--c8y-palette-gray-100));
+  --warn: var(--c8y-palette-orange-60);
+  --warn-soft: color-mix(in srgb, var(--c8y-palette-orange-20) 45%, var(--c8y-palette-gray-100));
+  --suggest: var(--c8y-palette-blue-60);
+  --suggest-soft: color-mix(in srgb, var(--c8y-palette-blue-10) 45%, var(--c8y-palette-gray-100));
+  --good: var(--c8y-palette-green-60);
 }
 
 * { box-sizing: border-box; }

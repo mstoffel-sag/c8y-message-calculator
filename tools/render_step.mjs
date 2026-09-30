@@ -2,7 +2,7 @@
  * Renders one wizard step to a standalone HTML file, for a WebKit snapshot.
  *
  *   npm test                                   # builds dist-test/, which this reads
- *   node tools/render_step.mjs contract /tmp/c.html [scrollPx] [locale] [scenarios]
+ *   node tools/render_step.mjs contract /tmp/c.html [scrollPx] [locale] [scenarios] [theme]
  *   qlmanage -t -s 1100 -o /tmp /tmp/c.html
  *
  * There is no browser in the loop here, so this plus qlmanage is how a layout
@@ -45,11 +45,11 @@ const COMPONENTS = {
   results: StepResults,
 };
 
-const [key, out, scroll = '0', locale = 'en', scenarios = '1'] = process.argv.slice(2);
+const [key, out, scroll = '0', locale = 'en', scenarios = '1', theme = 'dark'] = process.argv.slice(2);
 const Step = COMPONENTS[key];
 if (!Step || !out) {
   console.error(
-    `usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx] [en|de]`,
+    `usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx] [en|de] [scenarios] [light|dark]`,
   );
   process.exit(1);
 }
@@ -101,12 +101,17 @@ const topbar = `<div class="topbar-inner">
   <button class="ghost danger">${t('nav.reset')}</button>
   <label class="ghost file">${t('io.import')}</label>
   <button class="ghost">${t('io.export')}</button>
+  <label class="locale"><select><option>${t(theme === 'light' ? 'app.theme.light' : 'app.theme.dark')}</option></select></label>
   <label class="locale"><select><option>${locale.toUpperCase()}</option></select></label>
 </div>`;
 
 writeFileSync(
   out,
-  `<!doctype html><html><head><meta charset="utf-8"><style>
+  // The theme is stated, not inherited. The stylesheet keys on the attribute
+  // now, so a snapshot no longer depends on whether the machine taking it
+  // happens to be in dark mode -- which is how every snapshot in this repo came
+  // out dark without anyone choosing that.
+  `<!doctype html><html data-theme="${theme === 'light' ? 'light' : 'dark'}"><head><meta charset="utf-8"><style>
 ${readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8')}
 .shell { margin-top: -${Number(scroll) || 0}px; }
 </style></head><body>

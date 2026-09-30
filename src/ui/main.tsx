@@ -24,6 +24,7 @@ import {
   saveScenario,
 } from './store.js';
 import { useExpert } from './expert.js';
+import { useTheme, type Theme } from './theme.js';
 import { LocaleContext, LocaleSwitch, useLocale, useT } from './i18n.js';
 import { STEPS } from './wizard/steps.js';
 import { StepFleet } from './wizard/StepFleet.js';
@@ -68,6 +69,7 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
   const [library, setLibrary] = useState(() => listScenarios());
   const [step, setStep] = useState(0);
   const [expert, setExpert] = useExpert();
+  const [theme, setTheme] = useTheme();
 
   useEffect(() => {
     saveScenario(openId, scenario);
@@ -213,7 +215,30 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
           <ScenarioIO scenario={scenario} onChange={setScenario} />
           </div>
 
-          <LocaleSwitch locale={locale} onChange={onLocale} />
+          {/* Same shape as the language switch beside it: a viewer preference,
+              quiet, and remembered. "System" is first because it is the
+              default, and the only option that follows a machine that changes
+              itself at sunset. */}
+          {/* Keyed, and so is the language switch below: two siblings that
+              both render `label.locale > select` are exactly what an unkeyed
+              diff is worst at telling apart. Cheap insurance, not a fix for
+              anything observed. */}
+          <label key="theme" class="locale" title={t('app.theme')}>
+            <span class="sr">{t('app.theme')}</span>
+            <select
+              value={theme}
+              onChange={(e) => setTheme((e.target as HTMLSelectElement).value as Theme)}
+            >
+              {/* Written out rather than built from THEMES: a computed key is
+                  invisible to the dead-key scan, and that scan is worth more
+                  than three saved lines. */}
+              <option value="system">{t('app.theme.system')}</option>
+              <option value="light">{t('app.theme.light')}</option>
+              <option value="dark">{t('app.theme.dark')}</option>
+            </select>
+          </label>
+
+          <LocaleSwitch key="locale" locale={locale} onChange={onLocale} />
         </div>
 
         <div class="rail">
