@@ -266,7 +266,15 @@ a { color: var(--accent); }
 /* min-width:0 so the tagline can give way rather than pushing the language
    switch onto a second row: German is a fifth longer than English here, and the
    bar is capped at 1240px on every screen. */
+/* The mark sits beside the brand block rather than inside it, so it stays
+   vertically centred against both lines however long the scenario name gets. */
+.mark { color: var(--brand); display: flex; align-items: center; flex: none; }
+
 .brand { display: flex; flex-direction: column; gap: 1px; margin-right: auto; min-width: 0; }
+.wordmark {
+  font-size: var(--c8y-font-size-xs); color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: 0.07em; line-height: 1.2;
+}
 .brand small {
   color: var(--ink-faint); font-size: var(--c8y-font-size-small);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

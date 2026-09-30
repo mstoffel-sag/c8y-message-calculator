@@ -50,7 +50,12 @@ const css = read('styles.css').replace(/url\(['"]?(fonts\/[^)'"]+)['"]?\)/g, (_,
 // text. The escape is invisible to the JS parser.
 const js = read('app.js').replace(/<\/script/gi, '<\\/script');
 
+// The favicon the same way: a one-file page that asks the filesystem for an
+// icon shows none, and a tab with no icon is the first thing anyone notices.
+const icon = Buffer.from(read('icon.svg'), 'utf8').toString('base64');
+
 const html = read('index.html')
+  .replace('href="icon.svg"', `href="data:image/svg+xml;base64,${icon}"`)
   .replace('<link rel="stylesheet" href="styles.css" />', `<style>\n${css}\n</style>`)
   .replace('<script type="module" src="app.js"></script>', `<script type="module">\n${js}\n</script>`);
 
@@ -59,7 +64,7 @@ for (const [what, marker] of [['stylesheet', '<style>'], ['bundle', '<script typ
     throw new Error(`the ${what} was not inlined -- src/ui/index.html no longer matches this script`);
   }
 }
-if (html.includes('href="styles.css"') || html.includes('src="app.js"')) {
+if (html.includes('href="styles.css"') || html.includes('src="app.js"') || html.includes('href="icon.svg"')) {
   throw new Error('a reference to a separate file survived -- the page would not run from file://');
 }
 

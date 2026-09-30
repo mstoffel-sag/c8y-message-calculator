@@ -18,6 +18,7 @@ export const en = {
   // build. The standalone build has no header to put it in -- it is the browser
   // tab there -- so this key belongs to one of the two apps.
   'app.tagline': 'Message calculator — estimate message volume',
+  'app.product': 'Cumulocity Message Calculator',
   'app.scenarioName': 'Scenario name',
   'app.description': 'Description',
   'app.description.placeholder': 'What this estimate is for, and anything a reader would need to know about it — which fleet, whose numbers, what was assumed.',

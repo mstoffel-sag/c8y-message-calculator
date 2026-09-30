@@ -26,6 +26,7 @@ const options = {
 function copyStatic() {
   copyFileSync(resolve(root, 'src/ui/index.html'), resolve(out, 'index.html'));
   copyFileSync(resolve(root, 'src/ui/styles.css'), resolve(out, 'styles.css'));
+  copyFileSync(resolve(root, 'src/ui/icon.svg'), resolve(out, 'icon.svg'));
 
   // The Cumulocity application manifest, with the version taken from
   // package.json so there is one place to bump. It has to land in the root of

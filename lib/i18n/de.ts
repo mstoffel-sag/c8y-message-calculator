@@ -17,6 +17,7 @@ import type { Key } from './en.js';
 export const de: Record<Key, string> = {
   /* ------------------------------------------------------- app chrome */
   'app.tagline': 'Nachrichtenrechner — Nachrichtenvolumen schätzen',
+  'app.product': 'Cumulocity Message Calculator',
   'app.scenarioName': 'Name des Szenarios',
   'app.description': 'Beschreibung',
   'app.description.placeholder': 'Wofür diese Schätzung ist und was ein Leser darüber wissen muss — welcher Maschinenpark, wessen Zahlen, welche Annahmen.',

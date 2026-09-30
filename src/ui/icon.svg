@@ -1,0 +1,36 @@
+<!--
+  The application icon: several readings, one message.
+
+  It is the picture the whole tool is built to teach (CONCEPT.md section 4),
+  drawn at icon scale. Three readings on the left converge into one envelope on
+  the right, which is the same grammar the explainer and the configuration
+  diagram use. A calculator glyph would have said "arithmetic", which is the
+  part nobody needs convincing about.
+
+  The envelope is deliberately empty. Filling it with bars turns the mark into
+  a bulleted list, which is what the first attempt looked like at 24px; two
+  dots inside it turn it into a face. The convergence is what carries the
+  meaning, so the convergence is all there is.
+
+  Transparent ground and one solid brand colour, so it reads on the light app
+  switcher tile and on the dark navigator alike. Green-40 (#119d11) is the
+  brand fill; the repo's rule is that green only steps darker when it becomes
+  small text, and there is none here.
+
+  Note the punctuation: this comment is XML, where a double hyphen is illegal.
+  The rest of the repo writes an em dash as two hyphens, and doing that here
+  produces a file every renderer rejects and no part of the build complains
+  about.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"
+     role="img" aria-label="Message calculator">
+  <g fill="none" stroke="#119d11" stroke-width="2.6" stroke-linecap="round">
+    <path d="M11 14 C17 14, 17 24, 23 24"/>
+    <path d="M11 24 H23"/>
+    <path d="M11 34 C17 34, 17 24, 23 24"/>
+  </g>
+  <circle cx="7" cy="14" r="3.4" fill="#119d11"/>
+  <circle cx="7" cy="24" r="3.4" fill="#119d11"/>
+  <circle cx="7" cy="34" r="3.4" fill="#119d11"/>
+  <rect x="23" y="12" width="21" height="24" rx="6.5" fill="#119d11"/>
+</svg>
