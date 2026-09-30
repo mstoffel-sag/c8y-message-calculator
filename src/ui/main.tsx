@@ -33,6 +33,7 @@ import { StepDiscrete } from './wizard/StepDiscrete.js';
 import { StepContract } from './wizard/StepContract.js';
 import { StepResults } from './wizard/StepResults.js';
 import { Findings } from './Results.js';
+import { Logo } from './Logo.js';
 import { compact, nf1 } from './format.js';
 
 /**
@@ -113,23 +114,13 @@ function Wizard({ locale, onLocale }: { locale: Locale; onLocale: (next: Locale)
     <>
       <div class="topbar">
         <div class="topbar-inner">
-          {/* The mark, and who this is from. The Web SDK build gets both from
-              the Cumulocity shell it runs inside; this build draws its own
-              frame, so without them it is a nameless green form. Same icon as
-              the Web SDK app's, which is the picture the tool exists to teach:
-              several readings, one message. */}
-          <div class="mark" aria-hidden="true">
-            <svg viewBox="0 0 48 48" width="30" height="30" focusable="false">
-              <g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
-                <path d="M11 14 C17 14, 17 24, 23 24" />
-                <path d="M11 24 H23" />
-                <path d="M11 34 C17 34, 17 24, 23 24" />
-              </g>
-              <circle cx="7" cy="14" r="3.4" fill="currentColor" />
-              <circle cx="7" cy="24" r="3.4" fill="currentColor" />
-              <circle cx="7" cy="34" r="3.4" fill="currentColor" />
-              <rect x="23" y="12" width="21" height="24" rx="6.5" fill="currentColor" />
-            </svg>
+          {/* Who this is from, then what it is. The Web SDK build gets both
+              from the Cumulocity shell it runs inside; this build draws its own
+              frame, so without them it is a nameless green form. The envelope
+              glyph that used to sit here is the favicon now -- a wordmark at
+              16 px is a smudge, and a tab wants a glyph. */}
+          <div class="logo">
+            <Logo />
           </div>
 
           <div class="brand">

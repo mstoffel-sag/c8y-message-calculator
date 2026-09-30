@@ -17,8 +17,8 @@ export const en = {
   // The page's own title, shown by the shell's `c8y-title` in the Web SDK
   // build. The standalone build has no header to put it in -- it is the browser
   // tab there -- so this key belongs to one of the two apps.
-  'app.tagline': 'Message calculator — estimate message volume',
-  'app.product': 'Cumulocity Message Calculator',
+  'app.tagline': 'Estimate message volume, not price',
+  'app.product': 'Message Calculator',
   'app.scenarioName': 'Scenario name',
   'app.description': 'Description',
   'app.description.placeholder': 'What this estimate is for, and anything a reader would need to know about it — which fleet, whose numbers, what was assumed.',
