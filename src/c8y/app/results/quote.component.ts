@@ -89,11 +89,11 @@ export class QuoteComponent {
     periodQuotes(this.store.scenario(), this.store.result()).filter(q => q.months > 0),
   );
 
-  // One period is its own total; a second row would only repeat it.
+  // Shown for a single period too: the reader looks for the sum in the same
+  // place every time, and a row that appears only sometimes reads as missing.
   readonly term = computed(() => {
     const t = this.locales.t();
-    const quotes = this.quotes();
-    const term = quotes.length > 1 ? termQuote(quotes) : undefined;
+    const term = termQuote(this.quotes());
     if (!term) return null;
     return {
       label: t('quote.term'),

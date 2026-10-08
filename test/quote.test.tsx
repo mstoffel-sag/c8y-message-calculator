@@ -135,10 +135,12 @@ describe('the quote, worked by hand', () => {
     }
   });
 
-  test('one period is its own total, so it gets no second row', () => {
+  test('one period still gets its sum row, so the total is always in the same place', () => {
     const one = conceptSection9Scenario();
     const html = render(h(Quote, { scenario: one, result: computeScenario(one) }));
-    assert.doesNotMatch(html, /Whole term/);
+    assert.match(html, /Whole term/);
+    assert.match(html, /<b>552,000,000<\/b>/);
+    assert.match(html, /<b>60 GiB-months<\/b>/);
   });
 });
 

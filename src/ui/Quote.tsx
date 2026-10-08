@@ -18,8 +18,9 @@ export function Quote({ scenario, result }: { scenario: Scenario; result: Scenar
   const t = useT();
   const quotes = periodQuotes(scenario, result).filter((q) => q.months > 0);
   if (quotes.length === 0) return null;
-  // One period is its own total; a second row would only repeat it.
-  const term = quotes.length > 1 ? termQuote(quotes) : undefined;
+  // Shown for a single period too: the reader looks for the sum in the same
+  // place every time, and a row that appears only sometimes reads as missing.
+  const term = termQuote(quotes);
 
   return (
     <section class="panel">
