@@ -468,7 +468,7 @@ describe('the Quote sheet', () => {
     // `cached` belonged to the formula; a stated quantity is just the value.
     assert.equal(quantity?.value, 45_978_000);
     // Rounded up per month and then multiplied by the months -- the order the
-    // Configurator bills in. Rounding at the end would under-count.
+    // Configurator bills in, at each period's peak: the safe side.
     assert.equal(term?.formula, 'ROUNDUP(D17/100000,0)*D$11');
     assert.equal(term?.cached, 460 * 12, '460 blocks a month for 12 months');
   });
@@ -500,12 +500,11 @@ describe('the Quote sheet', () => {
     // Prices are Excel's job. Quantities are the tool's, so they arrive filled
     // in: 460 blocks a month for 12 months.
     assert.equal(cell(17, 6)?.cached, 5520);
-    // Messages over the whole term, at every month's own volume.
-    const term = quote().rows.find((r) => r.row === 32)!;
-    assert.ok((term.cells.find((c) => c.col === 6)?.value as number) > 500_000_000);
-    // And the gap against a commitment quoted on peak months.
-    const gap = quote().rows.find((r) => r.row === 34)!;
-    assert.ok((gap.cells.find((c) => c.col === 6)?.value as number) >= 0);
+    // One commitment figure and nothing beside it: no month-by-month total,
+    // no gap against it.
+    for (const r of [32, 33, 34, 36]) {
+      assert.equal(quote().rows.find((row) => row.row === r), undefined, `row ${r}`);
+    }
   });
 
   test('five periods widen the sheet instead of lengthening it', () => {

@@ -33,15 +33,14 @@ import { ScenarioStore } from '../scenario.store.js';
           <span class="mc-sub-label">{{ c.sub }}</span>
         </header>
         <div class="mc-body">
-          <!-- Three figures, no captions under them. The captions restated the
-               labels they sat under, and the fourth stat -- quoted minus
-               expected -- is made properly in the paragraph below, which has
-               room to say why the gap matters rather than only how big it is. -->
-          <div class="mc-grid mc-three m-b-16">
+          <!-- One figure, the one the Configurator quotes: each period's peak
+               month in billing units, times its length -- the safe side. -->
+          <div class="mc-grid mc-two m-b-16">
             @for (stat of c.stats; track stat.key) {
               <div class="mc-stat">
                 <span>{{ stat.label }}</span>
                 <b>{{ stat.value }}</b>
+                <small>{{ stat.sub }}</small>
               </div>
             }
           </div>
@@ -63,19 +62,10 @@ export class CommitmentComponent {
       sub: t('commitment.sub', { months: c.termMonths }),
       stats: [
         {
-          key: 'messages',
-          label: t('commitment.stat.messages'),
-          value: compact(c.termMessages),
-        },
-        {
-          key: 'quoted',
-          label: t('commitment.stat.quoted'),
+          key: 'units',
+          label: t('commitment.stat.units'),
           value: compact(c.termUnitsQuoted),
-        },
-        {
-          key: 'actual',
-          label: t('commitment.stat.actual'),
-          value: compact(c.termUnitsActual),
+          sub: t('commitment.stat.units.sub'),
         },
       ],
     };

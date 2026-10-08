@@ -422,9 +422,8 @@ export const de: Record<Key, string> = {
   'storage.under1pct': 'unter 1 %',
   'commitment.heading': 'Die Verpflichtung',
   'commitment.sub': '{months} Monate · jede Menge, aus der sich eine commit-to-consume-Summe zusammensetzt',
-  'commitment.stat.messages': 'Nachrichten über die Laufzeit',
-  'commitment.stat.quoted': 'Abrechenbare Einheiten, wie angeboten',
-  'commitment.stat.actual': 'Abrechenbare Einheiten, Monat für Monat',
+  'commitment.stat.units': 'Abrechenbare Einheiten über die Laufzeit',
+  'commitment.stat.units.sub': 'Spitzenmonat jeder Periode, auf 100.000 Nachrichten aufgerundet, × ihre Monate',
 
   /* ---------------------------------------------- the hand-off */
   'handoff.heading': 'Übergabe an den Sales Configurator',

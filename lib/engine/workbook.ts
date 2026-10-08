@@ -577,6 +577,7 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         style: 'numberBold',
         // Rounded up per month, then multiplied by the months -- the order the
         // Configurator bills in, and not the same as rounding up at the end.
+        // Each period at its peak month: the safe side of the commitment.
         formula: overTerm(r, (cell) => `ROUNDUP(${cell}/${MESSAGE_BILLING_UNIT},0)`),
         cached: commitment.termUnitsQuoted,
       });
@@ -653,30 +654,6 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         formula: `SUM(${colName(TOTAL)}${FIRST_ITEM}:${colName(TOTAL)}${lastItemRow})`,
         cached: 0,
       },
-    ]),
-    row(totalRow + 2, [
-      text(LABEL, 'Messages over the term', 'label'),
-      num(TERM, Math.round(commitment.termMessages), 'numberBold'),
-      text(TOTAL, 'every month at its own volume', 'note'),
-    ]),
-    row(totalRow + 3, [
-      text(LABEL, 'Billable units if billed month by month', 'label'),
-      num(TERM, commitment.termUnitsActual, 'number'),
-      text(TOTAL, 'lower than the quoted commitment whenever the fleet ramps', 'note'),
-    ]),
-    row(totalRow + 4, [
-      text(LABEL, 'Units quoted but not expected to be consumed', 'label'),
-      num(TERM, Math.max(0, commitment.termUnitsQuoted - commitment.termUnitsActual), 'number'),
-    ]),
-    row(totalRow + 6, [
-      text(
-        LABEL,
-        'The commitment above quotes each period at its peak month, as the Configurator does. Real ' +
-          'consumption is the months added up, which is lower whenever the fleet ramps or February ' +
-          'is in the term. Unused commitment is forfeited at expiry, so the gap is worth settling ' +
-          'before signature.',
-        'note',
-      ),
     ]),
   );
 

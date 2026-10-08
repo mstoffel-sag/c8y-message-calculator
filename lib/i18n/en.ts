@@ -439,9 +439,8 @@ export const en = {
   'storage.under1pct': 'under 1 %',
   'commitment.heading': 'The commitment',
   'commitment.sub': '{months} months · every quantity a commit-to-consume total is built from',
-  'commitment.stat.messages': 'Messages over the term',
-  'commitment.stat.quoted': 'Billable units, as quoted',
-  'commitment.stat.actual': 'Billable units, month by month',
+  'commitment.stat.units': 'Billable units over the term',
+  'commitment.stat.units.sub': 'peak month of each period, rounded up to 100,000 messages, × its months',
 
   /* ---------------------------------------------- the hand-off */
   'handoff.heading': 'Hand-off to the Sales Configurator',

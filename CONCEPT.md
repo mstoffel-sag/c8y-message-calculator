@@ -871,6 +871,11 @@ period's length in `D21`; this is the same quantities carried across the term th
 other panels in between, a reader who had typed twelve months and found only a peak month in the table
 had nowhere in view to see the term — which is the question the table reliably provokes.
 
+**Since 0.8.1 only the first is shown.** The results panel and the workbook's Quote sheet carry one
+quantity: billable units over the term as quoted -- each period's peak month, rounded up to whole
+billing units, times its length. It is the safe side, never below what the fleet consumes, and one
+number is less confusing than two. `termUnitsActual` and `headroom` stay in the engine, unread.
+
 Rounding order is not cosmetic here. Messages are sold per 100,000 **per month**, so each month's
 part-block is paid for; rounding the term total up once at the end would under-count by up to one
 block per month. The workbook's formula rounds per period column before multiplying by the months, and

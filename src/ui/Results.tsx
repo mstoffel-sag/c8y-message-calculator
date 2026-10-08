@@ -389,10 +389,10 @@ export function Storage({ result }: { result: ScenarioResult }) {
  * quantities that get multiplied, and says plainly that the multiplication
  * happens in the workbook over a price column the tool leaves empty.
  *
- * The headroom line is the point of the section. The Configurator quotes a
- * period at its peak month times its length, which is the right way to quote it,
- * and it is also more than the fleet will send. Unused commitment is forfeited at
- * expiry, so the gap is worth seeing before signature rather than after.
+ * One quantity is shown: billable units over the term as the Configurator
+ * quotes them -- each period's peak month, rounded up to whole billing units,
+ * times its length. That is the safe side: it is never below what the fleet
+ * actually consumes, and a single number keeps the panel unambiguous.
  */
 export function Commitment({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
   const t = useT();
@@ -406,22 +406,15 @@ export function Commitment({ scenario, result }: { scenario: Scenario; result: S
         <span class="sub">{t('commitment.sub', { months: c.termMonths })}</span>
       </header>
       <div class="body">
-        {/* Three figures, no captions under them. The captions restated the
-            labels they sat under, and the fourth stat -- quoted minus expected
-            -- is made properly in the paragraph below, which has room to say
-            why the gap matters rather than only how big it is. */}
-        <div class="grid three" style="margin-bottom:18px">
+        {/* One figure, the one the Configurator quotes: each period's peak
+            month in billing units, times its length. It is the safe side --
+            never below what the fleet consumes -- and one number is all a
+            commitment needs. */}
+        <div class="grid two" style="margin-bottom:18px">
           <div class="stat">
-            <span>{t('commitment.stat.messages')}</span>
-            <b>{compact(c.termMessages)}</b>
-          </div>
-          <div class="stat">
-            <span>{t('commitment.stat.quoted')}</span>
+            <span>{t('commitment.stat.units')}</span>
             <b>{compact(c.termUnitsQuoted)}</b>
-          </div>
-          <div class="stat">
-            <span>{t('commitment.stat.actual')}</span>
-            <b>{compact(c.termUnitsActual)}</b>
+            <small>{t('commitment.stat.units.sub')}</small>
           </div>
         </div>
 
