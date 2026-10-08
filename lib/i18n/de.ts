@@ -429,6 +429,7 @@ export const de: Record<Key, string> = {
   'quote.span.one': '{from} · {count} Monat',
   'quote.span.other': '{from} – {to} · {count} Monate',
   'quote.storage.stated': 'wie angegeben',
+  'quote.term': 'Gesamte Laufzeit',
   'quote.safeSide': 'Jede Periode in ihrem stärksten Monat, auf volle Abrechnungseinheiten aufgerundet — 100.000 Nachrichten, 1 GiB — und mit ihren Monaten multipliziert. Nie unter dem, was der Park verbraucht.',
 
   /* ---------------------------------------------- the hand-off */

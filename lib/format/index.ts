@@ -101,6 +101,22 @@ export function gibMonths(value: number): string {
   return translate(locale, 'format.gibMonths', { amount: gib(value) });
 }
 
+/**
+ * A billed quantity in whole GiB, every digit shown.
+ *
+ * `gib` shortens for reading -- one decimal, TiB past 10 TiB -- and a shortened
+ * figure can land below the one it stands for: 11,980 GiB-months reads as
+ * "11.7 TiB". A quote is never allowed to read lower than it is, so the figures
+ * that get quoted are printed whole. They are whole already, by construction.
+ */
+export function wholeGib(value: number): string {
+  return `${nf.format(value)} GiB`;
+}
+
+export function wholeGibMonths(value: number): string {
+  return translate(locale, 'format.gibMonths', { amount: wholeGib(value) });
+}
+
 export function gibRange(low: number, high: number): string {
   const [a, b] = [gib(low), gib(high)];
   const unitOf = (s: string) => s.replace(/^[\d.,\s]+/, '');

@@ -4,19 +4,22 @@
  * shows little else.
  *
  * Four figures a period, all on the safe side -- the peak month rounded up to
- * whole billing units, times the months. The nine counters, the storage
+ * whole billing units, times the months -- and printed with every digit: a
+ * shortened "1.4 B" can read below the 1,44x,000,000 it stands for. The nine counters, the storage
  * breakdown and the volume panels are how these were reached; somebody
  * checking the estimate wants them, somebody quoting it does not.
  */
 
-import { periodQuotes, type Scenario, type ScenarioResult } from '../../lib/engine/index.js';
-import { compact, gib, gibMonths, monthYear, n } from './format.js';
+import { periodQuotes, termQuote, type Scenario, type ScenarioResult } from '../../lib/engine/index.js';
+import { monthYear, n, wholeGib, wholeGibMonths } from './format.js';
 import { useT } from './i18n.js';
 
 export function Quote({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
   const t = useT();
   const quotes = periodQuotes(scenario, result).filter((q) => q.months > 0);
   if (quotes.length === 0) return null;
+  // One period is its own total; a second row would only repeat it.
+  const term = quotes.length > 1 ? termQuote(quotes) : undefined;
 
   return (
     <section class="panel">
@@ -47,17 +50,34 @@ export function Quote({ scenario, result }: { scenario: Scenario; result: Scenar
                     })}
                   </div>
                 </td>
-                <td class="num"><b>{compact(q.messagesPerMonth)}</b></td>
-                <td class="num">{compact(q.messagesOverPeriod)}</td>
+                <td class="num"><b>{n(q.messagesPerMonth)}</b></td>
+                <td class="num">{n(q.messagesOverPeriod)}</td>
                 <td class="num">
-                  <b>{gib(q.storageGiBPerMonth)}</b>
+                  <b>{wholeGib(q.storageGiBPerMonth)}</b>
                   {q.storageStated && (
                     <div class="hint" style="margin:0">{t('quote.storage.stated')}</div>
                   )}
                 </td>
-                <td class="num">{gibMonths(q.storageGiBOverPeriod)}</td>
+                <td class="num">{wholeGibMonths(q.storageGiBOverPeriod)}</td>
               </tr>
             ))}
+            {term && (
+              <tr class="total">
+                <td>
+                  <b>{t('quote.term')}</b>
+                  <div class="hint" style="margin:0">
+                    {t.plural('quote.span', term.months, {
+                      from: monthYear(term.start.year, term.start.month),
+                      to: monthYear(term.end.year, term.end.month),
+                    })}
+                  </div>
+                </td>
+                <td />
+                <td class="num"><b>{n(term.messages)}</b></td>
+                <td />
+                <td class="num"><b>{wholeGibMonths(term.storageGiB)}</b></td>
+              </tr>
+            )}
           </tbody>
         </table>
         <p class="hint" style="margin-top:14px">{t('quote.safeSide')}</p>

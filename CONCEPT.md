@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 41 — the results page leads with one quote per period, and storage is quoted per month like messages · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-10-08
+**Status:** draft for review, rev 42 — the quote adds up the term, prints every digit, and is tested by hand, against the workbook and across generated fleets · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-10-08
 
 ---
 
@@ -884,7 +884,10 @@ a test pins the order.
 
 **The page leads with what gets quoted, and by default shows little else.** One row per contract
 period: messages a month and over the period, storage a month and over the period, each rounded up to
-whole billing units — 100,000 messages, 1 GiB — at the period's busiest month. Then the workbook
+whole billing units — 100,000 messages, 1 GiB — at the period's busiest month. With more than one
+period a last row adds them up over the whole term; it is a sum of the rows and nothing else, so it
+equals the Quote sheet's term column. **Every digit is printed**: a shortened figure can read below
+the quote ("1.3 B" for 1,340,000,000), which is the one direction it may not err in. Then the workbook
 download and the guidance. The page used to open with some thirty figures, and the two a quote needs
 had to be found among them.
 

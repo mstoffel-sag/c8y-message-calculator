@@ -4,15 +4,16 @@
  * shows little else.
  *
  * Four figures a period, all on the safe side -- the peak month rounded up to
- * whole billing units, times the months. The nine counters, the storage
+ * whole billing units, times the months -- and printed with every digit: a
+ * shortened "1.4 B" can read below the 1,44x,000,000 it stands for. The nine counters, the storage
  * breakdown and the volume panels are how these were reached; somebody
  * checking the estimate wants them, somebody quoting it does not.
  */
 
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
-import { periodQuotes } from '../../../../lib/engine/index.js';
-import { compact, gib, gibMonths, monthYear } from '../../../../lib/format/index.js';
+import { periodQuotes, termQuote } from '../../../../lib/engine/index.js';
+import { monthYear, n, wholeGib, wholeGibMonths } from '../../../../lib/format/index.js';
 import { LocaleService } from '../i18n/locale.service.js';
 import { TPipe } from '../i18n/t.pipe.js';
 import { ScenarioStore } from '../scenario.store.js';
@@ -58,6 +59,18 @@ import { ScenarioStore } from '../scenario.store.js';
                   <td class="text-right">{{ row.storageOverPeriod }}</td>
                 </tr>
               }
+              @if (term(); as term) {
+                <tr class="mc-total">
+                  <td>
+                    <b>{{ term.label }}</b>
+                    <div class="mc-hint">{{ term.span }}</div>
+                  </td>
+                  <td></td>
+                  <td class="text-right"><b>{{ term.messages }}</b></td>
+                  <td></td>
+                  <td class="text-right"><b>{{ term.storage }}</b></td>
+                </tr>
+              }
             </tbody>
           </table>
           <p class="mc-hint m-t-16">{{ 'quote.safeSide' | t }}</p>
@@ -72,10 +85,30 @@ export class QuoteComponent {
 
   // Formats numbers and month names, and calls t() for the labels, so it
   // re-runs when the language changes.
+  private readonly quotes = computed(() =>
+    periodQuotes(this.store.scenario(), this.store.result()).filter(q => q.months > 0),
+  );
+
+  // One period is its own total; a second row would only repeat it.
+  readonly term = computed(() => {
+    const t = this.locales.t();
+    const quotes = this.quotes();
+    const term = quotes.length > 1 ? termQuote(quotes) : undefined;
+    if (!term) return null;
+    return {
+      label: t('quote.term'),
+      span: t.plural('quote.span', term.months, {
+        from: monthYear(term.start.year, term.start.month),
+        to: monthYear(term.end.year, term.end.month),
+      }),
+      messages: n(term.messages),
+      storage: wholeGibMonths(term.storageGiB),
+    };
+  });
+
   readonly rows = computed(() => {
     const t = this.locales.t();
-    return periodQuotes(this.store.scenario(), this.store.result())
-      .filter(q => q.months > 0)
+    return this.quotes()
       .map(q => ({
         index: q.index,
         label: t('contract.periodN', { index: q.index }),
@@ -83,10 +116,10 @@ export class QuoteComponent {
           from: monthYear(q.start.year, q.start.month),
           to: monthYear(q.end.year, q.end.month),
         }),
-        messagesPerMonth: compact(q.messagesPerMonth),
-        messagesOverPeriod: compact(q.messagesOverPeriod),
-        storagePerMonth: gib(q.storageGiBPerMonth),
-        storageOverPeriod: gibMonths(q.storageGiBOverPeriod),
+        messagesPerMonth: n(q.messagesPerMonth),
+        messagesOverPeriod: n(q.messagesOverPeriod),
+        storagePerMonth: wholeGib(q.storageGiBPerMonth),
+        storageOverPeriod: wholeGibMonths(q.storageGiBOverPeriod),
         stated: q.storageStated,
       }));
   });

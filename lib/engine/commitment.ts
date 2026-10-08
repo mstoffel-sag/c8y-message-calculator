@@ -133,3 +133,35 @@ export function periodQuotes(scenario: Scenario, result: ScenarioResult): Period
     };
   });
 }
+
+/**
+ * The periods added up: what the whole contract term is quoted at.
+ *
+ * A sum of the period rows and nothing else -- no re-rounding, no second pass
+ * over the months -- so the figure on screen is the column above it added up,
+ * and equal to the workbook's term column by construction. A test holds both.
+ */
+export interface TermQuote {
+  months: number;
+  start: { year: number; month: number };
+  end: { year: number; month: number };
+  messageUnits: number;
+  messages: number;
+  storageGiB: number;
+}
+
+export function termQuote(quotes: PeriodQuote[]): TermQuote | undefined {
+  const first = quotes[0];
+  const last = quotes[quotes.length - 1];
+  if (!first || !last) return undefined;
+  const sum = (pick: (q: PeriodQuote) => number): number =>
+    quotes.reduce((total, q) => total + pick(q), 0);
+  return {
+    months: sum((q) => q.months),
+    start: first.start,
+    end: last.end,
+    messageUnits: sum((q) => q.messageUnitsOverPeriod),
+    messages: sum((q) => q.messagesOverPeriod),
+    storageGiB: sum((q) => q.storageGiBOverPeriod),
+  };
+}

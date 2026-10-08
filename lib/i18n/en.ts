@@ -446,6 +446,7 @@ export const en = {
   'quote.span.one': '{from} · {count} month',
   'quote.span.other': '{from} – {to} · {count} months',
   'quote.storage.stated': 'as stated',
+  'quote.term': 'Whole term',
   'quote.safeSide': 'Each period at its busiest month, rounded up to whole billing units — 100,000 messages, 1 GiB — and multiplied by its months. Never below what the fleet will use.',
 
   /* ---------------------------------------------- the hand-off */

@@ -596,8 +596,8 @@ describe('expert mode gates the JSON', () => {
     // month and over the period, each rounded up. 45,978,000 at the peak month
     // is 460 blocks of 100,000; 4.02 GiB at the fullest month end is 5.
     assert.match(html, /What to quote/);
-    assert.match(html, /<b>46 M<\/b>/);
-    assert.match(html, />552 M</);
+    assert.match(html, /<b>46,000,000<\/b>/);
+    assert.match(html, />552,000,000</);
     assert.match(html, /<b>5 GiB<\/b>/);
     assert.match(html, />60 GiB-months</);
     // And nothing of how they were reached.
