@@ -1,8 +1,8 @@
 /**
- * Operational storage: what the database holds at each month's end, added up.
+ * Operational storage: what the database holds at each month's end.
  *
- * Its own component so it can sit under the commitment rather than among the
- * volume panels. `D27` and `D37` are the two quantities that leave this page,
+ * Its own component so it can sit under the hand-off table rather than among
+ * the volume panels. `D27` and `D37` are the two quantities that leave this page,
  * and they now read next to each other.
  */
 
@@ -83,7 +83,8 @@ export class StorageComponent {
     // The quote is anchored on the first period, which is what the
     // Configurator's own note says; the others are listed under the grid.
     const first = result.storageByPeriod[0];
-    if (!peak || !first || peak.retained <= 0) return null;
+    if (!peak || !first || !first.peak || peak.retained <= 0) return null;
+    const firstPeak = first.peak;
 
     const partial = peak.daysCovered < peak.retentionDays;
     const mixed = peak.retentionDaysShortest !== peak.retentionDays;
@@ -100,14 +101,13 @@ export class StorageComponent {
     return {
       stats: [
         {
-          // The unit rides in the label rather than the figure: "778
-          // GiB-months" breaks across its own hyphen at this size.
+          // The unit rides in the label rather than the figure, where a
+          // reader looks for one anyway.
           key: 'ods',
           label: t('storage.stat.ods', { index: n(first.periodIndex) }),
-          value: n(first.unitMonths),
+          value: n(first.unitsPerMonth),
           sub: t('storage.stat.ods.sub', {
-            months: n(first.monthsCounted),
-            range: gibRange(first.lowGiBMonths, first.highGiBMonths),
+            range: gibRange(firstPeak.lowGiB, firstPeak.highGiB),
           }),
         },
         {
@@ -136,23 +136,22 @@ export class StorageComponent {
               : t('storage.stat.perMeasurement.alone'),
         },
         {
-          // The same period as the ODS stat, summed the same way. Two figures
-          // on two different bases in one grid reads as a contradiction rather
-          // than as two facts.
+          // The same month as the ODS stat. Two figures on two different bases
+          // in one grid read as a contradiction rather than as two facts.
           key: 'dataHub',
           label: t('storage.stat.dataHub', { index: n(first.periodIndex) }),
-          value: `${n(first.dataHubLowGiBMonths)} – ${n(first.dataHubHighGiBMonths)}`,
+          value: gibRange(firstPeak.dataHubLowGiB, firstPeak.dataHubHighGiB),
           sub: t('storage.stat.dataHub.sub'),
         },
       ],
       perPeriod:
         result.storageByPeriod.length > 1
           ? result.storageByPeriod
-              .map(p => `P${p.periodIndex} ${gibMonths(p.giBMonths)}`)
+              .map(p => `P${p.periodIndex} ${gib(p.unitsPerMonth)}`)
               .join(' · ')
           : '',
       odsParams: {
-        amount: n(first.unitMonths),
+        amount: gib(first.unitsPerMonth),
         index: n(first.periodIndex),
         months: n(first.monthsCounted),
         average: gib(first.averageGiB),

@@ -19,6 +19,7 @@ import {
   fragmentNameFor,
   intervalSlug,
   commitmentFor,
+  periodQuotes,
   intervalsOf,
   lintScenario,
   measurementView,
@@ -1046,6 +1047,97 @@ describe('the commit-to-consume commitment', () => {
     assert.equal(c.termMessages, 0);
     assert.equal(c.termUnitsQuoted, 0);
     assert.equal(c.headroom, 0, 'not NaN');
+  });
+});
+
+describe('what each period is quoted at', () => {
+  const twoPeriods = () => {
+    const base = conceptSection9Scenario();
+    const hvac = base.machineTypes[0]!;
+    return {
+      ...base,
+      periods: [
+        { index: 1, months: 12, machineCountOverrides: {}, commercial: {} },
+        { index: 2, months: 24, machineCountOverrides: { [hvac.id]: 4000 }, commercial: {} },
+      ],
+    };
+  };
+
+  test('one month per period, rounded up, and that times the months', () => {
+    const scenario = conceptSection9Scenario();
+    const [q] = periodQuotes(scenario, computeScenario(scenario));
+    // 45,978,000 at the peak month is 460 blocks of 100,000.
+    assert.equal(q!.messageUnitsPerMonth, 460);
+    assert.equal(q!.messagesPerMonth, 46_000_000);
+    assert.equal(q!.messagesOverPeriod, 552_000_000);
+    // 4.02 GiB at the fullest month end is 5 billable GiB.
+    assert.equal(q!.storageGiBPerMonth, 5);
+    assert.equal(q!.storageGiBOverPeriod, 60);
+    assert.deepEqual([q!.start, q!.end], [{ year: 2027, month: 1 }, { year: 2027, month: 12 }]);
+  });
+
+  test('never below what the fleet consumes, period by period', () => {
+    const scenario = twoPeriods();
+    const result = computeScenario(scenario);
+    const quotes = periodQuotes(scenario, result);
+    // The second period ramps up in its first months and February is short,
+    // so month by month it sends less than its peak times its length.
+    for (const q of quotes) {
+      const months = result.months.filter((m) => m.periodIndex === q.index);
+      const used = months.reduce((sum, m) => sum + m.total, 0);
+      assert.ok(q.messagesOverPeriod >= used, `period ${q.index}: messages`);
+      const storage = result.storageByPeriod.find((p) => p.periodIndex === q.index)!;
+      assert.ok(q.storageGiBOverPeriod >= storage.unitMonths, `period ${q.index}: storage`);
+    }
+    // And the term adds up to what the workbook quotes.
+    const c = commitmentFor(scenario, result);
+    assert.equal(
+      quotes.reduce((sum, q) => sum + q.messageUnitsOverPeriod, 0),
+      c.termUnitsQuoted,
+    );
+  });
+
+  test('a stated storage figure replaces the estimate', () => {
+    const base = conceptSection9Scenario();
+    const scenario = {
+      ...base,
+      periods: [{ ...base.periods[0]!, commercial: { ...base.periods[0]!.commercial, ods: 8 } }],
+    };
+    const [q] = periodQuotes(scenario, computeScenario(scenario));
+    assert.equal(q!.storageGiBPerMonth, 8);
+    assert.equal(q!.storageGiBOverPeriod, 96);
+    assert.equal(q!.storageStated, true);
+  });
+});
+
+describe('a stored storage figure keeps its meaning', () => {
+  test('a GiB-months figure from before format 2 becomes one month', async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    const old = conceptSection9Scenario() as unknown as Record<string, unknown>;
+    delete old.format;
+    (old.periods as { commercial: Record<string, unknown> }[])[0]!.commercial = {
+      sharedCloud: 1,
+      ods: 60,
+    };
+    const fixed = normalise(old);
+    // 60 GiB-months over 12 months is 5 a month: the same storage over the
+    // period, where leaving it alone would quote 720.
+    assert.equal(fixed.periods[0]!.commercial.ods, 5);
+    assert.equal(fixed.periods[0]!.commercial.sharedCloud, 1, 'nothing else moves');
+    assert.equal(fixed.format, 2);
+    // Rounded up, so the period is never quoted below what was stated.
+    (old.periods as { commercial: Record<string, unknown> }[])[0]!.commercial = { ods: 61 };
+    assert.equal(normalise(old).periods[0]!.commercial.ods, 6);
+  });
+
+  test('a format-2 scenario is left alone, however often it is loaded', async () => {
+    const { normalise } = await import('../src/ui/store.js');
+    const now = conceptSection9Scenario();
+    now.periods[0]!.commercial = { ods: 5 };
+    const once = normalise(JSON.parse(JSON.stringify(now)));
+    const twice = normalise(JSON.parse(JSON.stringify(once)));
+    assert.equal(twice.periods[0]!.commercial.ods, 5);
+    assert.equal(normalise(blankScenario()).format, 2, 'a new scenario is born current');
   });
 });
 

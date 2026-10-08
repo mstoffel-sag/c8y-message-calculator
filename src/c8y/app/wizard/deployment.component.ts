@@ -162,13 +162,13 @@ export class DeploymentComponent {
         help: item.helpKey ? t(item.helpKey) : '',
         cells: scenario.periods.map(period => {
           const stated = commercialNumber(period, item.key);
-          // GiB-months: the period's month-end snapshots added up, which is the
-          // quantity this cell is billed on (storage.ts).
+          // GiB a month: the period's fullest month-end, rounded up, which the
+          // Configurator multiplies by the months (storage.ts).
           const storage =
             item.source === 'estimated'
               ? storageForPeriod(result.storage, period.index)
               : undefined;
-          const estimate = storage === undefined ? undefined : storage.unitMonths;
+          const estimate = storage === undefined ? undefined : storage.unitsPerMonth;
 
           return {
             periodIndex: period.index,
@@ -184,8 +184,8 @@ export class DeploymentComponent {
                 : stated > 0
                   ? t('deployment.estimate', { value: estimate })
                   : t('deployment.estimatedAt', {
-                      low: storage.lowGiBMonths.toFixed(1),
-                      high: storage.highGiBMonths.toFixed(1),
+                      low: (storage.peak?.lowGiB ?? 0).toFixed(1),
+                      high: (storage.peak?.highGiB ?? 0).toFixed(1),
                     }),
           };
         }),

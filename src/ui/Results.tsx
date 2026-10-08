@@ -1,9 +1,9 @@
 /**
  * Output. CONCEPT.md section 7.
  *
- * The nine counters are the primary artefact; everything else on the page
- * supports them. Deliberately absent: billable units, utilisation, headroom,
- * commit recommendations, overage warnings. A billing system handles
+ * The volume panels behind the quote, shown in Expert mode: how the peak month
+ * was reached, where it comes from and how it moves month by month. Still
+ * absent: prices, utilisation, overage warnings. A billing system handles
  * withdrawal, and this tool cannot get a bill wrong if it never computes one.
  */
 
@@ -12,7 +12,6 @@ import {
   type Finding,
   type MonthResult,
   type PeriodResult,
-  commitmentFor,
   type Scenario,
   type ScenarioResult,
 } from '../../lib/engine/index.js';
@@ -235,11 +234,11 @@ export function Findings({ findings }: { findings: Finding[] }) {
  * that look like a measurement, so both ends are shown, the retention that
  * scales them is stated, and the ODS line stays somebody's decision.
  *
- * The headline figure is a period's sum of month-end snapshots, in GiB-months,
- * because that is what is billed. The fullest month keeps a stat of its own: it
- * is not the quantity, but it says when the fleet stopped filling up, and a
- * period whose peak lands in its last month is a period that will be quoted
- * higher next time.
+ * The headline figure is a period's fullest month-end in whole GiB, because
+ * that is what the ODS line holds and the Configurator multiplies by the
+ * months. The fullest month keeps a stat of its own: it says when the fleet
+ * stopped filling up, and a period whose peak lands in its last month is a
+ * period that will be quoted higher next time.
  */
 export function Storage({ result }: { result: ScenarioResult }) {
   const t = useT();
@@ -247,7 +246,8 @@ export function Storage({ result }: { result: ScenarioResult }) {
   // The quote is anchored on the first period, which is what the Configurator's
   // own note says; the others are listed under the grid.
   const first = result.storageByPeriod[0];
-  if (!peak || !first || peak.retained <= 0) return null;
+  if (!peak || !first || !first.peak || peak.retained <= 0) return null;
+  const firstPeak = first.peak;
   const partial = peak.daysCovered < peak.retentionDays;
   const mixed = peak.retentionDaysShortest !== peak.retentionDays;
   // What share of the retained volume is not measurement values: event, alarm
@@ -274,11 +274,10 @@ export function Storage({ result }: { result: ScenarioResult }) {
                 unit in small caps above the number is where a reader looks for
                 one anyway. */}
             <span>{t('storage.stat.ods', { index: n(first.periodIndex) })}</span>
-            <b>{n(first.unitMonths)}</b>
+            <b>{n(first.unitsPerMonth)}</b>
             <small>
               {t('storage.stat.ods.sub', {
-                months: n(first.monthsCounted),
-                range: gibRange(first.lowGiBMonths, first.highGiBMonths),
+                range: gibRange(firstPeak.lowGiB, firstPeak.highGiB),
               })}
             </small>
           </div>
@@ -308,14 +307,11 @@ export function Storage({ result }: { result: ScenarioResult }) {
             </small>
           </div>
           <div class="stat">
-            {/* The same period as the ODS stat, summed the same way. Reporting
-                this one at the fullest month while the ODS line was a period
-                sum put two figures on two different bases in one grid, which
-                reads as a contradiction rather than as two facts. */}
+            {/* The same month as the ODS stat. Two figures on two different
+                bases in one grid read as a contradiction rather than as two
+                facts. */}
             <span>{t('storage.stat.dataHub', { index: n(first.periodIndex) })}</span>
-            <b>
-              {n(first.dataHubLowGiBMonths)} – {n(first.dataHubHighGiBMonths)}
-            </b>
+            <b>{gibRange(firstPeak.dataHubLowGiB, firstPeak.dataHubHighGiB)}</b>
             <small>{t('storage.stat.dataHub.sub')}</small>
           </div>
         </div>
@@ -324,7 +320,7 @@ export function Storage({ result }: { result: ScenarioResult }) {
           <p class="hint" style="margin:-8px 0 16px">
             {t('storage.perPeriod')}{' '}
             {result.storageByPeriod
-              .map((p) => `P${p.periodIndex} ${gibMonths(p.giBMonths)}`)
+              .map((p) => `P${p.periodIndex} ${gib(p.unitsPerMonth)}`)
               .join(' · ')}
           </p>
         )}
@@ -335,7 +331,7 @@ export function Storage({ result }: { result: ScenarioResult }) {
               <Rich
                 k="storage.odsCell"
                 p={{
-                  amount: n(first.unitMonths),
+                  amount: gib(first.unitsPerMonth),
                   index: n(first.periodIndex),
                   months: n(first.monthsCounted),
                   average: gib(first.averageGiB),
@@ -380,46 +376,3 @@ export function Storage({ result }: { result: ScenarioResult }) {
     </section>
   );
 }
-
-/**
- * The commit-to-consume commitment, in the only terms this tool has: quantities.
- *
- * A CTC contract is signed on one number -- total spend over the term -- and the
- * tool supplies every factor in it except the rate. So this reports the
- * quantities that get multiplied, and says plainly that the multiplication
- * happens in the workbook over a price column the tool leaves empty.
- *
- * One quantity is shown: billable units over the term as the Configurator
- * quotes them -- each period's peak month, rounded up to whole billing units,
- * times its length. That is the safe side: it is never below what the fleet
- * actually consumes, and a single number keeps the panel unambiguous.
- */
-export function Commitment({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
-  const t = useT();
-  const c = commitmentFor(scenario, result);
-  if (c.termMonths === 0 || c.termUnitsQuoted === 0) return null;
-
-  return (
-    <section class="panel">
-      <header>
-        <h2>{t('commitment.heading')}</h2>
-        <span class="sub">{t('commitment.sub', { months: c.termMonths })}</span>
-      </header>
-      <div class="body">
-        {/* One figure, the one the Configurator quotes: each period's peak
-            month in billing units, times its length. It is the safe side --
-            never below what the fleet consumes -- and one number is all a
-            commitment needs. */}
-        <div class="grid two" style="margin-bottom:18px">
-          <div class="stat">
-            <span>{t('commitment.stat.units')}</span>
-            <b>{compact(c.termUnitsQuoted)}</b>
-            <small>{t('commitment.stat.units.sub')}</small>
-          </div>
-        </div>
-
-      </div>
-    </section>
-  );
-}
-

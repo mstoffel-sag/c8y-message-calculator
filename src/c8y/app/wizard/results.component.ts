@@ -15,10 +15,11 @@ import { MeasurementDiagramComponent } from '../diagram/measurement-diagram.comp
 import { LocaleService } from '../i18n/locale.service.js';
 import { RichComponent } from '../i18n/rich.component.js';
 import { TPipe } from '../i18n/t.pipe.js';
-import { CommitmentComponent } from '../results/commitment.component.js';
+import { FindingsComponent } from '../results/findings.component.js';
 import { StorageComponent } from '../results/storage.component.js';
 import { HandoffComponent } from '../results/handoff.component.js';
 import { PayloadsComponent } from '../results/payloads.component.js';
+import { QuoteComponent } from '../results/quote.component.js';
 import { ResultsPanelsComponent } from '../results/results-panels.component.js';
 import { ScenarioStore } from '../scenario.store.js';
 
@@ -28,11 +29,12 @@ import { ScenarioStore } from '../scenario.store.js';
   imports: [
     CoreModule,
     EmptyComponent,
-    CommitmentComponent,
+    FindingsComponent,
     HandoffComponent,
     StorageComponent,
     MeasurementDiagramComponent,
     PayloadsComponent,
+    QuoteComponent,
     ResultsPanelsComponent,
     RichComponent,
     TPipe,
@@ -42,21 +44,20 @@ import { ScenarioStore } from '../scenario.store.js';
     @if (machineTypes().length === 0) {
       <c8y-mc-empty>{{ 'results.empty' | t }}</c8y-mc-empty>
     } @else {
-      <!-- The table first, then the term it is quoted over, then the file that
-           carries both away. The download led the page and was the one thing on
-           it nobody could act on until they had read the rest. -->
-      <c8y-mc-handoff />
+      <!-- Two figures per period, messages and storage, is what a quote needs;
+           the page used to lead with some thirty, and the two that mattered had
+           to be found among them. Everything else is how those two were
+           reached, and stays behind Expert mode for whoever is checking rather
+           than quoting. -->
+      <c8y-mc-quote />
 
-      <!-- Directly under the table: the table is one month per period and its
-           D21 is the period's length; this is the same quantities across the
-           term those two imply. Further down the page the two read as
-           unrelated. -->
-      <c8y-mc-commitment />
-
-      <!-- Storage is the other quantity a period is quoted on, so it belongs
-           beside the commitment rather than further down among the volume
-           panels: D27 and D37 are the two numbers that leave this page. -->
-      <c8y-mc-storage />
+      @if (expert()) {
+        <!-- The Configurator's own rows, then storage, which is the other
+             quantity a period is quoted on: D27 and D37 are the two numbers
+             that leave this page. -->
+        <c8y-mc-handoff />
+        <c8y-mc-storage />
+      }
 
       <!-- The workbook download. Built in the browser: no upload, no service,
            nothing leaves the tenant. It mirrors the Configurator's own rows so
@@ -81,38 +82,38 @@ import { ScenarioStore } from '../scenario.store.js';
         </div>
       </div>
 
-      <!-- The design the numbers came from, machine type by machine type.
-           Somebody checking the estimate needs to see the shape that produced
-           it, and the diagram says in one look what the counters only imply. -->
-      @if (designs().length > 0) {
-        <div class="mc-panel">
-          <header>
-            <h2>{{ 'design.heading' | t }}</h2>
-            <span class="mc-sub-label">{{ 'design.sub' | t }}</span>
-          </header>
-          <div class="mc-body">
-            @for (design of designs(); track design.key) {
-              <div class="m-b-24">
-                <div class="mc-row m-b-4">
-                  <h3>{{ design.name }}</h3>
-                  <span class="mc-mt-tag">{{ design.machines }}</span>
-                  <span class="mc-mt-tag">{{ design.measurements }}</span>
-                </div>
-                <c8y-mc-measurement-diagram [view]="design.view" />
-              </div>
-            }
-          </div>
-        </div>
-      }
-
-      <c8y-mc-results-panels />
-
-      <!-- The payloads are for whoever writes the device code, not for the
-           person filling in the wizard. -->
-      @if (expert()) {
-        <c8y-mc-payloads />
-      } @else {
+      @if (!expert()) {
+        @if (hasFindings()) {
+          <c8y-mc-findings />
+        }
         <p class="mc-hint m-t-16"><c8y-mc-rich k="payload.hidden" /></p>
+      } @else {
+        <!-- The design the numbers came from, machine type by machine type.
+             Somebody checking the estimate needs to see the shape that produced
+             it, and the diagram says in one look what the counters only imply. -->
+        @if (designs().length > 0) {
+          <div class="mc-panel">
+            <header>
+              <h2>{{ 'design.heading' | t }}</h2>
+              <span class="mc-sub-label">{{ 'design.sub' | t }}</span>
+            </header>
+            <div class="mc-body">
+              @for (design of designs(); track design.key) {
+                <div class="m-b-24">
+                  <div class="mc-row m-b-4">
+                    <h3>{{ design.name }}</h3>
+                    <span class="mc-mt-tag">{{ design.machines }}</span>
+                    <span class="mc-mt-tag">{{ design.measurements }}</span>
+                  </div>
+                  <c8y-mc-measurement-diagram [view]="design.view" />
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <c8y-mc-results-panels />
+        <c8y-mc-payloads />
       }
     }
   `,
@@ -124,6 +125,7 @@ export class StepResultsComponent {
 
   readonly machineTypes = computed(() => this.store.scenario().machineTypes);
   readonly expert = this.store.expert;
+  readonly hasFindings = computed(() => this.store.findings().length > 0);
 
   readonly designs = computed(() => {
     const t = this.locales.t();

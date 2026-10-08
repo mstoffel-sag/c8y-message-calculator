@@ -33,7 +33,7 @@ import {
   payloadsFor,
   resolveBundles,
   seriesNameOf,
-  storageGiBMonthsForPeriod,
+  storageGiBPerMonthForPeriod,
   totalOf,
   type MachineType,
   type Scenario,
@@ -1291,17 +1291,20 @@ describe('storage is the month ends, added up', () => {
     // either one borrowing a month from the other.
     const ratio = result.storageByPeriod[1]!.giBMonths / result.storageByPeriod[0]!.giBMonths;
     assert.ok(Math.abs(ratio - 2) < 0.05, `${ratio}`);
-    // What the line item takes is the billable unit sum, not the raw GiB: the
-    // month is rounded up before it is added, because that is what is billed.
+    // What the line item takes is one month in whole GiB, the period's
+    // fullest: the Configurator multiplies the cell by the months.
+    const second = result.storageByPeriod[1]!;
+    assert.equal(storageGiBPerMonthForPeriod(result, 2), second.unitsPerMonth);
     assert.equal(
-      storageGiBMonthsForPeriod(result, 2),
-      result.storageByPeriod[1]!.unitMonths,
+      second.unitsPerMonth,
+      Math.ceil(Math.max(...result.storage.filter((m) => m.periodIndex === 2).map((m) => m.quotedGiB))),
     );
     assert.ok(
-      result.storageByPeriod[1]!.unitMonths >= result.storageByPeriod[1]!.giBMonths,
-      'rounding up never quotes less than what is on disk',
+      second.unitsPerMonth * second.monthsCounted >= second.unitMonths,
+      'the fullest month times the months never quotes less than month by month',
     );
-    assert.equal(storageGiBMonthsForPeriod(result, 9), 0, 'a period that does not exist');
+    assert.ok(second.unitMonths >= second.giBMonths, 'rounding up never quotes less than is on disk');
+    assert.equal(storageGiBPerMonthForPeriod(result, 9), 0, 'a period that does not exist');
   });
 });
 
@@ -1322,6 +1325,7 @@ describe('retention is a rule per measurement type', () => {
   const twoTypes = (kept: [number | undefined, number | undefined]): Scenario => {
     const daily = { mode: 'interval' as const, seconds: 86_400 };
     return {
+      format: 2,
       name: 'two types',
       notes: '',
       settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme', retentionDays: 30 },
@@ -1452,6 +1456,7 @@ describe('retention is a rule per measurement type', () => {
   const discreteFleet = (kept: {
     event?: number; alarm?: number; command?: number; inventory?: number;
   }): Scenario => ({
+    format: 2,
     name: 'one of each',
     notes: '',
     settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme', retentionDays: 30 },

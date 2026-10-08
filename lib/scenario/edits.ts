@@ -14,12 +14,14 @@
 
 import {
   CADENCE_FOR_KIND,
+  SCENARIO_FORMAT,
   SECONDS_PER_DAY,
   cadenceToPeriod,
   toSeconds,
   type Bundle,
   type DurationUnit,
   type Cadence,
+  type Commercial,
   type MachineType,
   type Metric,
   type MetricKind,
@@ -491,6 +493,29 @@ function seriesCount(raw: unknown): number | undefined {
   return Math.floor(raw);
 }
 
+/**
+ * A period's stated quantities, with a storage figure from before format 2
+ * turned into one month.
+ *
+ * Until then the Operational Data Store line was GiB-months for the whole
+ * period, and the workbook multiplied it by the months again. It is GiB per
+ * month now, like every other line, so an old figure is divided by the months
+ * and rounded up -- over the period that is the same storage, never less. Left
+ * alone it would be quoted at the period's length times what was meant.
+ */
+function migratedCommercial(raw: unknown, months: unknown, format: unknown): Commercial {
+  const commercial = { ...((raw ?? {}) as Commercial) };
+  const ods = commercial['ods'];
+  if (
+    (typeof format !== 'number' || format < 2) &&
+    typeof ods === 'number' && ods > 0 &&
+    typeof months === 'number' && months > 0
+  ) {
+    commercial['ods'] = Math.ceil(ods / months);
+  }
+  return commercial;
+}
+
 export function normalise(input: unknown): Scenario {
   const raw = (input ?? {}) as Partial<Scenario>;
   const fallback = blankScenario();
@@ -515,7 +540,7 @@ export function normalise(input: unknown): Scenario {
       index: typeof period?.index === 'number' ? period.index : i + 1,
       months: typeof period?.months === 'number' ? period.months : 12,
       machineCountOverrides: period?.machineCountOverrides ?? {},
-      commercial: period?.commercial ?? {},
+      commercial: migratedCommercial(period?.commercial, period?.months, raw.format),
     }));
 
   const machineTypes = (Array.isArray(raw.machineTypes) ? raw.machineTypes : []).map((mt) => ({
@@ -566,6 +591,7 @@ export function normalise(input: unknown): Scenario {
   }));
 
   return {
+    format: SCENARIO_FORMAT,
     name: raw.name ?? fallback.name,
     notes: raw.notes ?? '',
     settings,

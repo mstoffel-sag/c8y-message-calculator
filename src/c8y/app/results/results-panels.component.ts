@@ -1,9 +1,9 @@
 /**
  * Output. CONCEPT.md section 7.
  *
- * The nine counters are the primary artefact; everything else on the page
- * supports them. Deliberately absent: billable units, utilisation, headroom,
- * commit recommendations, overage warnings. A billing system handles
+ * The volume panels behind the quote, shown in Expert mode: how the peak month
+ * was reached, where it comes from and how it moves month by month. Still
+ * absent: prices, utilisation, overage warnings. A billing system handles
  * withdrawal, and this tool cannot get a bill wrong if it never computes one.
  *
  * Every panel is a `computed()` that returns finished strings. That is not

@@ -469,10 +469,10 @@ describe('the hand-off row explains its own buttons', () => {
     const html = render(<Handoff scenario={scenario} result={result} />);
     // The workbook fills D37 in from the storage estimate. This screen used to
     // show a dash there, which made the two disagree about the same cell.
-    // 4.02 GiB standing at every month end of a 12-month period, each month
-    // rounded up to a whole billable GiB: 60 units, which is the quantity --
-    // not the 4.02 the fullest month holds, and not the 48.21 on disk.
-    assert.match(html, /\b60\b/);
+    // 4.02 GiB at the fullest month end, rounded up to a whole billable GiB:
+    // 5 for one month, which the Configurator multiplies by the period's 12.
+    assert.match(html, /font-style:italic[^>]*>5</);
+    assert.doesNotMatch(html, />60</, 'not the period sum, which would be multiplied twice');
     assert.match(html, /estimated, overridable/);
     // The catalogue writes punctuation literally, curly apostrophe included.
     assert.match(html, /title="the tool’s estimate; state a figure/);
@@ -484,8 +484,8 @@ describe('the hand-off row explains its own buttons', () => {
     // it, or the checklist misses the one line the tool filled in itself.
     assert.match(html, /Every cell, value and label/);
     // The value is built on click, so assert the source of truth instead.
-    const { storageGiBMonthsForPeriod } = await import('../lib/engine/index.js');
-    assert.ok(storageGiBMonthsForPeriod(result, 1) > 0);
+    const { storageGiBPerMonthForPeriod } = await import('../lib/engine/index.js');
+    assert.ok(storageGiBPerMonthForPeriod(result, 1) > 0);
   });
 
   test('and every copy button can report what happened', () => {
@@ -506,9 +506,9 @@ describe('the storage estimate shows its working', () => {
     // The §9 fleet holds 174 M values at every month end -- 30 days of writing
     // at 5.8 M values a day -- but only 44.4 M measurement documents, because
     // the four climate readings share one. At 95 B a document that is 3.93 GiB,
-    // 4.02 with the documents and devices, and the twelve month-ends make the
-    // period: 13.0 to 125.3 GiB-months across the measured spread.
-    assert.match(html, /13 – 125 GiB/);
+    // 4.02 with the documents and devices: 1.1 to 10.4 GiB at the fullest
+    // month across the measured spread.
+    assert.match(html, /1\.1 – 10\.4 GiB/);
     // Shorter words, same duty: a reader must not be able to take the figure
     // without also learning where the bytes came from and how wide the spread is.
     assert.match(html, /95 bytes a measurement/, 'the figure it came from travels with it');
@@ -518,20 +518,22 @@ describe('the storage estimate shows its working', () => {
 
   test('the figure it quotes is what is billed, with what is on disk beside it', () => {
     const html = render(<StoragePanel result={result} />);
-    // The quantity is the billable unit sum -- each month rounded up to a whole
-    // GiB, because that is what ODS bills -- with its unit in the stat's label.
-    assert.match(html, /GiB-months<\/span><b>60<\/b>/, 'the quoted figure');
-    assert.match(html, /rounded up to a whole GiB/, 'and why it is not 48');
-    assert.match(html, /13 – 125 GiB/, 'with the whole range beside it');
-    assert.match(html, /is what storage bills for/);
+    // The quantity is one month in whole GiB, the period's fullest, because
+    // ODS bills each month rounded up and the Configurator multiplies by the
+    // months -- with its unit in the stat's label.
+    assert.match(html, /GiB a month<\/span><b>5<\/b>/, 'the quoted figure');
+    assert.match(html, /rounded up to a whole GiB/, 'and why it is not 4.02');
+    assert.match(html, /1\.1 – 10\.4 GiB/, 'with the whole range beside it');
+    assert.match(html, /goes in the storage line/);
+    assert.match(html, /48\.2 GiB-months/, 'and what is really on disk over the period');
   });
 
   test('the ODS cell is filled in for every period, and stays overridable', () => {
     const html = render(<StepContract scenario={scenario} result={result} onChange={noop} />);
     // Empty box, estimate as the placeholder: nobody has stated this, and this
     // is what the workbook will use if nobody does.
-    assert.match(html, /placeholder="60"/);
-    assert.match(html, /13\.0–125\.3 GiB-months on disk across the range/);
+    assert.match(html, /placeholder="5"/);
+    assert.match(html, /fullest month 1\.1–10\.4 GiB on disk across the range/);
   });
 
   test('it says which half of itself rests on the weaker assumption', () => {
@@ -585,13 +587,34 @@ describe('expert mode gates the JSON', () => {
   const scenario = conceptSection9Scenario();
   const result = computeScenario(scenario);
 
-  test('off by default: no payloads, but the reader is told where they are', () => {
+  test('off by default: the quote, and the reader is told where the rest is', () => {
     const html = render(<StepResults scenario={scenario} result={result} expert={false} />);
     assert.doesNotMatch(html, /<pre/, 'no JSON on screen');
     assert.doesNotMatch(html, /measurement\/measurements\/create/);
     assert.match(html, /Expert mode/, 'and it says how to get them');
-    // The numbers a customer came for are still all there.
+    // The numbers a customer came for: per period, messages and storage, a
+    // month and over the period, each rounded up. 45,978,000 at the peak month
+    // is 460 blocks of 100,000; 4.02 GiB at the fullest month end is 5.
+    assert.match(html, /What to quote/);
+    assert.match(html, /<b>46 M<\/b>/);
+    assert.match(html, />552 M</);
+    assert.match(html, /<b>5 GiB<\/b>/);
+    assert.match(html, />60 GiB-months</);
+    // And nothing of how they were reached.
+    assert.doesNotMatch(html, /Measurements Created/);
+    assert.doesNotMatch(html, /Operational storage/);
+    assert.doesNotMatch(html, /Calendar-month range/);
+    assert.doesNotMatch(html, /class="dg-msg"/);
+    // Guidance stays: a warning is worth reading before the figure is quoted.
+    assert.match(html, /Guidance/);
+  });
+
+  test('on: the counters, the storage breakdown and the design come back', () => {
+    const html = render(<StepResults scenario={scenario} result={result} expert />);
+    assert.match(html, /What to quote/);
     assert.match(html, /Measurements Created/);
+    assert.match(html, /Operational storage/);
+    assert.match(html, /What each machine sends/);
   });
 
   test('on: the payloads come back', () => {
@@ -691,13 +714,11 @@ describe('the configuration diagram appears where it helps', () => {
     assert.match(html, /shared &mdash; readings on the same tick|shared — readings/);
   });
 
-  test('as a summary on the results step, expert mode or not', () => {
+  test('as a summary on the results step, in expert mode', () => {
     const result = computeScenario(scenario);
-    for (const expert of [false, true]) {
-      const html = render(<StepResults scenario={scenario} result={result} expert={expert} />);
-      assert.match(html, /What each machine sends/);
-      assert.match(html, /class="dg-msg"/);
-    }
+    const html = render(<StepResults scenario={scenario} result={result} expert />);
+    assert.match(html, /What each machine sends/);
+    assert.match(html, /class="dg-msg"/);
   });
 
   test('it names the real datapoints, not placeholders', () => {

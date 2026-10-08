@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 40 — storage is measured, so the byte figure is no longer asked for · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-09-28
+**Status:** draft for review, rev 41 — the results page leads with one quote per period, and storage is quoted per month like messages · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-10-08
 
 ---
 
@@ -394,16 +394,17 @@ The Operational Data Store is a real line in the Configurator (row 37) that some
 Two questions decide what goes in it: **what is measured**, and **how big a stored value is**. The
 first is a billing rule; the second comes from `StorageCalculation.txt` and is a range.
 
-**What is measured: the end of each month, added up.** The platform captures what the database holds
-when a calendar month closes. That capture happens every month, and a contract period's quantity is
-those captures **added up** — so the unit is **GiB-months**, and the figure for a twelve-month period
-is roughly twelve times what the database holds at any one time.
+**What is measured: the end of each month, one month at a time.** The platform captures what the
+database holds when a calendar month closes and bills that capture rounded up to a whole GiB, every
+month. What the fleet consumes over a period is those captures added up, in **GiB-months**.
 
-Two plausible readings of "storage for the period" are both wrong, and worth naming because each is
-wrong in an expensive direction. The **fullest month** over-states a period that spent most of itself
-filling up: quoting a year at the level it reached in month twelve charges for eleven months the
-customer did not have. The **last month** does the reverse, and under-states a fleet that shrank. The
-sum is neither, and it is what is billed.
+**What is quoted: the fullest month, times the months.** The Configurator multiplies every line by the
+period's length, so `D37` holds one month, and the month it holds is the period's fullest — the same
+rule as messages, which are quoted at their peak month. On a fleet that fills up during the period
+that is more than the captures added up, and it is meant to be: a commit-to-consume figure below
+consumption runs short, one above it does not. Until rev 41 the cell held the period's sum, which the
+Quote sheet then multiplied by the months a second time — twelve times the storage on a one-year
+period. A stated figure saved before then is converted on load (`normalise`, scenario format 2).
 
 | Assumption | Value | Provenance |
 |---|---|---|
@@ -433,11 +434,11 @@ produces something that looks like a measurement. A fourfold spread *is* the fin
 hands it over intact — summed the same way as the quoted figure, so the range arrives at the period
 as a range rather than being re-derived from a total that has already lost it.
 
-**But a cell needs one number, so the tool writes one.** `D37` is the **billable** quantity: each
-month's storage rounded **up to a whole GiB**, then added up. That is what the CTC Metrics Dashboard
-bills — `CEILING(GiB)` per month — and it is not a detail. A fleet holding 150 MiB pays for a GiB
-every month, so a year is twelve units and not 1.8, and for anything small the rounding *is* most of
-the figure. The unrounded GiB-months stay beside it as the honest answer to "how much is on disk".
+**But a cell needs one number, so the tool writes one.** `D37` is the **billable** quantity: the
+fullest month's storage rounded **up to a whole GiB**. That is what the CTC Metrics Dashboard bills —
+`CEILING(GiB)` per month — and it is not a detail. A fleet holding 150 MiB pays for a GiB every
+month, so a year is twelve units and not 1.8, and for anything small the rounding *is* most of the
+figure. The unrounded GiB-months stay in Expert mode as the honest answer to "how much is on disk".
 
 The central figure is written, not the top of the range. The old model wrote the top on the grounds
 that under-stating a commit-to-consume contract depletes it early; measured against real tenants the
@@ -866,15 +867,11 @@ person doing the quoting rather than to a volume estimate. `Commitment.headroom`
 engine, computed and unread — the workbook's Quote sheet is where a figure like this earns its place,
 next to the prices that make it money.
 
-**The panel sits directly under the hand-off table.** The table states one month per period and the
-period's length in `D21`; this is the same quantities carried across the term those two imply. With
-other panels in between, a reader who had typed twelve months and found only a peak month in the table
-had nowhere in view to see the term — which is the question the table reliably provokes.
-
-**Since 0.8.1 only the first is shown.** The results panel and the workbook's Quote sheet carry one
-quantity: billable units over the term as quoted -- each period's peak month, rounded up to whole
-billing units, times its length. It is the safe side, never below what the fleet consumes, and one
-number is less confusing than two. `termUnitsActual` and `headroom` stay in the engine, unread.
+**Only the first is shown, and since rev 41 not as a panel of its own.** The results page leads with
+one row per period — messages and storage, a month and over the period, each rounded up to whole
+billing units — and the term is those rows. It is the safe side, never below what the fleet consumes.
+`periodQuotes` in `lib/engine/commitment.ts` computes the row and is what both apps and the workbook's
+storage line read; `termUnitsActual` and `headroom` stay in the engine, unread.
 
 Rounding order is not cosmetic here. Messages are sold per 100,000 **per month**, so each month's
 part-block is paid for; rounding the term total up once at the end would under-count by up to one
@@ -885,12 +882,17 @@ a test pins the order.
 
 ## 7. Output
 
-**The page reads in the order a quote is built.** The hand-off table, then the commitment it adds up
-to, then operational storage — `D27` and `D37` are the two quantities that leave this page, so they
-sit together rather than with storage further down among the volume panels — and only then the
-workbook that carries them away. The sheet-by-sheet description under the download button is gone:
-it told a reader what was in a file they had not opened yet, and the sheets name themselves once it
-is open.
+**The page leads with what gets quoted, and by default shows little else.** One row per contract
+period: messages a month and over the period, storage a month and over the period, each rounded up to
+whole billing units — 100,000 messages, 1 GiB — at the period's busiest month. Then the workbook
+download and the guidance. The page used to open with some thirty figures, and the two a quote needs
+had to be found among them.
+
+**Everything else is how those figures were reached, and sits behind Expert mode**: the hand-off table,
+operational storage, the design per machine, the volume panels and the payloads, in that order.
+Somebody checking an estimate wants them; somebody quoting it does not. The sheet-by-sheet description
+under the download button is gone: it told a reader what was in a file they had not opened yet, and
+the sheets name themselves once it is open.
 
 **Rows at zero collapse.** A line item nobody filled in, and a counter that is zero in every period,
 are both one line of a checklist with nothing to transfer — 14 of them on the §9 fleet, burying the
@@ -918,12 +920,12 @@ page supports this table.
   beside a computed one lends it authority it has not earned. Burstiness is a device-design question
   and it changes no counter — billing is a monthly total.
 - Stored values per month, as a count, and the operational storage they imply as a **range** with its
-  assumptions attached (§4.6): what the database holds at each month's end, added up over the period,
-  in GiB-months. Both ends, never a midpoint.
+  assumptions attached (§4.6): what the database holds at the fullest month's end, and the period's
+  month-ends added up in GiB-months. Both ends, never a midpoint.
 - A per-period ramp of message volume as the fleet rolls out.
 
-Deliberately absent: billable units, utilisation, headroom, commit recommendations, overage warnings.
-A billing system handles withdrawal (§2).
+Deliberately absent: prices, utilisation, headroom, commit recommendations, overage warnings. A
+billing system handles withdrawal (§2).
 
 **Payload design** — for every measurement type, event, alarm and inventory fragment, a
 copy-pasteable example: REST JSON plus

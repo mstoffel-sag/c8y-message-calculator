@@ -8,7 +8,7 @@
  */
 
 import type { Key } from '../i18n/index.js';
-import type { MachineType, Metric, Period, Scenario } from '../engine/types.js';
+import { SCENARIO_FORMAT, type MachineType, type Metric, type Period, type Scenario } from '../engine/types.js';
 
 let seq = 0;
 export function nextId(prefix: string): string {
@@ -221,6 +221,7 @@ export function blankMachineType(name = 'New machine type'): MachineType {
 export function blankScenario(): Scenario {
   const now = new Date();
   return {
+    format: SCENARIO_FORMAT,
     name: 'Untitled scenario',
     notes: '',
     settings: {
@@ -242,6 +243,7 @@ export function newPeriod(index: number, months = 12): Period {
 export function conceptSection9Scenario(): Scenario {
   const hvac = presetByKey('hvac')!;
   return {
+    format: SCENARIO_FORMAT,
     name: 'CONCEPT.md section 9 - 1,000 rooftop HVAC units',
     notes: 'The worked example. Steady state, 100 % online, one period.',
     settings: { startYear: 2027, startMonth: 1, fragmentPrefix: 'acme' },

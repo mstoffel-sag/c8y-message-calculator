@@ -9,7 +9,8 @@ import {
 } from '../../../lib/engine/index.js';
 import { buildXlsx } from '../../../lib/xlsx/writer.js';
 import { Handoff } from './Handoff.js';
-import { Commitment, Results, Storage } from '../Results.js';
+import { Findings, Results, Storage } from '../Results.js';
+import { Quote } from '../Quote.js';
 import { Payloads } from '../Payloads.js';
 import { MeasurementDiagram } from '../MeasurementDiagram.js';
 import { Empty } from '../parts.js';
@@ -29,23 +30,32 @@ export function StepResults({
   if (scenario.machineTypes.length === 0) {
     return <Empty>{t('results.empty')}</Empty>;
   }
+  // Two figures per period, messages and storage, is what a quote needs; the
+  // page used to lead with some thirty, and the two that mattered had to be
+  // found among them. Everything else is how those two were reached, and
+  // stays one switch away for whoever is checking rather than quoting.
+  if (!expert) {
+    return (
+      <>
+        <Quote scenario={scenario} result={result} />
+        <DownloadWorkbook scenario={scenario} result={result} />
+        {result.findings.length > 0 && <Findings findings={result.findings} />}
+        <ExpertHidden />
+      </>
+    );
+  }
   return (
     <>
-      {/* The table first, then the term it is quoted over, then the file that
-          carries both away. The download led the page and was the one thing on
-          it nobody could act on until they had read the rest. */}
+      <Quote scenario={scenario} result={result} />
+      {/* The Configurator's own rows next, then storage, which is the other
+          quantity a period is quoted on: D27 and D37 are the two numbers that
+          leave this page. */}
       <Handoff scenario={scenario} result={result} />
-      <Commitment scenario={scenario} result={result} />
-      {/* Storage is the other quantity a period is quoted on, so it belongs
-          beside the commitment rather than further down among the volume
-          panels: D27 and D37 are the two numbers that leave this page. */}
       <Storage result={result} />
       <DownloadWorkbook scenario={scenario} result={result} />
       <Design scenario={scenario} />
       <Results scenario={scenario} result={result} />
-      {/* The payloads are for whoever writes the device code, not for the
-          person filling in the wizard. */}
-      {expert ? <Payloads scenario={scenario} /> : <PayloadsHidden />}
+      <Payloads scenario={scenario} />
     </>
   );
 }
@@ -134,7 +144,7 @@ function DownloadWorkbook({ scenario, result }: { scenario: Scenario; result: Sc
   );
 }
 
-function PayloadsHidden() {
+function ExpertHidden() {
   return (
     <p class="hint" style="margin-top:18px">
       <Rich k="payload.hidden" />

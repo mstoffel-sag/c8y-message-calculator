@@ -18,11 +18,12 @@
  *
  * 1. **What is measured, and when.** Storage is billed on what the database
  *    holds when a calendar month closes; that snapshot is taken every month and
- *    the month-end figures are added up over the contract period. So the
- *    quantity is a sum in GiB-months, not the fullest month and not the last
- *    one: a period that ends full has paid for every month it took to fill up.
- *    `storagePerPeriod` does that addition and is the only thing a quote should
- *    read.
+ *    each month-end figure is billed rounded up to a whole GiB. The quote takes
+ *    the period's fullest month times its length, the way messages are quoted
+ *    at their peak month -- the safe side for a commitment, where a figure below
+ *    consumption runs short. `PeriodStorage.unitsPerMonth` is that month and is
+ *    the only thing a quote should read; the sums beside it say what is really
+ *    on disk.
  *
  * 2. **Retention, per measurement type.** What survives to the end of the month
  *    is what is still inside its retention window, and a retention rule in
@@ -370,8 +371,9 @@ const FULLER_BY = 1.0001;
  * cumulative, so it keeps climbing while the fleet grows even through a quiet
  * month.
  *
- * This ranks for display only -- the quantity is `PeriodStorage.giBMonths`, a
- * sum over every month -- so a tolerance here cannot move a quoted figure.
+ * This ranks for display only -- the quantity is `PeriodStorage.unitsPerMonth`,
+ * a strict maximum over whole GiB -- so a tolerance here cannot move a quoted
+ * figure.
  */
 export function peakStorageMonth(storage: StorageMonth[]): StorageMonth | undefined {
   return storage.reduce<StorageMonth | undefined>(
@@ -383,9 +385,8 @@ export function peakStorageMonth(storage: StorageMonth[]): StorageMonth | undefi
 /**
  * The fullest month inside one contract period.
  *
- * Not the quantity -- see `storageForPeriod` for that -- but worth naming: it
- * says when the fleet stopped filling up, which is a different month from the
- * one where the message count levelled off.
+ * Worth naming beside the quantity: it says when the fleet stopped filling up,
+ * which is a different month from the one where the message count levelled off.
  */
 export function peakStorageForPeriod(
   storage: StorageMonth[],
@@ -395,14 +396,15 @@ export function peakStorageForPeriod(
 }
 
 /**
- * One period's storage: the month-end snapshots, added up.
+ * One period's storage: the month-end snapshots, added up, and the fullest one.
  *
- * This is the quantity a quote is built on. The platform captures what the
- * database holds at the end of each calendar month and the period's figure is
- * the sum of those captures -- GiB-months -- so a period is not quoted at its
- * fullest month. Quoting the peak would charge twelve months of a full database
- * for a year that spent most of itself filling one up; quoting the last month
- * would do the reverse and under-state a shrinking fleet.
+ * The platform captures what the database holds at the end of each calendar
+ * month and bills each capture rounded up to a whole GiB. The quote takes the
+ * fullest month times the period's length, as it does for messages: on a fleet
+ * that fills up during the period that is more than the months added up, and
+ * it is meant to be -- a commitment sized below consumption runs short, one
+ * sized above it does not. The sums stay here as the honest answer to "how
+ * much is really on disk".
  *
  * Every column is summed the same way, so the unverified byte range and the
  * DataHub share arrive at the period as ranges too rather than being re-derived
@@ -429,6 +431,7 @@ export function storageForPeriod(
     dataHubLowGiBMonths: sum((m) => m.dataHubLowGiB),
     dataHubHighGiBMonths: sum((m) => m.dataHubHighGiB),
     averageGiB: giBMonths / own.length,
+    unitsPerMonth: Math.max(...own.map((m) => m.unitsGiB)),
     peak: peakStorageMonth(own),
   };
 }
@@ -443,20 +446,17 @@ export function storagePerPeriod(storage: StorageMonth[]): PeriodStorage[] {
 
 /**
  * The quantity a period's Operational Data Store line is filled in with: whole
- * GiB units, one month at a time, added up over the period.
+ * GiB for one month, the period's fullest, rounded up.
  *
- * Named for what it is rather than "GiB", because it is not a GiB figure and a
- * reader who treats it as one will wonder why a year reads twelve times too
- * high.
- *
- * It rounds each month up before adding, because that is what is billed. The
- * unrounded sum is still there as `giBMonths` and is the honest answer to "how
- * much is on disk"; it is not the answer to "what goes in D37", and for a small
- * fleet the two differ by most of the figure.
+ * One month because the Configurator multiplies every line by the period's
+ * length, messages included; a sum over the period in this cell was multiplied
+ * by the months a second time. The fullest month because that is the safe
+ * side, the same as messages are quoted at their peak month: a commitment sized
+ * on it never runs short.
  */
-export function storageGiBMonthsForPeriod(
+export function storageGiBPerMonthForPeriod(
   result: { storageByPeriod: PeriodStorage[] },
   periodIndex: number,
 ): number {
-  return result.storageByPeriod.find((p) => p.periodIndex === periodIndex)?.unitMonths ?? 0;
+  return result.storageByPeriod.find((p) => p.periodIndex === periodIndex)?.unitsPerMonth ?? 0;
 }

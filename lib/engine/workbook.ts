@@ -29,8 +29,7 @@ import { en, translate } from '../i18n/index.js';
 import type { MetricKind, Period, PeriodStorage, Scenario, ScenarioResult } from './types.js';
 import { colName } from '../xlsx/writer.js';
 import type { Cell, Row, Sheet } from '../xlsx/writer.js';
-import { MESSAGE_BILLING_UNIT, commitmentFor } from './commitment.js';
-import { storageGiBMonthsForPeriod } from './storage.js';
+import { MESSAGE_BILLING_UNIT, commitmentFor, periodQuotes } from './commitment.js';
 
 const COL = { category: 2, label: 3, value: 4, unit: 6, note: 7 } as const;
 
@@ -260,8 +259,9 @@ function storageSheet(result: ScenarioResult, scenario: Scenario): Sheet {
       text(
         1,
         'Storage is billed on what the database holds at the end of each calendar month, ' +
-          'captured every month and added up over the period -- so the quantity is a sum in ' +
-          'GiB-months, and the period total below is what the ODS line is filled in from. ' +
+          'each rounded up to a whole GiB. The ODS line on the Quote sheet holds the period\'s ' +
+          'fullest month, rounded up, and is multiplied by the period\'s months -- the safe side, ' +
+          'never below the month-end figures added up. The period totals below are those sums. ' +
           'Retention is a rule per type -- measurement type, event type, alarm type, one per ' +
           `operation -- and the scenario default for a type without one is ${fallback} days. ` +
           'An inventory write is the exception: it overwrites the managed object in place, so ' +
@@ -444,6 +444,7 @@ function commercialBool(period: Period | undefined, key: string): boolean {
 function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
   const periods = result.periods;
   const commitment = commitmentFor(scenario, result);
+  const quotes = periodQuotes(scenario, result);
 
   const CAT = 2;
   const LABEL = 3;
@@ -593,10 +594,9 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
     } else {
       const quantities = periods.map((period) =>
         item.key === 'ods'
-          // Two decimals, as the Configurator sheet wrote it before this sheet
-          // had to carry the value: a GiB-month figure resting on an unverified
-          // 100-400 B has no business showing twelve of them.
-          ? Number(storageGiBMonthsForPeriod(result, period.index).toFixed(2))
+          // One month in whole GiB, stated or the fullest month's: the term
+          // column multiplies it by the months like every other line.
+          ? (quotes.find((q) => q.index === period.index)?.storageGiBPerMonth ?? 0)
           : commercialQuantity(scenario.periods.find((p) => p.index === period.index), item.key),
       );
 

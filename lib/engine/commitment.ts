@@ -22,6 +22,7 @@
  */
 
 import type { ScenarioResult, Scenario } from './types.js';
+import { storageGiBPerMonthForPeriod } from './storage.js';
 
 /** Messages are sold in blocks of this many per month. */
 export const MESSAGE_BILLING_UNIT = 100_000;
@@ -77,4 +78,58 @@ export function commitmentFor(scenario: Scenario, result: ScenarioResult): Commi
     headroom: termUnitsQuoted > 0 ? 1 - termUnitsActual / termUnitsQuoted : 0,
     unitsPerMonth,
   };
+}
+
+/**
+ * What one contract period is quoted at -- the two figures the results page
+ * leads with, and the two the Configurator multiplies by the period's length.
+ *
+ * Both are one month, rounded up, on the safe side: messages at the period's
+ * peak calendar month in whole 100,000-message units, storage at its fullest
+ * month-end in whole GiB. Times the months, neither can come out below what the
+ * fleet consumes, which is the direction a commit-to-consume figure has to err
+ * in. A storage figure stated on the contract step replaces the estimate, as it
+ * does in the hand-off table.
+ */
+export interface PeriodQuote {
+  index: number;
+  months: number;
+  /** First and last calendar month of the period. */
+  start: { year: number; month: number };
+  end: { year: number; month: number };
+  /** Peak month in whole billing units, and those units as messages. */
+  messageUnitsPerMonth: number;
+  messagesPerMonth: number;
+  messageUnitsOverPeriod: number;
+  messagesOverPeriod: number;
+  /** Whole GiB, stated or the fullest month's. */
+  storageGiBPerMonth: number;
+  storageGiBOverPeriod: number;
+  storageStated: boolean;
+}
+
+export function periodQuotes(scenario: Scenario, result: ScenarioResult): PeriodQuote[] {
+  return result.periods.map((p) => {
+    const period = scenario.periods.find((s) => s.index === p.index);
+    const months = period?.months ?? 0;
+    const units = billingUnits(p.peak.total);
+    const stated = period?.commercial['ods'];
+    const storageStated = typeof stated === 'number' && stated > 0;
+    const storage = storageStated ? stated : storageGiBPerMonthForPeriod(result, p.index);
+    const first = p.months[0];
+    const last = p.months[p.months.length - 1];
+    return {
+      index: p.index,
+      months,
+      start: { year: first?.year ?? 0, month: first?.month ?? 0 },
+      end: { year: last?.year ?? 0, month: last?.month ?? 0 },
+      messageUnitsPerMonth: units,
+      messagesPerMonth: units * MESSAGE_BILLING_UNIT,
+      messageUnitsOverPeriod: units * months,
+      messagesOverPeriod: units * MESSAGE_BILLING_UNIT * months,
+      storageGiBPerMonth: storage,
+      storageGiBOverPeriod: storage * months,
+      storageStated,
+    };
+  });
 }

@@ -220,7 +220,21 @@ export interface ScenarioSettings {
   retentionDays?: number;
 }
 
+/**
+ * The saved-scenario format this build writes. Bumped when a stored value
+ * changes meaning rather than shape, which `normalise` cannot tell from the
+ * value alone.
+ *
+ * 2: a stated Operational Data Store quantity is GiB **per month**, like every
+ *    other line the Configurator multiplies by a period's length. Before, it
+ *    was GiB-months for the whole period, and the workbook multiplied it by
+ *    the months a second time.
+ */
+export const SCENARIO_FORMAT = 2;
+
 export interface Scenario {
+  /** See SCENARIO_FORMAT. Absent on anything saved before format 2. */
+  format: number;
   name: string;
   notes: string;
   settings: ScenarioSettings;
@@ -579,10 +593,9 @@ export interface PeriodStorage {
   /** Month-end GiB added up, unrounded. What is really on disk over the term. */
   giBMonths: number;
   /**
-   * The quantity the Operational Data Store line is filled in with: each
-   * month's GiB rounded up to a whole unit, then added up. Always at least one
-   * per month a fleet exists, which is what billing does and what `giBMonths`
-   * silently did not.
+   * Each month's GiB rounded up to a whole unit, then added up -- what billing
+   * would draw down month by month. Always at least one per month a fleet
+   * exists, which `giBMonths` silently was not.
    */
   unitMonths: number;
   /** The same sum at each end of the unverified byte range. */
@@ -592,7 +605,15 @@ export interface PeriodStorage {
   dataHubHighGiBMonths: number;
   /** `giBMonths / monthsCounted` -- what a month of the period holds on average. */
   averageGiB: number;
-  /** The fullest month in the period. Not the quantity, but worth naming. */
+  /**
+   * The quantity the Operational Data Store line is filled in with: the
+   * period's fullest month, rounded up to a whole GiB. The Configurator
+   * multiplies every line by the period's length, so the cell holds one month,
+   * and the fullest one is the safe side -- never below what any month of the
+   * period is billed. Times the months it is at least `unitMonths`.
+   */
+  unitsPerMonth: number;
+  /** The fullest month in the period. */
   peak?: StorageMonth;
 }
 

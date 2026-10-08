@@ -180,7 +180,7 @@ tools/xlsx_dump.py  stdlib-only .xlsx reader, used to read the Sales Configurato
 | 2 Measurements | one row per series, and one question about each: how often it is read. A row can also stand for a **count** of series — 450 PLC tags on one scan is one row reading 450, not 450 rows — which is how a fleet nobody has a datapoint list for still gets estimated; a count over the platform's 100-series recommendation is still quoted as one message, because that is what the platform does with it, and L6 warns about the width and prices what splitting would add. A count does not assume the series share a message: the measurement type dropdown offers **One measurement for all series** or **One measurement per series**, the second modelling the agent that posts one datapoint per request, and the guidance panel then prices the bundling it gives up. Series are grouped by interval into one measurement type each, as you type, and that type's fragment name is editable in the row. Splitting one out creates its own measurement type there and then. A status flag is a row like any other — the interval you give it is the rate you intend to read it at, and the tool warns if one is left on the fleet's fastest tick. |
 | 3 Events, alarms, inventory & commands | everything that is not a measurement, one panel each. Commands close the step, with the status-transition count, because the contrast between three inbound elements and one outbound one is the thing being taught |
 | 4 Contract & deployment | periods, the ramp and the calendar, then every Configurator line item the fleet cannot imply — one column per period, right under the table that decides how many periods there are |
-| 5 Results | messages per calendar month, the cell each number goes in, the operational-storage range, the CTC commitment in billable units, and an Excel download |
+| 5 Results | per contract period, messages and storage a month and over the period, rounded up, and an Excel download; Expert mode adds the cell each number goes in, the storage range, the design and the payloads |
 
 ### English and German, from one catalogue
 
@@ -208,11 +208,9 @@ and a half times — so both ends of the range are always shown.
 **Bytes follow the document, not the reading.** A measurement carrying ten series is stored once, not
 ten times, so bundling cuts this figure as well as the message count.
 
-**Storage is billed on what the database holds at the end of each calendar month, captured every
-month and added up over the contract period** — so the quantity is in **GiB-months**, and a
-twelve-month period reads roughly twelve times what the database holds at any one time. It is
-deliberately neither the fullest month, which would charge a year at the level it only reached in
-month twelve, nor the last, which would under-state a fleet that shrank.
+**Storage is billed on what the database holds at the end of each calendar month**, rounded up to a
+whole GiB, every month. It is quoted the way messages are: the period's fullest month, times the
+period's months — the safe side, never below what the fleet will use.
 
 **Retention is a rule per type**, asked in a column on the row that owns the type: once per
 measurement type in the measurements table, and on every row of the events, alarms and commands
@@ -227,11 +225,12 @@ all**: a write overwrites the managed object in place, so nothing accumulates to
 managed object is not one of the types a retention rule covers — every device registered counts
 towards storage until somebody deletes it.
 
-The Configurator's ODS cell (`D37`) carries the **billable** quantity: each month's storage rounded
-**up to a whole GiB**, then added up, which is what the platform bills. A fleet holding 150 MiB pays
-for a GiB every month, so a year is twelve units and not 1.8 — for a small fleet the rounding is most
-of the figure. The unrounded GiB-months sit beside it as the honest answer to how much is on disk,
-the note carries the whole range, and typing a figure in the deployment panel overrides it.
+The Configurator's ODS cell (`D37`) carries the **billable** quantity for one month: the fullest
+month's storage rounded **up to a whole GiB**, which the Configurator multiplies by the months. A
+fleet holding 150 MiB pays for a GiB every month, so a year is twelve units and not 1.8 — for a small
+fleet the rounding is most of the figure. The unrounded GiB-months sit in Expert mode as the honest
+answer to how much is on disk, the note carries the whole range, and typing a figure in the
+deployment panel overrides it.
 
 Each retention window is walked backwards through the months the ramp produced, so a fleet three
 months into a rollout is not credited with a full window of history, and storage keeps climbing after

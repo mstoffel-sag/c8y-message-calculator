@@ -193,19 +193,21 @@ describe('the workbook content', () => {
     }
   });
 
-  test('the storage line is the period sum, and the Storage sheet shows the addition', () => {
+  test('the storage line is one month, and the term multiplies it once', () => {
     const result = computeScenario(conceptSection9Scenario());
     const period = result.storageByPeriod[0]!;
 
-    // D37 carries the quantity storage is billed on: the month-end snapshots,
-    // each rounded up to a whole GiB, added up. The fullest month is a stat,
-    // not the cell -- quoting it would charge twelve full months for a year
-    // spent filling up.
-    const d37 = sheet('Quote')
-      .rows.find((row) => row.cells.some((c) => c.value === 'Operational Data Store'))
-      ?.cells.find((c) => typeof c.value === 'number')?.value;
-    assert.equal(d37, period.unitMonths);
-    assert.notEqual(d37, Number(period.peak!.quotedGiB.toFixed(2)));
+    // D37 holds one month, the period's fullest, in whole GiB: the term column
+    // multiplies it by the months like every other line. It used to hold the
+    // period's sum, and the term column multiplied that by twelve again.
+    const ods = sheet('Quote').rows.find((row) =>
+      row.cells.some((c) => c.value === 'Operational Data Store'),
+    )!;
+    const d37 = ods.cells.find((c) => typeof c.value === 'number')?.value;
+    assert.equal(d37, period.unitsPerMonth);
+    assert.equal(d37, 5, '4.02 GiB at the fullest month-end, rounded up');
+    const term = ods.cells.find((c) => c.formula !== undefined && c.style === 'number');
+    assert.equal(term?.cached, 5 * 12);
 
     // And the sheet behind it carries one row per month plus the total, so the
     // sum can be checked rather than taken on trust.

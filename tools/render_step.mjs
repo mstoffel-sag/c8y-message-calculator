@@ -2,7 +2,7 @@
  * Renders one wizard step to a standalone HTML file, for a WebKit snapshot.
  *
  *   npm test                                   # builds dist-test/, which this reads
- *   node tools/render_step.mjs contract /tmp/c.html [scrollPx] [locale] [scenarios] [theme]
+ *   node tools/render_step.mjs contract /tmp/c.html [scrollPx] [locale] [scenarios] [theme] [expert]
  *   qlmanage -t -s 1100 -o /tmp /tmp/c.html
  *
  * There is no browser in the loop here, so this plus qlmanage is how a layout
@@ -18,6 +18,9 @@
  *
  * `scenarios` is how many are in the library, which is what decides whether the
  * rail is there at all: one is the default and the CSS hides it.
+ *
+ * `expert` is `on` (the default) or `off`. The results step shows the quote and
+ * little else with it off, which is what most readers see.
  */
 
 import { h } from 'preact';
@@ -45,11 +48,12 @@ const COMPONENTS = {
   results: StepResults,
 };
 
-const [key, out, scroll = '0', locale = 'en', scenarios = '1', theme = 'dark'] = process.argv.slice(2);
+const [key, out, scroll = '0', locale = 'en', scenarios = '1', theme = 'dark', expert = 'on'] =
+  process.argv.slice(2);
 const Step = COMPONENTS[key];
 if (!Step || !out) {
   console.error(
-    `usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx] [en|de] [scenarios] [light|dark]`,
+    `usage: render_step.mjs <${Object.keys(COMPONENTS).join('|')}> <out.html> [scrollPx] [en|de] [scenarios] [light|dark] [on|off]`,
   );
   process.exit(1);
 }
@@ -64,7 +68,7 @@ const def = STEPS[index];
 setFormatLocale(locale);
 const t = makeT(locale);
 const body = render(
-  h(LocaleContext.Provider, { value: locale }, h(Step, { scenario, result, expert: true, onChange: () => {} })),
+  h(LocaleContext.Provider, { value: locale }, h(Step, { scenario, result, expert: expert !== 'off', onChange: () => {} })),
 );
 const rail = STEPS.map(
   (s, i) => `<button class="rail-step ${i === index ? 'on' : ''}"><i>${i + 1}</i>${t(s.titleKey)}</button>`,
