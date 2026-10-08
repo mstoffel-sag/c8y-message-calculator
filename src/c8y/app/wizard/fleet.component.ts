@@ -1,6 +1,15 @@
 /** Machines: types, counts, online share, and the protocol each one talks. */
 
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  afterRenderEffect,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { CoreModule } from '@c8y/ngx-components';
 
 import { machineTypeSummary } from '../../../../lib/engine/index.js';
@@ -19,6 +28,9 @@ import { ProseComponent } from '../i18n/rich.component.js';
 import { TPipe, TPluralPipe } from '../i18n/t.pipe.js';
 import { machineStructure } from '../machine.component.js';
 import { ScenarioStore } from '../scenario.store.js';
+
+/** Past this the description folds: about eight lines at the field's size. */
+const DESCRIBE_CAP_PX = 160;
 
 @Component({
   selector: 'c8y-mc-step-fleet',
@@ -41,14 +53,27 @@ import { ScenarioStore } from '../scenario.store.js';
          this is the part nobody can reconstruct from the numbers, and it
          travels in the exported JSON. -->
     <div class="form-group mc-describe">
-      <label>{{ 'app.description' | t }}</label>
+      <label for="mc-scenario-description">{{ 'app.description' | t }}</label>
       <textarea
+        #describeBox
+        id="mc-scenario-description"
         class="form-control"
         rows="2"
         [value]="notes()"
         [attr.placeholder]="'app.description.placeholder' | t"
         (input)="describe($any($event.target).value)"
       ></textarea>
+      @if (describeOverflows()) {
+        <button
+          type="button"
+          class="btn btn-link btn-xs p-l-0 mc-describe-toggle"
+          [attr.aria-expanded]="describeOpen()"
+          aria-controls="mc-scenario-description"
+          (click)="describeOpen.set(!describeOpen())"
+        >
+          {{ (describeOpen() ? 'app.description.less' : 'app.description.more') | t }}
+        </button>
+      }
     </div>
 
     <c8y-mc-teach [title]="'fleet.teach.title' | t">
@@ -151,6 +176,32 @@ export class StepFleetComponent {
 
   readonly machineTypes = computed(() => this.store.scenario().machineTypes);
   readonly notes = computed(() => this.store.scenario().notes);
+
+  /**
+   * The description sized to what is in it, and folded past about eight
+   * lines -- a long brief is worth keeping, not worth pushing the machine table
+   * off the first screen. The height comes from `scrollHeight` after each
+   * render rather than from CSS, because `field-sizing: content` is missing
+   * in Firefox. The standalone build does the same in StepFleet.tsx.
+   */
+  private readonly describeBox = viewChild<ElementRef<HTMLTextAreaElement>>('describeBox');
+  readonly describeOpen = signal(false);
+  readonly describeOverflows = signal(false);
+
+  constructor() {
+    afterRenderEffect(() => {
+      this.notes();
+      const open = this.describeOpen();
+      const el = this.describeBox()?.nativeElement;
+      if (!el) return;
+      el.style.height = 'auto';
+      const full = el.scrollHeight + (el.offsetHeight - el.clientHeight);
+      const over = full > DESCRIBE_CAP_PX;
+      el.style.height = `${open || !over ? full : DESCRIBE_CAP_PX}px`;
+      el.style.overflowY = over && !open ? 'auto' : 'hidden';
+      this.describeOverflows.set(over);
+    });
+  }
 
   describe(notes: string): void {
     this.store.patch(scenario => ({ ...scenario, notes }));

@@ -10,7 +10,13 @@
  * checking the estimate wants them, somebody quoting it does not.
  */
 
-import { periodQuotes, termQuote, type Scenario, type ScenarioResult } from '../../lib/engine/index.js';
+import {
+  periodQuotes,
+  statedLines,
+  termQuote,
+  type Scenario,
+  type ScenarioResult,
+} from '../../lib/engine/index.js';
 import { monthYear, n, wholeGib, wholeGibMonths } from './format.js';
 import { useT } from './i18n.js';
 
@@ -21,6 +27,7 @@ export function Quote({ scenario, result }: { scenario: Scenario; result: Scenar
   // Shown for a single period too: the reader looks for the sum in the same
   // place every time, and a row that appears only sometimes reads as missing.
   const term = termQuote(quotes);
+  const lines = statedLines(scenario);
 
   return (
     <section class="panel">
@@ -82,6 +89,49 @@ export function Quote({ scenario, result }: { scenario: Scenario; result: Scenar
           </tbody>
         </table>
         <p class="hint" style="margin-top:14px">{t('quote.safeSide')}</p>
+
+        {/* What the fleet does not decide: deployments, add-ons, support. Only
+            the lines somebody stated, so the block stays as short as the quote
+            above it; the full list is the Contract step and the workbook. */}
+        <h3 style="margin:22px 0 6px">{t('deployment.heading')}</h3>
+        {lines.length === 0 ? (
+          <p class="hint" style="margin:0">{t('quote.addOns.none')}</p>
+        ) : (
+          <table class="quote">
+            <thead>
+              <tr>
+                <th />
+                {quotes.map((q) => (
+                  <th class="num" key={q.index}>{t('contract.periodN', { index: q.index })}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map(({ item, values }) => (
+                <tr key={item.key}>
+                  <td>
+                    {item.label}
+                    <div class="hint" style="margin:0">{item.unit}</div>
+                  </td>
+                  {quotes.map((q) => {
+                    const value = values.find((v) => v.index === q.index)?.value;
+                    return (
+                      <td class="num" key={q.index}>
+                        {value === true
+                          ? t('deployment.yes')
+                          : value === false
+                            ? t('deployment.no')
+                            : value
+                              ? n(value)
+                              : '—'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </section>
   );

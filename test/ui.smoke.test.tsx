@@ -313,9 +313,9 @@ describe('the wizard renders', () => {
     assert.doesNotMatch(html, /\bprice\b/i);
   });
 
-  test('contract: the ramp, on the real calendar', () => {
+  test('contract: periods follow the rollout', () => {
     const html = render(<StepContract {...props} result={result} />);
-    assert.match(html, /11 %/);
+    assert.match(html, /quoted at its busiest month/);
     assert.match(html, /Period 1/);
   });
 

@@ -249,12 +249,14 @@ a { color: var(--accent); }
 .shell { flex: 1; min-width: 0; }
 
 /* The scenario's description: present but quiet, so it does not compete with
-   the step it sits above. It grows with what is typed in it. */
+   the step it sits above. It grows with what is typed in it, up to a cap past
+   which it folds (StepFleet.tsx), so it is never resized by hand. */
 .field.describe { margin-bottom: calc(var(--u) * 2); }
 .field.describe textarea {
-  width: 100%; resize: vertical; min-height: 44px;
+  width: 100%; resize: none; min-height: 44px;
   font: inherit; font-size: var(--c8y-font-size-small);
 }
+.field.describe .describe-toggle { align-self: flex-start; padding: 2px 0; margin-top: 2px; }
 
 /* ---------------------------------------------------------------- top bar */
 
@@ -330,8 +332,8 @@ a { color: var(--accent); }
 
 /* ------------------------------------------------------------------ inputs */
 
-label.field { display: flex; flex-direction: column; gap: 4px; font-size: var(--c8y-font-size-small); color: var(--ink-faint); }
-label.field > span { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; font-size: var(--c8y-font-size-xs); }
+label.field, div.field.describe { display: flex; flex-direction: column; gap: 4px; font-size: var(--c8y-font-size-small); color: var(--ink-faint); }
+label.field > span, .field.describe > label { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; font-size: var(--c8y-font-size-xs); }
 input[type="text"], input[type="number"], select, textarea {
   font: var(--c8y-font-size-base) / var(--c8y-line-height-base) var(--sans); color: var(--ink);
   background: var(--panel); border: 1px solid var(--c8y-palette-gray-60);

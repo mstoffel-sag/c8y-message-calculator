@@ -8,6 +8,7 @@ import { Choice, Num, Teach, Txt, Empty } from '../parts.js';
 import { machineStructure } from '../Machine.js';
 import { n } from '../format.js';
 import { Prose, useT } from '../i18n.js';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 
 interface Props {
   scenario: Scenario;
@@ -24,17 +25,10 @@ export function StepFleet({ scenario, onChange }: Props) {
           The name is in the header because it labels the rail entry; this is
           the part nobody can reconstruct from the numbers -- whose fleet, whose
           figures, what was assumed -- and it travels in the exported JSON. */}
-      <label class="field describe">
-        <span>{t('app.description')}</span>
-        <textarea
-          rows={2}
-          value={scenario.notes}
-          placeholder={t('app.description.placeholder')}
-          onInput={(e) =>
-            onChange({ ...scenario, notes: (e.target as HTMLTextAreaElement).value })
-          }
-        />
-      </label>
+      <Describe
+        notes={scenario.notes}
+        onInput={(notes) => onChange({ ...scenario, notes })}
+      />
 
       <Teach title={t('fleet.teach.title')}>
         <Prose k="fleet.teach.body" />
@@ -134,5 +128,62 @@ export function StepFleet({ scenario, onChange }: Props) {
       </div>
       <p class="hint">{t('fleet.presetNote')}</p>
     </>
+  );
+}
+
+/**
+ * Past this the description stops growing and folds: about eight lines at the
+ * field's type size. A long brief is worth keeping, but not worth pushing the
+ * machine table off the first screen of the step every time it is opened.
+ */
+const DESCRIBE_CAP_PX = 160;
+
+/**
+ * The scenario's description, sized to what is in it.
+ *
+ * The height is set from `scrollHeight` on every change rather than left to
+ * CSS: `field-sizing: content` would do it in one line, but Firefox does not
+ * have it. Folded, the field stops at the cap and scrolls inside; unfolded it
+ * shows everything. The toggle only exists while there is more than fits.
+ */
+function Describe({ notes, onInput }: { notes: string; onInput: (notes: string) => void }) {
+  const t = useT();
+  const box = useRef<HTMLTextAreaElement>(null);
+  const [open, setOpen] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const full = el.scrollHeight + (el.offsetHeight - el.clientHeight);
+    const over = full > DESCRIBE_CAP_PX;
+    el.style.height = `${open || !over ? full : DESCRIBE_CAP_PX}px`;
+    el.style.overflowY = over && !open ? 'auto' : 'hidden';
+    setOverflows(over);
+  }, [notes, open]);
+
+  return (
+    <div class="field describe">
+      <label for="scenario-description">{t('app.description')}</label>
+      <textarea
+        id="scenario-description"
+        ref={box}
+        rows={2}
+        value={notes}
+        placeholder={t('app.description.placeholder')}
+        onInput={(e) => onInput((e.target as HTMLTextAreaElement).value)}
+      />
+      {overflows && (
+        <button
+          class="ghost describe-toggle"
+          aria-expanded={open}
+          aria-controls="scenario-description"
+          onClick={() => setOpen(!open)}
+        >
+          {open ? t('app.description.less') : t('app.description.more')}
+        </button>
+      )}
+    </div>
   );
 }

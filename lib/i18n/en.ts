@@ -21,6 +21,8 @@ export const en = {
   'app.product': 'Message Calculator',
   'app.scenarioName': 'Scenario name',
   'app.description': 'Description',
+  'app.description.more': 'Show all',
+  'app.description.less': 'Show less',
   'app.description.placeholder': 'What this estimate is for, and anything a reader would need to know about it — which fleet, whose numbers, what was assumed.',
   'app.stat.peakMonth': 'messages / peak month',
   'app.stat.vsUnbundled': 'vs unbundled',
@@ -252,20 +254,20 @@ export const en = {
 
   /* ----------------------------- contract periods and the ramp */
   'contract.ramp.heading': 'Periods',
-  'contract.ramp.sub': 'How long each period runs, and how many machines are live in it',
-  'contract.teach.title': 'Billing runs on real calendar months',
-  'contract.teach.body': 'February is 28 days and January is 31 — an **11 % swing** for a fleet doing exactly the same thing. The tool works in real month lengths and names the peak month.\n\n**Registration follows the ramp.** Each period contributes *Inventories Created* only for the machines it *adds*, once, in its first month. Putting onboarding into the monthly rate overstates every later period.',
+  'contract.ramp.sub': 'Length and machine count per period',
+  'contract.teach.title': 'A period per stage of the rollout',
+  'contract.teach.body': 'Add a period wherever the number of machines changes. Each period is quoted at its busiest month.\n\nNew machines register once, in the first month of the period that adds them.',
   'contract.rampStarts': 'Ramp starts',
   'contract.year': 'Year',
   'contract.retention': 'Data kept, default',
   'contract.retention.suffix': 'days',
-  'contract.retention.title': 'Days of data the tenant keeps by default. A measurement type with a retention rule of its own — set on the Measurements step — overrides this. Decides the operational storage estimate on the Results step; it does not change the message count.',
+  'contract.retention.title': 'Default for every measurement type without a rule of its own. Changes storage, not messages.',
   'contract.col.period': 'Period',
   'contract.col.months': 'Months',
   'contract.periodN': 'Period {index}',
   'contract.remove': 'Remove',
   'contract.addPeriod': 'Add period',
-  'contract.addPeriod.hint': 'The Configurator allows five. A contract auto-renews on a 12-month term if it ends without a new agreement, and unused commitment is forfeited rather than carried forward.',
+  'contract.addPeriod.hint': 'Up to five, as in the Configurator.',
 
   /* -------------------------------------------- unnamed things */
   'machine.unnamedShort': 'Unnamed',
@@ -447,6 +449,7 @@ export const en = {
   'quote.span.other': '{from} – {to} · {count} months',
   'quote.storage.stated': 'as stated',
   'quote.term': 'Whole term',
+  'quote.addOns.none': 'No deployment or add-on stated yet — they are entered on the Contract & deployment step.',
   'quote.safeSide': 'Each period at its busiest month, rounded up to whole billing units — 100,000 messages, 1 GiB — and multiplied by its months. Never below what the fleet will use.',
 
   /* ---------------------------------------------- the hand-off */

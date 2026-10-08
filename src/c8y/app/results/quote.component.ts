@@ -12,7 +12,7 @@
 
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
-import { periodQuotes, termQuote } from '../../../../lib/engine/index.js';
+import { periodQuotes, statedLines, termQuote } from '../../../../lib/engine/index.js';
 import { monthYear, n, wholeGib, wholeGibMonths } from '../../../../lib/format/index.js';
 import { LocaleService } from '../i18n/locale.service.js';
 import { TPipe } from '../i18n/t.pipe.js';
@@ -74,6 +74,39 @@ import { ScenarioStore } from '../scenario.store.js';
             </tbody>
           </table>
           <p class="mc-hint m-t-16">{{ 'quote.safeSide' | t }}</p>
+
+          <!-- What the fleet does not decide: deployments, add-ons, support.
+               Only the lines somebody stated, so the block stays as short as
+               the quote above it; the full list is the Contract step and the
+               workbook. -->
+          <h3 class="m-t-24 m-b-8">{{ 'deployment.heading' | t }}</h3>
+          @if (lines().length === 0) {
+            <p class="mc-hint">{{ 'quote.addOns.none' | t }}</p>
+          } @else {
+            <table class="table mc-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  @for (head of periodHeads(); track head.index) {
+                    <th class="text-right">{{ head.label }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (line of lines(); track line.key) {
+                  <tr>
+                    <td>
+                      {{ line.label }}
+                      <div class="mc-hint">{{ line.unit }}</div>
+                    </td>
+                    @for (cell of line.cells; track cell.index) {
+                      <td class="text-right">{{ cell.text }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
         </div>
       </div>
     }
@@ -104,6 +137,35 @@ export class QuoteComponent {
       messages: n(term.messages),
       storage: wholeGibMonths(term.storageGiB),
     };
+  });
+
+  readonly periodHeads = computed(() => {
+    const t = this.locales.t();
+    return this.quotes().map(q => ({ index: q.index, label: t('contract.periodN', { index: q.index }) }));
+  });
+
+  readonly lines = computed(() => {
+    const t = this.locales.t();
+    const quotes = this.quotes();
+    return statedLines(this.store.scenario()).map(({ item, values }) => ({
+      key: item.key,
+      label: item.label,
+      unit: item.unit,
+      cells: quotes.map(q => {
+        const value = values.find(v => v.index === q.index)?.value;
+        return {
+          index: q.index,
+          text:
+            value === true
+              ? t('deployment.yes')
+              : value === false
+                ? t('deployment.no')
+                : value
+                  ? n(value)
+                  : '—',
+        };
+      }),
+    }));
   });
 
   readonly rows = computed(() => {

@@ -24,6 +24,7 @@ import {
   MESSAGE_BILLING_UNIT,
   computeScenario,
   periodQuotes,
+  statedLines,
   termQuote,
   workbookSheets,
   type MachineType,
@@ -141,6 +142,59 @@ describe('the quote, worked by hand', () => {
     assert.match(html, /Whole term/);
     assert.match(html, /<b>552,000,000<\/b>/);
     assert.match(html, /<b>60 GiB-months<\/b>/);
+  });
+});
+
+describe('deployment and add-ons beside the quote', () => {
+  test('only the lines somebody stated, per period, exactly as stated', () => {
+    const scenario = ramp();
+    scenario.periods[0]!.commercial = { sharedCloud: 1, tenants: 3, ods: 7 };
+    scenario.periods[1]!.commercial = { sharedCloud: 1, dataHubStandard: true, microserviceCcu: 2 };
+    const lines = statedLines(scenario);
+
+    assert.deepEqual(
+      lines.map((l) => l.item.key),
+      ['sharedCloud', 'dataHubStandard', 'microserviceCcu', 'tenants'],
+      'Configurator order; storage belongs to the quote, not to the add-ons',
+    );
+    const value = (key: string, index: number) =>
+      lines.find((l) => l.item.key === key)!.values.find((v) => v.index === index)!.value;
+    assert.equal(value('tenants', 1), 3);
+    assert.equal(value('tenants', 2), 0, 'a period that states nothing reads zero');
+    assert.equal(value('dataHubStandard', 1), false);
+    assert.equal(value('dataHubStandard', 2), true);
+
+    const html = render(h(Quote, { scenario, result: computeScenario(scenario) }));
+    assert.match(html, /Deployment &amp; add-ons|Deployment & add-ons/);
+    assert.match(html, /Public\/Shared Cloud/);
+    assert.match(html, /Microservice Hosting<div[^>]*>per CCU \(1c-4g\)</);
+    assert.match(html, />Yes</);
+    assert.doesNotMatch(html, /VPN Services|Gold \(Public Cloud Upgrade\)/, 'lines at zero stay out');
+    assert.doesNotMatch(html, /Operational Data Store/);
+    assert.doesNotMatch(html, /€|EUR|USD|\$\d/, 'quantities, never prices');
+  });
+
+  test('periods are matched by index, not by position', () => {
+    const scenario = ramp();
+    scenario.periods = [...scenario.periods].reverse();
+    scenario.periods.find((p) => p.index === 2)!.commercial = { vpn: 4 };
+    const html = render(h(Quote, { scenario, result: computeScenario(scenario) }));
+    // The columns follow the quote's period order, whatever it is; what has to
+    // hold is that the 4 sits under the Period 2 heading and nowhere else.
+    const block = html.slice(html.lastIndexOf('<table'));
+    const heads = [...block.matchAll(/<th class="num">Period (\d)<\/th>/g)].map((m) => m[1]);
+    const cells = [...block.matchAll(/VPN Services[\s\S]*?<\/tr>/g)][0]![0]
+      .match(/<td class="num">([^<]*)<\/td>/g)!
+      .map((c) => c.replace(/<[^>]+>/g, ''));
+    assert.equal(cells[heads.indexOf('2')], '4');
+    assert.equal(cells[heads.indexOf('1')], '—');
+  });
+
+  test('nothing stated says where to state it', () => {
+    const scenario = ramp();
+    for (const p of scenario.periods) p.commercial = {};
+    const html = render(h(Quote, { scenario, result: computeScenario(scenario) }));
+    assert.match(html, /No deployment or add-on stated yet/);
   });
 });
 

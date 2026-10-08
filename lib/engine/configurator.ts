@@ -13,6 +13,7 @@
  */
 
 import type { Key } from '../i18n/index.js';
+import type { Scenario } from './types.js';
 
 /** Rows between one period's block and the next. */
 export const PERIOD_ROW_STRIDE = 30;
@@ -133,3 +134,36 @@ export function periodMonthsCell(periodIndex: number): string {
 
 /** Base row of each of the nine counters, in Configurator order. */
 export const COUNTER_BASE_ROWS = [28, 29, 30, 31, 32, 33, 34, 35, 36] as const;
+
+/** One deployment or add-on line, with what each period states for it. */
+export interface StatedLine {
+  item: LineItem;
+  /** A quantity, or a yes/no for a `choice` line, keyed by period index. */
+  values: { index: number; value: number | boolean }[];
+}
+
+/**
+ * The deployment, add-on and support lines somebody actually stated, for the
+ * results page to show beside the quote.
+ *
+ * Messages and storage are left out -- the quote above carries both, rounded
+ * the way they are billed -- and so is every line at zero or "no" in every
+ * period: on a typical estimate most of the fifteen are, and listing them buries
+ * the one or two that are not. Nothing is derived here; each value is what the
+ * Contract step holds, which is also what the workbook writes.
+ */
+export function statedLines(scenario: Scenario): StatedLine[] {
+  const periods = [...scenario.periods].sort((a, b) => a.index - b.index);
+  return LINE_ITEMS.filter((item) => item.source === 'asked' || item.source === 'choice')
+    .map((item) => ({
+      item,
+      values: periods.map((p) => {
+        const value = p.commercial[item.key];
+        return {
+          index: p.index,
+          value: item.source === 'choice' ? value === true : typeof value === 'number' ? value : 0,
+        };
+      }),
+    }))
+    .filter((line) => line.values.some(({ value }) => value === true || (typeof value === 'number' && value > 0)));
+}

@@ -20,6 +20,8 @@ export const de: Record<Key, string> = {
   'app.product': 'Message Calculator',
   'app.scenarioName': 'Name des Szenarios',
   'app.description': 'Beschreibung',
+  'app.description.more': 'Alles zeigen',
+  'app.description.less': 'Weniger zeigen',
   'app.description.placeholder': 'Wofür diese Schätzung ist und was ein Leser darüber wissen muss — welcher Maschinenpark, wessen Zahlen, welche Annahmen.',
   'app.stat.peakMonth': 'Nachrichten / Spitzenmonat',
   'app.stat.vsUnbundled': 'vs. ungebündelt',
@@ -240,20 +242,20 @@ export const de: Record<Key, string> = {
 
   /* ----------------------------- contract periods and the ramp */
   'contract.ramp.heading': 'Perioden',
-  'contract.ramp.sub': 'Wie lang jede Periode läuft und wie viele Maschinen in ihr aktiv sind',
-  'contract.teach.title': 'Die Abrechnung läuft auf echten Kalendermonaten',
-  'contract.teach.body': 'Der Februar hat 28 Tage, der Januar 31 — ein **Unterschied von 11 %** für einen Maschinenpark, der genau dasselbe tut. Das Werkzeug rechnet mit echten Monatslängen und nennt den Spitzenmonat.\n\n**Die Registrierung folgt dem Hochlauf.** Jede Periode trägt *Inventories Created* nur für die Maschinen bei, die sie *hinzufügt*, einmalig, in ihrem ersten Monat. Das Onboarding in die monatliche Rate zu packen überschätzt jede spätere Periode.',
+  'contract.ramp.sub': 'Länge und Maschinenzahl je Periode',
+  'contract.teach.title': 'Eine Periode je Ausbaustufe',
+  'contract.teach.body': 'Legen Sie eine Periode an, wo sich die Zahl der Maschinen ändert. Jede Periode wird mit ihrem stärksten Monat angeboten.\n\nNeue Maschinen werden einmal registriert, im ersten Monat der Periode, die sie hinzufügt.',
   'contract.rampStarts': 'Hochlauf beginnt',
   'contract.year': 'Jahr',
   'contract.retention': 'Aufbewahrung, Standard',
   'contract.retention.suffix': 'Tage',
-  'contract.retention.title': 'Tage, die der Tenant die Daten standardmäßig hält. Ein Messtyp mit eigener Aufbewahrungsregel — im Schritt Messungen gesetzt — überschreibt diesen Wert. Bestimmt die Schätzung des operativen Speichers im Schritt Ergebnisse; die Zahl der Nachrichten ändert sich dadurch nicht.',
+  'contract.retention.title': 'Standard für jeden Messtyp ohne eigene Regel. Ändert den Speicher, nicht die Nachrichten.',
   'contract.col.period': 'Periode',
   'contract.col.months': 'Monate',
   'contract.periodN': 'Periode {index}',
   'contract.remove': 'Entfernen',
   'contract.addPeriod': 'Periode hinzufügen',
-  'contract.addPeriod.hint': 'Der Configurator erlaubt fünf. Ein Vertrag verlängert sich automatisch um 12 Monate, wenn er ohne neue Vereinbarung endet, und nicht verbrauchte Verpflichtung verfällt, statt übertragen zu werden.',
+  'contract.addPeriod.hint': 'Bis zu fünf, wie im Configurator.',
 
   /* -------------------------------------------- unnamed things */
   'machine.unnamedShort': 'Unbenannt',
@@ -430,6 +432,7 @@ export const de: Record<Key, string> = {
   'quote.span.other': '{from} – {to} · {count} Monate',
   'quote.storage.stated': 'wie angegeben',
   'quote.term': 'Gesamte Laufzeit',
+  'quote.addOns.none': 'Noch kein Deployment und kein Add-on angegeben — sie werden im Schritt Vertrag & Deployment eingetragen.',
   'quote.safeSide': 'Jede Periode in ihrem stärksten Monat, auf volle Abrechnungseinheiten aufgerundet — 100.000 Nachrichten, 1 GiB — und mit ihren Monaten multipliziert. Nie unter dem, was der Park verbraucht.',
 
   /* ---------------------------------------------- the hand-off */

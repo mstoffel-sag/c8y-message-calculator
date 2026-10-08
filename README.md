@@ -45,6 +45,10 @@ Each period is taken at its **busiest month**, rounded **up** to whole billing u
 messages, 1 GiB — and multiplied by its months. So the figures are never below what the fleet will
 use, which is the safe side for a commit-to-consume contract.
 
+Below it, **Deployment & add-ons** lists every deployment, add-on and support line you stated on the
+Contract & deployment step, per period — the quantities the account team prices beside messages and
+storage.
+
 **Download Excel workbook** carries the same quantities in a Quote sheet laid out like the Sales
 Configurator, with an empty price column: send it to your account team, who price it. It is safe to
 email — it contains no prices.
