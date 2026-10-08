@@ -5,7 +5,7 @@
  * workspace root) and writes it into the build as `cumulocity.json`, which is
  * what a tenant reads when the zip is uploaded. It is the Angular app's
  * equivalent of the hand-written `cumulocity.json` the static build ships --
- * see README, "Two builds, two manifests".
+ * see DEVELOPMENT.md, "The zips".
  *
  * The version comes from package.json so there is one place to bump.
  */

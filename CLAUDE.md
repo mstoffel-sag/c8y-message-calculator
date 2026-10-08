@@ -168,7 +168,8 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 ## Docs, and keeping the cost of a change down
 
 - **CONCEPT.md** is the design doc: bump the rev line and say what changed when the design does, not
-  when an implementation detail does. **README.md** is orientation for a new reader.
+  when an implementation detail does. **README.md** is for someone using or deploying the tool --
+  usage and deployment only; build, test, layout and invariants go in **DEVELOPMENT.md**.
 - **No step ordinals outside the wizard table in CONCEPT.md §6.** That table's `Key` column
   (`fleet`, `series`, `discrete`, `contract`, `results`) is the stable handle: code
   comments name the component, tests are named after the key, prose names the screen. Reordering the
