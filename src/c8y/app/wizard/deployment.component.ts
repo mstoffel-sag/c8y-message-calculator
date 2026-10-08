@@ -15,7 +15,10 @@ import { CoreModule } from '@c8y/ngx-components';
 
 import {
   ASKED_LINE_ITEMS,
+  HYPERSCALERS,
+  HYPERSCALER_KEY,
   storageForPeriod,
+  type Hyperscaler,
   type LineItem,
 } from '../../../../lib/engine/index.js';
 import {
@@ -23,6 +26,7 @@ import {
   commercialNumber,
   copyCommercialAcross,
   setCommercial,
+  setHyperscaler,
 } from '../../../../lib/scenario/edits.js';
 import { TeachComponent } from '../controls/fields.component.js';
 import { LocaleService } from '../i18n/locale.service.js';
@@ -65,6 +69,21 @@ interface Row {
         <c8y-mc-teach [title]="'deployment.teach.title' | t">
           <c8y-mc-prose k="deployment.teach.body" />
         </c8y-mc-teach>
+
+        <!-- One answer for the whole quote, as in the Configurator's E6. It moves
+             no quantity; the VPN line cannot be priced without it. -->
+        <div class="mc-row m-b-16">
+          <div class="form-group" style="width:220px">
+            <label>{{ 'deployment.hyperscaler' | t }}</label>
+            <!-- Selected on the options: see choice.component.ts. -->
+            <select class="form-control" (change)="setHyperscaler($any($event.target).value)">
+              @for (option of hyperscalers(); track option.value) {
+                <option [value]="option.value" [selected]="option.selected">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+          <span class="mc-hint">{{ 'deployment.hyperscaler.hint' | t }}</span>
+        </div>
 
         <div class="mc-scroll">
           <table class="table mc-table">
@@ -192,6 +211,16 @@ export class DeploymentComponent {
       })),
     })).filter(group => group.rows.length > 0);
   });
+
+  readonly hyperscalers = computed(() => {
+    const t = this.locales.t();
+    const chosen = this.store.scenario().settings.hyperscaler ?? 'cumulocity';
+    return HYPERSCALERS.map(value => ({ value, label: t(HYPERSCALER_KEY[value]), selected: value === chosen }));
+  });
+
+  setHyperscaler(raw: string): void {
+    this.store.patch(s => setHyperscaler(s, raw as Hyperscaler));
+  }
 
   setChoice(periodIndex: number, key: string, on: boolean): void {
     this.store.patch(s => setCommercial(s, periodIndex, key, on));

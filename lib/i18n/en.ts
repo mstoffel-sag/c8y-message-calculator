@@ -281,6 +281,11 @@ export const en = {
   'deployment.col.unit': 'Unit',
   'deployment.copyAcross': 'Copy period 1 across all periods',
   'deployment.copyAcross.hint': 'Most quotes repeat the same deployment every period.',
+  'deployment.hyperscaler': 'Hyperscaler',
+  'deployment.hyperscaler.hint': 'Changes no quantity. The Configurator reads it for the VPN Services line.',
+  'deployment.hyperscaler.cumulocity': 'Cumulocity’s choice',
+  'deployment.hyperscaler.aws': 'AWS',
+  'deployment.hyperscaler.azure': 'Azure',
   'deployment.yes': 'Yes',
   'deployment.no': 'No',
   'deployment.estimate': 'estimate {value} GiB a month',
@@ -450,6 +455,7 @@ export const en = {
   'quote.storage.stated': 'as stated',
   'quote.term': 'Whole term',
   'quote.addOns.none': 'No deployment or add-on stated yet — they are entered on the Contract & deployment step.',
+  'quote.hyperscaler': 'Hyperscaler: {name}',
   'quote.safeSide': 'Each period at its busiest month, rounded up to whole billing units — 100,000 messages, 1 GiB — and multiplied by its months. Never below what the fleet will use.',
 
   /* ---------------------------------------------- the hand-off */
@@ -541,7 +547,7 @@ export const en = {
   'item.messages.help': 'The sum of the nine counters below. This is what the calculator exists to produce.',
   'item.ods.help': 'Storage, in GiB a month: what the database holds at the end of the period’s fullest calendar month, rounded up to a whole GiB — which is how it bills — and multiplied by the months like every other line. Filled in from the storage estimate, and overridable here. The bytes behind it were measured across 7,472 tenants, and the spread either side is wide, so the Storage sheet carries the whole range beside whatever number lands in the cell.',
   'item.streamingAnalytics.help': 'The per-tenant edition. Note the multi-tenant Analytics Builder is already included with a deployment, and EPL Apps come with Dedicated.',
-  'item.dataHubStandard.help': 'Answering yes applies an uplift to the message rate in the Configurator. It does not change the message count, so it does not change anything the calculator computes — it is carried through so the quote is complete.',
+  'item.dataHubStandard.help': 'Yes raises that period’s message rate by the Configurator’s uplift. The message count stays the same; the workbook adds the uplift to the period’s total.',
   'item.microserviceCcu.help': 'One CCU is 1 CPU or 4 GiB of RAM depending on which is greater. Example: a microservice with 2 CCUs can have 2 CPUs and 8 GiB of RAM or 1 CPU and 5 GiB of RAM — always rounding up to the next whole 4GB.',
   'item.enterpriseFunctions.help': 'Custom branding, custom domains and the user hierarchy.',
   'item.tenants.help': 'Additional tenants beyond the one the deployment includes. With the Multi-Tenancy add-on a customer can create these themselves.',

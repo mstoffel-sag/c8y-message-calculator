@@ -168,6 +168,9 @@ tools/            render_step.mjs (snapshot a step), xlsx_dump.py (read an .xlsx
 - **`test/workbook.test.ts`** checks the workbook's content and that it is a real archive, and
   enforces the one hard constraint: every price cell empty, every money cell a formula with a zero
   cached value, and no currency anywhere in the XML.
+  It also prices the Quote sheet with made-up figures and evaluates every formula the way Excel
+  would, holding each period's total to the Configurator's arithmetic — DataHub uplift and discount
+  included — and the periods to the commitment.
 - **`test/ui.smoke.test.tsx`** renders every step of the standalone app; **`test/i18n.test.tsx`**
   keeps the German complete and the catalogue free of dead keys.
 

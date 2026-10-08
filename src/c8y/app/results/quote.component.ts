@@ -12,7 +12,7 @@
 
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
-import { periodQuotes, statedLines, termQuote } from '../../../../lib/engine/index.js';
+import { HYPERSCALER_KEY, periodQuotes, statedLines, termQuote } from '../../../../lib/engine/index.js';
 import { monthYear, n, wholeGib, wholeGibMonths } from '../../../../lib/format/index.js';
 import { LocaleService } from '../i18n/locale.service.js';
 import { TPipe } from '../i18n/t.pipe.js';
@@ -107,6 +107,7 @@ import { ScenarioStore } from '../scenario.store.js';
               </tbody>
             </table>
           }
+          <p class="mc-hint m-t-8">{{ hyperscaler() }}</p>
         </div>
       </div>
     }
@@ -142,6 +143,12 @@ export class QuoteComponent {
   readonly periodHeads = computed(() => {
     const t = this.locales.t();
     return this.quotes().map(q => ({ index: q.index, label: t('contract.periodN', { index: q.index }) }));
+  });
+
+  readonly hyperscaler = computed(() => {
+    const t = this.locales.t();
+    const chosen = this.store.scenario().settings.hyperscaler ?? 'cumulocity';
+    return t('quote.hyperscaler', { name: t(HYPERSCALER_KEY[chosen]) });
   });
 
   readonly lines = computed(() => {

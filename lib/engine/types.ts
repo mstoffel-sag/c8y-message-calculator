@@ -196,6 +196,10 @@ export interface Period {
   commercial: Commercial;
 }
 
+/** The Configurator's three answers to "which cloud", in its order. */
+export const HYPERSCALERS = ['cumulocity', 'aws', 'azure'] as const;
+export type Hyperscaler = (typeof HYPERSCALERS)[number];
+
 export interface ScenarioSettings {
   /**
    * Where the ramp starts on the calendar. Billing is per calendar month, so
@@ -218,6 +222,13 @@ export interface ScenarioSettings {
    * Absent means DEFAULT_RETENTION_DAYS.
    */
   retentionDays?: number;
+  /**
+   * The Configurator's hyperscaler (its cell E6). It moves no quantity -- it
+   * decides which of two VPN prices the Configurator looks up, so a quote with
+   * a VPN line is not priceable without it. Absent means `cumulocity`, the
+   * Configurator's own default.
+   */
+  hyperscaler?: Hyperscaler;
 }
 
 /**

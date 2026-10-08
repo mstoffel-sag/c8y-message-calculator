@@ -15,6 +15,7 @@
 import {
   CADENCE_FOR_KIND,
   SCENARIO_FORMAT,
+  HYPERSCALERS,
   SECONDS_PER_DAY,
   cadenceToPeriod,
   toSeconds,
@@ -22,6 +23,7 @@ import {
   type DurationUnit,
   type Cadence,
   type Commercial,
+  type Hyperscaler,
   type MachineType,
   type Metric,
   type MetricKind,
@@ -534,6 +536,9 @@ export function normalise(input: unknown): Scenario {
   // carried is the one the tool would compute anyway, within the spread.
   delete settings.bytesPerValue;
   delete settings.bytesPerMeasurement;
+  // Optional, so a save from before it existed is already valid; anything that
+  // is not one of the three is dropped rather than carried into the workbook.
+  if (!(HYPERSCALERS as readonly unknown[]).includes(settings.hyperscaler)) delete settings.hyperscaler;
 
   const periods = (Array.isArray(raw.periods) && raw.periods.length > 0 ? raw.periods : fallback.periods)
     .map((period, i) => ({
@@ -674,6 +679,11 @@ export function setCommercial(
       return { ...p, commercial };
     }),
   };
+}
+
+/** The Configurator's hyperscaler. A setting rather than a period's line: it holds for the whole quote. */
+export function setHyperscaler(scenario: Scenario, hyperscaler: Hyperscaler): Scenario {
+  return { ...scenario, settings: { ...scenario.settings, hyperscaler } };
 }
 
 /** Most quotes repeat the same deployment in every period. */

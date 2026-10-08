@@ -11,6 +11,7 @@
  */
 
 import {
+  HYPERSCALER_KEY,
   periodQuotes,
   statedLines,
   termQuote,
@@ -132,6 +133,9 @@ export function Quote({ scenario, result }: { scenario: Scenario; result: Scenar
             </tbody>
           </table>
         )}
+        <p class="hint" style="margin:8px 0 0">
+          {t('quote.hyperscaler', { name: t(HYPERSCALER_KEY[scenario.settings.hyperscaler ?? 'cumulocity']) })}
+        </p>
       </div>
     </section>
   );

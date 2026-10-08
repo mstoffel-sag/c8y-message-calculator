@@ -14,8 +14,16 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { computeScenario, workbookFileName, workbookSheets } from '../lib/engine/index.js';
-import { buildXlsx, colName } from '../lib/xlsx/writer.js';
+import {
+  LINE_ITEMS,
+  computeScenario,
+  periodQuotes,
+  workbookFileName,
+  workbookSheets,
+  type Scenario,
+} from '../lib/engine/index.js';
+import { normalise, setHyperscaler } from '../lib/scenario/edits.js';
+import { buildXlsx, colName, type Sheet } from '../lib/xlsx/writer.js';
 import { crc32, makeZip, utf8 } from '../lib/xlsx/zip.js';
 import { blankScenario, conceptSection9Scenario, presetByKey } from '../lib/presets/index.js';
 
@@ -452,8 +460,8 @@ describe('the Quote sheet', () => {
     // They used to be `Configurator!D23` and friends -- one sheet quoting
     // another. That sheet is gone, so the quantity is the value, and a
     // dangling reference is the failure this guards against.
-    assert.equal(cell(13, 4)?.value, 1, 'Public/Shared Cloud');
-    assert.equal(cell(13, 4)?.formula, undefined);
+    assert.equal(cell(14, 4)?.value, 1, 'Public/Shared Cloud');
+    assert.equal(cell(14, 4)?.formula, undefined);
     const dangling = quote()
       .rows.flatMap((r) => r.cells)
       .filter((c) => typeof c.formula === 'string' && c.formula.includes('Configurator!'));
@@ -461,9 +469,9 @@ describe('the Quote sheet', () => {
   });
 
   test('messages are billed per 100,000, rounded up per month then over the term', () => {
-    // One period of 12 months, so the messages row sits at 17.
-    const quantity = cell(17, 4);
-    const term = cell(17, 6);
+    // One period of 12 months, so the messages row sits at 18.
+    const quantity = cell(18, 4);
+    const term = cell(18, 6);
     // Stated, not read off a second sheet -- that sheet is gone.
     assert.equal(quantity?.formula, undefined);
     assert.equal(typeof quantity?.value, 'number');
@@ -471,16 +479,17 @@ describe('the Quote sheet', () => {
     assert.equal(quantity?.value, 45_978_000);
     // Rounded up per month and then multiplied by the months -- the order the
     // Configurator bills in, at each period's peak: the safe side.
-    assert.equal(term?.formula, 'ROUNDUP(D17/100000,0)*D$11');
+    assert.equal(term?.formula, 'ROUNDUP(D18/100000,0)*D$12');
     assert.equal(term?.cached, 460 * 12, '460 blocks a month for 12 months');
   });
 
   test('the catalog discount applies to everything except messages', () => {
-    // Messages carry their own negotiated rate.
-    assert.equal(cell(17, 8)?.formula, 'F17*G17');
+    // Messages carry their own negotiated rate, raised by the DataHub uplift in
+    // D7 where row 21 (DataHub - Standard Deployment) says Yes, and no discount.
+    assert.equal(cell(18, 8)?.formula, '(ROUNDUP(D18/100000,0)*(1+IF(D21="Yes",$D$7,0))*D$12)*G18');
     // Everything else takes the discount in D6.
-    assert.equal(cell(13, 8)?.formula, 'F13*G13*(1-$D$6)');
-    assert.equal(cell(18, 8)?.formula, 'F18*G18*(1-$D$6)', 'Operational Data Store');
+    assert.equal(cell(14, 8)?.formula, 'F14*G14*(1-$D$6)');
+    assert.equal(cell(19, 8)?.formula, 'F19*G19*(1-$D$6)', 'Operational Data Store');
     // And the discount cell itself is an empty input.
     assert.equal(cell(6, 4)?.style, 'percentInput');
     assert.equal(cell(6, 4)?.value, null);
@@ -490,23 +499,18 @@ describe('the Quote sheet', () => {
     // Every line: billable units over the term (F) x unit price (G) -> total (H).
     // The commitment is the sum of that column, and the headline at row 8 points
     // at it rather than summing a second time.
-    assert.equal(cell(30, 8)?.formula, 'SUM(H13:H28)');
-    assert.equal(cell(8, 8)?.formula, 'H30');
-    assert.equal(cell(30, 7)?.value, 'CTC commitment, whole term');
+    assert.equal(cell(34, 8)?.formula, 'SUM(H14:H29)');
+    assert.equal(cell(9, 8)?.formula, 'H34');
+    assert.equal(cell(34, 7)?.value, 'CTC commitment, whole term');
     // Nothing is cached: the file ships with no price, so every total is zero
     // until Excel recalculates on open.
-    assert.equal(cell(30, 8)?.cached, 0);
+    assert.equal(cell(34, 8)?.cached, 0);
   });
 
   test('the quantity side of the commitment is computed, not left to Excel', () => {
     // Prices are Excel's job. Quantities are the tool's, so they arrive filled
     // in: 460 blocks a month for 12 months.
-    assert.equal(cell(17, 6)?.cached, 5520);
-    // One commitment figure and nothing beside it: no month-by-month total,
-    // no gap against it.
-    for (const r of [32, 33, 34, 36]) {
-      assert.equal(quote().rows.find((row) => row.row === r), undefined, `row ${r}`);
-    }
+    assert.equal(cell(18, 6)?.cached, 5520);
   });
 
   test('five periods widen the sheet instead of lengthening it', () => {
@@ -526,23 +530,23 @@ describe('the Quote sheet', () => {
 
     // Months in D..H, and the term is their sum: 6+12+18+24+30.
     for (const [i, col] of [4, 5, 6, 7, 8].entries()) {
-      assert.equal(at(11, col)?.value, (i + 1) * 6, `period ${i + 1} months`);
+      assert.equal(at(12, col)?.value, (i + 1) * 6, `period ${i + 1} months`);
     }
-    assert.equal(at(11, 10)?.value, 90, 'term months');
+    assert.equal(at(12, 10)?.value, 90, 'term months');
 
     // Five periods push the term, price and total columns right; the line items
     // stay on the same rows, which is the point of laying them out this way.
-    assert.equal(at(12, 10)?.value, 'Billable units, whole term');
-    assert.equal(at(12, 12)?.value, 'Total, whole term');
+    assert.equal(at(13, 10)?.value, 'Billable units, whole term');
+    assert.equal(at(13, 12)?.value, 'Total, whole term');
 
     // The term column multiplies each period by its own length and adds them up.
     assert.equal(
-      at(17, 10)?.formula,
-      'ROUNDUP(D17/100000,0)*D$11+ROUNDUP(E17/100000,0)*E$11+ROUNDUP(F17/100000,0)*F$11' +
-        '+ROUNDUP(G17/100000,0)*G$11+ROUNDUP(H17/100000,0)*H$11',
+      at(18, 10)?.formula,
+      'ROUNDUP(D18/100000,0)*D$12+ROUNDUP(E18/100000,0)*E$12+ROUNDUP(F18/100000,0)*F$12' +
+        '+ROUNDUP(G18/100000,0)*G$12+ROUNDUP(H18/100000,0)*H$12',
     );
     // And the commitment still sums one column.
-    assert.equal(at(30, 12)?.formula, 'SUM(L13:L28)');
+    assert.equal(at(34, 12)?.formula, 'SUM(L14:L29)');
   });
 
   test('every cached value is zero wherever a price is missing', () => {
@@ -581,6 +585,14 @@ describe('the Quote sheet', () => {
     assert.match(text, /Unit Price/);
   });
 
+  test('every sheet opens zoomed in, and the Quote sheet keeps its frozen header', () => {
+    const xml = new TextDecoder().decode(buildXlsx(sheetsFor()));
+    const views = xml.match(/<sheetView [^>]*>/g) ?? [];
+    assert.equal(views.length, sheetsFor().length, 'one view per sheet');
+    for (const view of views) assert.match(view, /zoomScale="140" zoomScaleNormal="140"/);
+    assert.match(xml, /zoomScaleNormal="140"><pane ySplit="13"/);
+  });
+
   test('formulas recalculate on open, since no total is cached non-zero', () => {
     const xml = new TextDecoder().decode(buildXlsx(sheetsFor()));
     assert.match(xml, /<calcPr calcId="0" fullCalcOnLoad="1"\/>/);
@@ -609,4 +621,187 @@ describe('the Quote sheet', () => {
     );
   });
 
+});
+
+/* ------------------------------------------- priced, it adds up like the CTC */
+
+/**
+ * Prices the Quote sheet and works it out the way Excel will: every formula,
+ * cell by cell, with a test price typed into each shaded cell.
+ *
+ * Covers the shapes the sheet writes -- `+ - * /`, parentheses, `ROUNDUP(x,0)`,
+ * `IF(a="Yes",b,c)` and `SUM(range)` -- and throws on anything else, so a new
+ * shape fails loudly rather than evaluating to something plausible.
+ */
+function priced(sheet: Sheet, inputs: Record<string, number>) {
+  const cells = new Map<string, Sheet['rows'][number]['cells'][number]>();
+  for (const row of sheet.rows) for (const c of row.cells) cells.set(`${colName(c.col)}${row.row}`, c);
+  const memo = new Map<string, number | string>();
+
+  const value = (ref: string): number | string => {
+    const key = ref.replace(/\$/g, '');
+    if (key in inputs) return inputs[key]!;
+    if (memo.has(key)) return memo.get(key)!;
+    const cell = cells.get(key);
+    let out: number | string;
+    if (cell?.formula) out = evaluate(cell.formula);
+    else if (typeof cell?.value === 'string') out = cell.value;
+    else out = typeof cell?.value === 'number' ? cell.value : 0;
+    memo.set(key, out);
+    return out;
+  };
+
+  const evaluate = (formula: string): number => {
+    let js = formula.replace(/SUM\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)/g, (_, c, a, c2, b) => {
+      assert.equal(c, c2, 'SUM over one column');
+      // As Excel's SUM: text in the range (the DataHub line's note) counts as nothing.
+      let sum = 0;
+      for (let r = Number(a); r <= Number(b); r++) {
+        const v = value(`${c}${r}`);
+        if (typeof v === 'number') sum += v;
+      }
+      return String(sum);
+    });
+    js = js.replace(/ROUNDUP\(([^,()]+),0\)/g, 'Math.ceil($1)');
+    js = js.replace(/IF\(([^,()]+)="([^"]*)",([^,()]+),([^,()]+)\)/g, '(($1)==="$2"?($3):($4))');
+    js = js.replace(/\$?[A-Z]+\$?\d+/g, (ref) => JSON.stringify(value(ref)));
+    assert.match(js, /^[\d\s.+\-*/()?:="a-zA-Z]*$/, `unexpected formula shape: ${formula}`);
+    // Only digits, operators, Math.ceil and quoted cell strings remain.
+    const out = Number(new Function(`return (${js});`)());
+    assert.ok(Number.isFinite(out), `${formula} evaluated to ${out}`);
+    return out;
+  };
+
+  return value;
+}
+
+describe('the Quote sheet, priced', () => {
+  // Test prices, made up. The sheet ships with none, and no real one belongs here.
+  const MESSAGE_PRICE = 2;
+  const DISCOUNT = 0.1;
+  const UPLIFT = 0.5;
+  const unitPrice = (key: string) => 10 + LINE_ITEMS.findIndex((i) => i.key === key);
+
+  function threePeriods(): Scenario {
+    const base = conceptSection9Scenario();
+    const id = base.machineTypes[0]!.id;
+    return {
+      ...base,
+      periods: [
+        { index: 1, months: 6, machineCountOverrides: { [id]: 400 },
+          commercial: { sharedCloud: 1, streamingAnalytics: 1, microserviceCcu: 2, tenants: 3, goldSupport: 1 } },
+        { index: 2, months: 12, machineCountOverrides: { [id]: 1000 },
+          commercial: { sharedCloud: 1, dataHubStandard: true, dataHubQueriedGiB: 50, vpn: 1, ods: 7 } },
+        { index: 3, months: 9, machineCountOverrides: { [id]: 2500 },
+          commercial: { dedicatedProd: 1, dedicatedDev: 1, dataHubDedicated: 2, tenants: 10, vpn: 2 } },
+      ],
+    };
+  }
+
+  /** Every price, discount and uplift the shaded cells take, by address. */
+  function inputsFor(sheet: Sheet): Record<string, number> {
+    const inputs: Record<string, number> = { D6: DISCOUNT, D7: UPLIFT };
+    for (const row of sheet.rows) {
+      const label = row.cells.find((c) => c.col === 3)?.value;
+      const priceCell = row.cells.find((c) => c.style === 'priceInput');
+      if (!priceCell) continue;
+      const item = LINE_ITEMS.find((i) => i.label === label)!;
+      inputs[`${colName(priceCell.col)}${row.row}`] = item.key === 'messages' ? MESSAGE_PRICE : unitPrice(item.key);
+    }
+    return inputs;
+  }
+
+  const rowLabelled = (sheet: Sheet, label: string) =>
+    sheet.rows.find((r) => r.cells.some((c) => c.col === 3 && c.value === label))!;
+
+  test('one period, worked by hand', () => {
+    // 460 blocks of messages at 2, raised by half for DataHub: 1,380 a month.
+    // Shared cloud 1 and storage 5 GiB at their prices, less 10 %. Times 12.
+    const scenario = conceptSection9Scenario();
+    scenario.periods[0]!.commercial = { sharedCloud: 1, dataHubStandard: true };
+    const sheet = workbookSheets(scenario, computeScenario(scenario))[0]!;
+    const value = priced(sheet, inputsFor(sheet));
+    const monthly = 460 * 2 * 1.5 + (1 * unitPrice('sharedCloud') + 5 * unitPrice('ods')) * 0.9;
+
+    assert.equal(value(`D${rowLabelled(sheet, 'Total per month').row}`), monthly);
+    assert.equal(value(`D${rowLabelled(sheet, 'Total per period').row}`), monthly * 12);
+    assert.equal(value('H9'), monthly * 12, 'the commitment');
+  });
+
+  test('every period agrees with the Configurator\'s arithmetic, and they add up to the commitment', () => {
+    const scenario = threePeriods();
+    const result = computeScenario(scenario);
+    const sheet = workbookSheets(scenario, result)[0]!;
+    const value = priced(sheet, inputsFor(sheet));
+    const quotes = periodQuotes(scenario, result);
+
+    // The Configurator, restated: per period, every line's quantity at its
+    // discounted price (G23..G47 carry the discount), messages at their own rate
+    // times 1 + uplift where D39 says Yes (G27), all times the months (H49).
+    const configurator = scenario.periods.map((period, i) => {
+      const quote = quotes[i]!;
+      const rate = MESSAGE_PRICE * (period.commercial.dataHubStandard === true ? 1 + UPLIFT : 1);
+      const lines = LINE_ITEMS.filter((item) => item.source === 'asked' || item.source === 'estimated')
+        .reduce((sum, item) => {
+          const quantity = item.key === 'ods'
+            ? quote.storageGiBPerMonth
+            : Number(period.commercial[item.key] ?? 0);
+          return sum + quantity * unitPrice(item.key) * (1 - DISCOUNT);
+        }, 0);
+      return (quote.messageUnitsPerMonth * rate + lines) * period.months;
+    });
+
+    const periodRow = rowLabelled(sheet, 'Total per period').row;
+    const sheetTotals = scenario.periods.map((p) => Number(value(`${colName(3 + p.index)}${periodRow}`)));
+    for (const [i, expected] of configurator.entries()) {
+      assert.ok(Math.abs(sheetTotals[i]! - expected) < 1e-6, `period ${i + 1}: ${sheetTotals[i]} vs ${expected}`);
+    }
+
+    const commitment = Number(value('J9'));
+    const sum = sheetTotals.reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(commitment - sum) < 1e-6, `commitment ${commitment} vs periods ${sum}`);
+    // Not a vacuous agreement: the uplift is in there, once.
+    assert.ok(configurator[1]! > 0 && quotes[1]!.messageUnitsPerMonth > 0);
+  });
+
+  test('without DataHub the uplift cell changes nothing', () => {
+    const scenario = conceptSection9Scenario();
+    const sheet = workbookSheets(scenario, computeScenario(scenario))[0]!;
+    const inputs = inputsFor(sheet);
+    const withUplift = priced(sheet, inputs)('H9');
+    const without = priced(sheet, { ...inputs, D7: 0 })('H9');
+    assert.equal(withUplift, without);
+  });
+
+  test('the uplift and subtotal cells ship empty, like every price', () => {
+    const sheet = workbookSheets(threePeriods(), computeScenario(threePeriods()))[0]!;
+    const uplift = sheet.rows.find((r) => r.row === 7)!.cells.find((c) => c.col === 4)!;
+    assert.equal(uplift.style, 'percentInput');
+    assert.equal(uplift.value, null);
+    for (const label of ['Total per month', 'Total per period']) {
+      const cells = rowLabelled(sheet, label).cells.filter((c) => c.formula);
+      assert.equal(cells.length, 3, `${label}: one per period`);
+      for (const c of cells) assert.equal(c.cached, 0, `${label} cached non-zero with no prices`);
+    }
+  });
+});
+
+describe('the hyperscaler', () => {
+  const hyperscalerCell = (scenario: Scenario) =>
+    workbookSheets(scenario, computeScenario(scenario))[0]!
+      .rows.find((r) => r.row === 8)!.cells.find((c) => c.col === 4)?.value;
+
+  test('the Quote sheet names it in the Configurator\'s words', () => {
+    const scenario = conceptSection9Scenario();
+    assert.equal(hyperscalerCell(scenario), 'Cumulocity Chosen', 'the Configurator\'s default');
+    assert.equal(hyperscalerCell(setHyperscaler(scenario, 'azure')), 'Azure');
+    assert.equal(hyperscalerCell(setHyperscaler(scenario, 'aws')), 'AWS');
+  });
+
+  test('a saved one survives a reload, and a bad one is dropped', () => {
+    const azure = setHyperscaler(conceptSection9Scenario(), 'azure');
+    assert.equal(normalise(JSON.parse(JSON.stringify(azure))).settings.hyperscaler, 'azure');
+    const junk = { ...azure, settings: { ...azure.settings, hyperscaler: 'gcp' } };
+    assert.equal(normalise(junk).settings.hyperscaler, undefined);
+  });
 });

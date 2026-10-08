@@ -13,6 +13,7 @@
 
 import {
   COUNTER_BASE_ROWS,
+  HYPERSCALER_LABEL,
   LINE_ITEMS,
   PERIOD_ROW_STRIDE,
   cellFor,
@@ -411,6 +412,12 @@ const QUOTE_COL = {
 
 /** Where the catalog discount is typed, referenced absolutely by every line. */
 const DISCOUNT_CELL = '$D$6';
+/**
+ * Where the DataHub Standard uplift is typed. The Configurator raises the
+ * message rate by it in every period that answers Yes; the percentage itself
+ * is internal, so the cell ships empty like every price (CONCEPT.md section 1).
+ */
+const UPLIFT_CELL = '$D$7';
 
 /** A commercial quantity as a number, for caching a cross-sheet reference. */
 function commercialQuantity(period: Period | undefined, key: string): number {
@@ -454,9 +461,9 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
   const PRICE = TERM + 1;
   const TOTAL = PRICE + 1;
 
-  const MONTHS_ROW = 11;
-  const HEAD_ROW = 12;
-  const FIRST_ITEM = 13;
+  const MONTHS_ROW = 12;
+  const HEAD_ROW = 13;
+  const FIRST_ITEM = 14;
 
   /** "D13*D$11+E13*E$11": a quantity per month, over the term. */
   const overTerm = (r: number, wrap: (cell: string) => string) =>
@@ -466,7 +473,21 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
 
   const itemRows = LINE_ITEMS.map((item, i) => ({ item, r: FIRST_ITEM + i }));
   const lastItemRow = FIRST_ITEM + LINE_ITEMS.length - 1;
-  const totalRow = lastItemRow + 2;
+  const rowOf = (key: string) => itemRows.find(({ item }) => item.key === key)!.r;
+  const messagesRow = rowOf('messages');
+  const dataHubRow = rowOf('dataHubStandard');
+  const monthlyRow = lastItemRow + 2;
+  const periodRow = monthlyRow + 1;
+  const totalRow = periodRow + 2;
+  const price = (r: number) => `$${colName(PRICE)}$${r}`;
+
+  /**
+   * One period's messages at the rate it pays: the Configurator's G27, which is
+   * the message price raised by the uplift where DataHub Standard says Yes. An
+   * empty uplift cell adds nothing, so the sheet is right before it is filled.
+   */
+  const messagesAtRate = (col: string) =>
+    `ROUNDUP(${col}${messagesRow}/${MESSAGE_BILLING_UNIT},0)*(1+IF(${col}${dataHubRow}="Yes",${UPLIFT_CELL},0))`;
 
   const rows: Row[] = [
     row(1, [text(CAT, 'Quote', 'title')]),
@@ -500,7 +521,17 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
       { col: 4, value: null, style: 'percentInput' },
       text(UNIT, 'applies to every line except Messages, as the Configurator does', 'note'),
     ]),
+    row(7, [
+      text(LABEL, 'DataHub Standard uplift', 'label'),
+      { col: 4, value: null, style: 'percentInput' },
+      text(UNIT, 'raises the message rate in every period with DataHub - Standard Deployment at Yes, as the Configurator does', 'note'),
+    ]),
     row(8, [
+      text(LABEL, 'Hyperscaler', 'label'),
+      text(4, HYPERSCALER_LABEL[scenario.settings.hyperscaler ?? 'cumulocity'], 'label'),
+      text(UNIT, 'decides which VPN Services price applies, as in the Configurator', 'note'),
+    ]),
+    row(9, [
       text(LABEL, 'CTC commitment, whole term', 'label'),
       {
         col: TOTAL,
@@ -516,19 +547,19 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         'note',
       ),
     ]),
-    row(9, [
+    row(10, [
       text(
         LABEL,
         'A commit-to-consume contract is signed on that one number. Discounts, approval thresholds, minimum commitments and currency conversion stay in the Sales Configurator -- this sheet is a working total, not an approved quote.',
         'note',
       ),
     ]),
-    // Row 10, the last free one before the period table, so the scenario's own
+    // Row 11, the last free one before the period table, so the scenario's own
     // description reads as a caption for the numbers rather than as another
     // note about the file. Omitted entirely when nobody wrote one -- an empty
     // labelled row is worse than no row.
     ...(scenario.notes.trim()
-      ? [row(10, [text(LABEL, 'About this estimate', 'label'), text(UNIT, scenario.notes.trim(), 'note')])]
+      ? [row(11, [text(LABEL, 'About this estimate', 'label'), text(UNIT, scenario.notes.trim(), 'note')])]
       : []),
     row(MONTHS_ROW, [
       text(LABEL, 'Months in period', 'label'),
@@ -583,12 +614,19 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         cached: commitment.termUnitsQuoted,
       });
       cells.push({ col: PRICE, value: null, style: 'priceInput' });
-      // Messages carry their own negotiated rate, so no catalog discount.
+      // Messages carry their own negotiated rate, so no catalog discount -- but
+      // the DataHub uplift, period by period. Not the term column times the
+      // price: that would bill an uplift nobody chose, or miss one somebody did.
       cells.push({
         col: TOTAL,
         value: null,
         style: 'money',
-        formula: `${colName(TERM)}${r}*${colName(PRICE)}${r}`,
+        formula: `(${periods
+          .map((p) => {
+            const c = colName(periodCol(p.index));
+            return `${messagesAtRate(c)}*${c}$${MONTHS_ROW}`;
+          })
+          .join('+')})*${colName(PRICE)}${r}`,
         cached: 0,
       });
     } else {
@@ -617,7 +655,7 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
         // A yes/no is not a quantity. The Configurator applies it to the message
         // rate rather than charging for it, so there is nothing to multiply --
         // and multiplying "Yes" by a month count would put #VALUE! in the total.
-        cells.push(text(TOTAL, 'applied to the message rate, not charged as a quantity', 'note'));
+        cells.push(text(TOTAL, `applied to the message rate through the uplift in ${UPLIFT_CELL.replace(/\$/g, '')}`, 'note'));
       } else {
         cells.push({
           col: TERM,
@@ -643,6 +681,43 @@ function quoteSheet(scenario: Scenario, result: ScenarioResult): Sheet {
 
     rows.push(row(r, cells));
   }
+
+  // The Configurator's Total (Monthly) and Total (Period), H48 and H49, one
+  // column per period. They are the same lines as the total column cut the
+  // other way, so they add up to the commitment below; a test holds them to it.
+  const summed = itemRows.filter(({ item }) => item.key !== 'messages' && item.source !== 'choice');
+  rows.push(
+    row(monthlyRow, [
+      text(LABEL, 'Total per month', 'label'),
+      ...periods.map((p) => {
+        const c = colName(periodCol(p.index));
+        return {
+          col: periodCol(p.index),
+          value: null,
+          style: 'money' as const,
+          formula:
+            `${messagesAtRate(c)}*${price(messagesRow)}` +
+            `+(${summed.map(({ r }) => `${c}${r}*${price(r)}`).join('+')})*(1-${DISCOUNT_CELL})`,
+          cached: 0,
+        };
+      }),
+      text(UNIT, 'as the Configurator\'s Total (Monthly)', 'note'),
+    ]),
+    row(periodRow, [
+      text(LABEL, 'Total per period', 'label'),
+      ...periods.map((p) => {
+        const c = colName(periodCol(p.index));
+        return {
+          col: periodCol(p.index),
+          value: null,
+          style: 'moneyBold' as const,
+          formula: `${c}${monthlyRow}*${c}$${MONTHS_ROW}`,
+          cached: 0,
+        };
+      }),
+      text(UNIT, 'as the Configurator\'s Total (Period)', 'note'),
+    ]),
+  );
 
   rows.push(
     row(totalRow, [

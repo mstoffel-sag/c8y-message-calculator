@@ -1,6 +1,6 @@
 # Cumulocity Message Calculator — Concept
 
-**Status:** draft for review, rev 42 — the quote adds up the term, prints every digit, and is tested by hand, against the workbook and across generated fleets · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-10-08
+**Status:** draft for review, rev 43 — checked against the Configurator itself: the workbook applies the DataHub uplift, names the hyperscaler, and totals each period per month and over the period as the Configurator does · **Owner:** marco.stoffel@cumulocity.com · **Date:** 2026-10-08
 
 ---
 
@@ -822,14 +822,22 @@ One of these is **calculated** (messages). One is **estimated** — the Operatio
 in from §4.6 with its assumptions in the note column and overridable in the wizard. **Everything else
 is asked.**
 
-**DataHub Standard is a yes/no that the tool records and does not act on.** It applies an uplift to
-the message *rate* in the Configurator. It does not change the message *count*, so it changes nothing
-this tool computes — and the uplift percentage is commercial information that has no business being
-in a bundle a customer may be shown (§1).
+**DataHub Standard is a yes/no that changes no quantity but does change the commitment.** The
+Configurator raises the message *rate* by an uplift in every period that answers Yes (its `G27`). The
+message *count* is untouched, so nothing on the results page moves — but a workbook that multiplied
+messages by the plain rate under-quoted every DataHub period by the whole uplift, which is what
+running both on the same scenario showed. The uplift percentage is commercial information that has no
+business in a bundle a customer may be shown (§1), so the Quote sheet takes it the way it takes the
+discount: an empty cell, applied period by period to the periods marked Yes.
+
+**The hyperscaler is asked once, for the whole quote** (the Configurator's `E6`: Cumulocity Chosen, AWS
+or Azure). It moves no quantity either; it decides which of two VPN prices applies, so a quote with a
+VPN line cannot be priced without it.
 
 ### What the wizard deliberately never asks
 
-Discounts, currency, margin, minimum commitments and approval thresholds. Those are the
+Discounts, currency, margin, minimum commitments, approval thresholds and the DataHub uplift
+percentage. Those are the
 Configurator's, and a tool that may be put in front of a customer must not carry them.
 
 ### 6.6 The commit-to-consume commitment
@@ -848,6 +856,11 @@ the multiplication as a live formula over an empty price column, so the commitme
 without a price ever existing in the tool — the same trick that lets the workbook be a quote without
 carrying a price list (§1). No money is ever cached in a cell: every money cell is a formula whose
 cached value is zero, which is enforced by test.
+
+Below the lines it carries the Configurator's own subtotals, one column per period: **Total per month**
+(its `H48`) and **Total per period** (`H49`, the month times the months). They are the line totals cut
+the other way, so they add up to the commitment, and a test prices the sheet with made-up figures,
+evaluates every formula, and holds each period to the Configurator's arithmetic restated by hand.
 
 Two quantities, deliberately both reported:
 

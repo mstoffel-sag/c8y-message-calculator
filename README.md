@@ -51,7 +51,9 @@ storage.
 
 **Download Excel workbook** carries the same quantities in a Quote sheet laid out like the Sales
 Configurator, with an empty price column: send it to your account team, who price it. It is safe to
-email — it contains no prices.
+email — it contains no prices. Once priced, it totals each period per month and over the period, as
+the Configurator does, with empty cells for the catalog discount and the DataHub Standard uplift; the
+hyperscaler chosen on the Contract & deployment step is named on it, since it decides the VPN price.
 
 **Expert mode**, in the header, shows how the figures were reached: the nine Configurator counters
 with copy buttons, the storage breakdown and its range, a diagram of what each machine sends, the

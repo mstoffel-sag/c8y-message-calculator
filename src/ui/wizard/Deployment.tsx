@@ -14,12 +14,15 @@
 
 import {
   ASKED_LINE_ITEMS,
+  HYPERSCALERS,
+  HYPERSCALER_KEY,
   storageForPeriod,
+  type Hyperscaler,
   type LineItem,
   type Scenario,
   type ScenarioResult,
 } from '../../../lib/engine/index.js';
-import { commercialBool, commercialNumber, copyCommercialAcross, setCommercial } from '../store.js';
+import { commercialBool, commercialNumber, copyCommercialAcross, setCommercial, setHyperscaler } from '../store.js';
 import { Teach } from '../parts.js';
 import { Prose, Rich, useT } from '../i18n.js';
 
@@ -45,6 +48,26 @@ export function Deployment({ scenario, onChange, result }: Props & { result: Sce
         <Teach title={t('deployment.teach.title')}>
           <Prose k="deployment.teach.body" />
         </Teach>
+
+        {/* One answer for the whole quote, as in the Configurator's E6. It moves
+            no quantity; it is asked because the VPN line cannot be priced
+            without it, and this is the step where the VPN line is. */}
+        <div class="row" style="margin-bottom:14px">
+          <label class="field" style="width:220px">
+            <span>{t('deployment.hyperscaler')}</span>
+            <select
+              value={scenario.settings.hyperscaler ?? 'cumulocity'}
+              onChange={(e) =>
+                onChange(setHyperscaler(scenario, (e.target as HTMLSelectElement).value as Hyperscaler))
+              }
+            >
+              {HYPERSCALERS.map((h) => (
+                <option key={h} value={h}>{t(HYPERSCALER_KEY[h])}</option>
+              ))}
+            </select>
+          </label>
+          <span class="hint" style="margin:0 0 8px">{t('deployment.hyperscaler.hint')}</span>
+        </div>
 
         <div class="scroll">
           <table>

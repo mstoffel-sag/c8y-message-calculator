@@ -13,7 +13,7 @@
  */
 
 import type { Key } from '../i18n/index.js';
-import type { Scenario } from './types.js';
+import type { Hyperscaler, Scenario } from './types.js';
 
 /** Rows between one period's block and the next. */
 export const PERIOD_ROW_STRIDE = 30;
@@ -121,6 +121,20 @@ export const LINE_ITEMS: LineItem[] = [
 ];
 
 export const ASKED_LINE_ITEMS = LINE_ITEMS.filter((i) => i.source !== 'calculated');
+
+/** The Configurator's own words for its hyperscaler choice, cell E6. */
+export const HYPERSCALER_LABEL: Record<Hyperscaler, string> = {
+  cumulocity: 'Cumulocity Chosen',
+  aws: 'AWS',
+  azure: 'Azure',
+};
+
+/** The same three, in the reader's language. */
+export const HYPERSCALER_KEY: Record<Hyperscaler, Key> = {
+  cumulocity: 'deployment.hyperscaler.cumulocity',
+  aws: 'deployment.hyperscaler.aws',
+  azure: 'deployment.hyperscaler.azure',
+};
 
 /** Column D cell for a line item in a given period, e.g. period 2 -> "D53". */
 export function cellFor(baseRow: number, periodIndex: number): string {

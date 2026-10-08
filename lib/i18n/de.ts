@@ -269,6 +269,11 @@ export const de: Record<Key, string> = {
   'deployment.col.unit': 'Einheit',
   'deployment.copyAcross': 'Periode 1 in alle Perioden kopieren',
   'deployment.copyAcross.hint': 'Die meisten Angebote wiederholen dasselbe Deployment in jeder Periode.',
+  'deployment.hyperscaler': 'Hyperscaler',
+  'deployment.hyperscaler.hint': 'Ändert keine Menge. Der Configurator liest ihn für die Zeile VPN Services.',
+  'deployment.hyperscaler.cumulocity': 'Wahl von Cumulocity',
+  'deployment.hyperscaler.aws': 'AWS',
+  'deployment.hyperscaler.azure': 'Azure',
   'deployment.yes': 'Ja',
   'deployment.no': 'Nein',
   'deployment.estimate': 'Schätzung {value} GiB pro Monat',
@@ -433,6 +438,7 @@ export const de: Record<Key, string> = {
   'quote.storage.stated': 'wie angegeben',
   'quote.term': 'Gesamte Laufzeit',
   'quote.addOns.none': 'Noch kein Deployment und kein Add-on angegeben — sie werden im Schritt Vertrag & Deployment eingetragen.',
+  'quote.hyperscaler': 'Hyperscaler: {name}',
   'quote.safeSide': 'Jede Periode in ihrem stärksten Monat, auf volle Abrechnungseinheiten aufgerundet — 100.000 Nachrichten, 1 GiB — und mit ihren Monaten multipliziert. Nie unter dem, was der Park verbraucht.',
 
   /* ---------------------------------------------- the hand-off */
@@ -492,7 +498,7 @@ export const de: Record<Key, string> = {
   'item.messages.help': 'Die Summe der neun Zähler darunter. Genau dafür existiert dieser Rechner.',
   'item.ods.help': 'Speicher, in GiB pro Monat: was die Datenbank am Ende des vollsten Kalendermonats der Periode hält, auf volle GiB aufgerundet — so wird abgerechnet — und wie jede andere Zeile mit den Monaten multipliziert. Aus der Speicherschätzung gefüllt und hier überschreibbar. Die zugrunde liegenden Bytes wurden über 7.472 Tenants gemessen, die Streuung nach beiden Seiten ist groß, deshalb trägt das Storage-Blatt die ganze Spanne neben der Zahl, die in der Zelle landet.',
   'item.streamingAnalytics.help': 'Die Edition pro Tenant. Beachten Sie: der mandantenfähige Analytics Builder ist bei einem Deployment schon enthalten, und EPL Apps kommen mit Dedicated.',
-  'item.dataHubStandard.help': 'Ja anzukreuzen wendet im Configurator einen Aufschlag auf den Nachrichtenpreis an. Es ändert die Zahl der Nachrichten nicht und damit nichts, was dieser Rechner berechnet — es wird mitgeführt, damit das Angebot vollständig ist.',
+  'item.dataHubStandard.help': 'Ja erhöht in dieser Periode den Nachrichtenpreis um den Aufschlag des Configurators. Die Zahl der Nachrichten bleibt gleich; die Arbeitsmappe rechnet den Aufschlag in die Summe der Periode ein.',
   'item.microserviceCcu.help': 'Eine CCU ist 1 CPU oder 4 GiB RAM, je nachdem, was größer ist. Beispiel: ein Microservice mit 2 CCUs kann 2 CPUs und 8 GiB RAM haben oder 1 CPU und 5 GiB RAM — immer auf die nächsten vollen 4 GB aufgerundet.',
   'item.enterpriseFunctions.help': 'Eigenes Branding, eigene Domains und die Benutzerhierarchie.',
   'item.tenants.help': 'Zusätzliche Tenants über den hinaus, den das Deployment enthält. Mit dem Add-on Multi-Tenancy kann ein Kunde diese selbst anlegen.',

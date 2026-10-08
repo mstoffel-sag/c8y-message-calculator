@@ -198,6 +198,9 @@ class Strings {
   }
 }
 
+/** The zoom every sheet opens at, in percent. */
+export const ZOOM_PERCENT = 140;
+
 function sheetXml(sheet: Sheet, strings: Strings): string {
   // Child order is fixed by the schema: dimension, sheetViews, cols, sheetData.
   const dimension = `<dimension ref="${dimensionRef(sheet)}"/>`;
@@ -207,11 +210,16 @@ function sheetXml(sheet: Sheet, strings: Strings): string {
         .join('')}</cols>`
     : '';
 
-  const pane = sheet.freezeRows
-    ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${sheet.freezeRows}" topLeftCell="A${
+  // Every sheet opens zoomed in: at Excel's 100 % the Quote sheet's figures
+  // were small enough that people zoomed by hand before reading them.
+  const freeze = sheet.freezeRows
+    ? `<pane ySplit="${sheet.freezeRows}" topLeftCell="A${
         sheet.freezeRows + 1
-      }" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+      }" activePane="bottomLeft" state="frozen"/>`
     : '';
+  const pane =
+    `<sheetViews><sheetView workbookViewId="0" zoomScale="${ZOOM_PERCENT}" zoomScaleNormal="${ZOOM_PERCENT}">` +
+    `${freeze}</sheetView></sheetViews>`;
 
   const rows = anchorColumnA([...sheet.rows].sort((a, b) => a.row - b.row))
     .map((row) => {
