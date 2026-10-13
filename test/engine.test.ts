@@ -170,6 +170,14 @@ describe('CONCEPT.md section 9 - 1,000 rooftop HVAC units', () => {
     assert.equal(Math.round(january.avgMessagesPerSec), 17);
   });
 
+  test('the per-type rates add up to the month, less onboarding', () => {
+    for (const month of result.months) {
+      const byType = month.byMachineType.reduce((sum, r) => sum + r.avgMessagesPerSec, 0);
+      const onboarding = month.onboardingCreates / (month.days * 86_400);
+      assert.ok(Math.abs(byType + onboarding - month.avgMessagesPerSec) < 1e-9);
+    }
+  });
+
   test('a clean model produces no errors or warnings', () => {
     const blocking = result.findings.filter((f) => f.severity !== 'suggestion');
     assert.deepEqual(blocking, [], JSON.stringify(blocking, null, 2));

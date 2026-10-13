@@ -212,3 +212,19 @@ describe('"how often" as a period', () => {
     assert.equal(commandsInMonth({ mode: 'command', transitions: 3, perDay: 1 }, 28), 28);
   });
 });
+
+describe('a message rate never reads as zero when something is sent', () => {
+  test('two decimals below one, one above, and a floor instead of 0', async () => {
+    const { rate, setFormatLocale } = await import('../lib/format/index.js');
+    assert.equal(rate(17.24), '17.2');
+    assert.equal(rate(0.0347), '0.03');
+    assert.equal(rate(0.001), '< 0.01');
+    assert.equal(rate(0), '0');
+    setFormatLocale('de');
+    try {
+      assert.equal(rate(0.0347), '0,03');
+    } finally {
+      setFormatLocale('en');
+    }
+  });
+});

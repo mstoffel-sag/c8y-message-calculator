@@ -39,10 +39,11 @@ export class LocaleService {
   private follow(lang: string | undefined): void {
     const asked = (lang ?? '').slice(0, 2).toLowerCase();
     const next = isLocale(asked) ? asked : DEFAULT_LOCALE;
-    this.locale.set(next);
     // Numbers are formatted by Intl rather than by the catalogue, so the
     // formatters have to be told separately -- 46,0 Mio. and 46.0 M differ in
-    // more than the suffix.
+    // more than the suffix. Told first, so nothing the signal wakes up can
+    // format a figure in the old language.
     setFormatLocale(next);
+    this.locale.set(next);
   }
 }

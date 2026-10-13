@@ -379,7 +379,7 @@ function MachineBlock({
           <Rich k="series.namingNote" />
         </p>
         <p class="hint" style="margin:6px 0 0">
-          <Rich k="series.retentionNote" p={{ days: String(defaultRetention) }} />
+          <Rich k="series.retentionNote" p={{ days: n(defaultRetention) }} />
         </p>
         </>
       )}

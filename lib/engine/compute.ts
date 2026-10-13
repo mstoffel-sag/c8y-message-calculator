@@ -329,6 +329,7 @@ function computeMonth(
   let naiveTotal = 0;
   let machinesOnline = 0;
   let machinesTotal = 0;
+  const spm = secondsInMonth(month.days);
 
   const defaultRetention = retentionFor(scenario.settings.retentionDays, DEFAULT_RETENTION_DAYS);
 
@@ -355,6 +356,7 @@ function computeMonth(
       machineTypeId: machineType.id,
       name: machineType.name,
       total: result.total,
+      avgMessagesPerSec: result.total / spm,
     });
   }
 
@@ -362,7 +364,6 @@ function computeMonth(
   naiveTotal += onboardingThisMonth;
 
   const total = totalOf(counters);
-  const spm = secondsInMonth(month.days);
   const avgMessagesPerSec = total / spm;
 
   return {

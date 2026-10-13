@@ -58,6 +58,17 @@ export function n(value: number): string {
   return nf.format(Math.round(value));
 }
 
+/**
+ * Messages per second. A small type sends well under one a second -- a hundred
+ * machines reporting hourly is 0.03 -- and one decimal would print that as 0,
+ * which reads as "sends nothing". So below one the figure keeps two decimals,
+ * and below those it says so rather than rounding to zero.
+ */
+export function rate(value: number): string {
+  if (value > 0 && value < 0.01) return `< ${formats.hundredth.format(0.01)}`;
+  return value < 1 ? formats.hundredth.format(value) : formats.tenth.format(value);
+}
+
 /** Short form for headline figures: 45,977,000 -> "46.0 M". */
 export function compact(value: number): string {
   const abs = Math.abs(value);

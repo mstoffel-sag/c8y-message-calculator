@@ -401,6 +401,7 @@ export const en = {
   'results.stat.perSecond.sub': 'averaged across the month',
   'byType.heading': 'Where the volume comes from',
   'byType.empty': 'No machine types yet.',
+  'byType.perSecond': '{rate} msg/s',
   'ramp.heading': 'Month by month',
   'ramp.months.one': '{count} month',
   'ramp.months.other': '{count} months',

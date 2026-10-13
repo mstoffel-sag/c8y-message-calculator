@@ -39,7 +39,7 @@ import { Choice, Every, Retention, Teach, Empty } from '../parts.js';
 import { Machine } from '../Machine.js';
 import { useCollapse, type Collapse } from '../collapse.js';
 import { Prose, Rich, useT } from '../i18n.js';
-import { nf1 } from '../format.js';
+import { n, nf1 } from '../format.js';
 import { Commands } from './Commands.js';
 
 interface Props {
@@ -124,7 +124,7 @@ export function StepDiscrete({ scenario, onChange }: Props) {
         <p class="hint">
           <Rich
             k="discrete.retentionNote"
-            p={{ days: String(scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS) }}
+            p={{ days: n(scenario.settings.retentionDays ?? DEFAULT_RETENTION_DAYS) }}
           />
         </p>
       </Teach>

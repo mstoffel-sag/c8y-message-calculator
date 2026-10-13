@@ -69,13 +69,27 @@ function readLocale(): Locale {
 }
 
 export function useLocale(): [Locale, (next: Locale) => void] {
-  const [locale, setLocale] = useState<Locale>(readLocale);
+  // Numbers are formatted by Intl rather than by the catalogue, so the
+  // formatter has to be told separately -- 46,0 Mio. and 46.0 M differ in more
+  // than the suffix. It is told *before* the render that uses it, in the
+  // initialiser and the setter. An effect runs after that render, so every
+  // figure in it came out in the old language and stayed that way until
+  // something else happened to re-render: the top bar kept "46 M" under a
+  // German label until a reload.
+  const [locale, setLocale] = useState<Locale>(() => {
+    const initial = readLocale();
+    setFormatLocale(initial);
+    return initial;
+  });
 
   useEffect(() => {
-    // Numbers are formatted by Intl rather than by the catalogue, so the
-    // formatter has to be told separately -- 46,0 Mio. and 46.0 M differ in
-    // more than the suffix.
-    setFormatLocale(locale);
+    // The page declares its language for screen readers, which otherwise read
+    // German with English pronunciation. index.html can only say "en".
+    try {
+      document.documentElement.lang = locale;
+    } catch {
+      // Not a browser.
+    }
     try {
       localStorage.setItem(STORAGE_KEY, locale);
     } catch {
@@ -83,7 +97,13 @@ export function useLocale(): [Locale, (next: Locale) => void] {
     }
   }, [locale]);
 
-  return [locale, useCallback((next: Locale) => setLocale(next), [])];
+  return [
+    locale,
+    useCallback((next: Locale) => {
+      setFormatLocale(next);
+      setLocale(next);
+    }, []),
+  ];
 }
 
 function tokensOf(paragraph: RichParagraph): ComponentChildren {
