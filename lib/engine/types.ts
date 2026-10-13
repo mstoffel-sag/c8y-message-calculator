@@ -490,7 +490,17 @@ export interface MonthResult {
   naiveTotal: number;
   /** One-off registration volume landing in this month. */
   onboardingCreates: number;
-  byMachineType: Array<{ machineTypeId: string; name: string; total: number }>;
+  /**
+   * `avgMessagesPerSec` is the same average as the month's own, for one type.
+   * The rows add up to the month's figure less onboarding, which belongs to no
+   * type's steady traffic.
+   */
+  byMachineType: Array<{
+    machineTypeId: string;
+    name: string;
+    total: number;
+    avgMessagesPerSec: number;
+  }>;
   /**
    * Messages per second averaged across the month. A sanity check on the
    * architecture, not a billing figure -- and deliberately not multiplied by a

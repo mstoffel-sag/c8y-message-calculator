@@ -364,7 +364,12 @@ export class SeriesMachineComponent {
     });
   });
 
-  readonly retentionParams = computed(() => ({ days: String(this.defaultRetention()) }));
+  // Formatted, so it reads the locale: `n()` takes it from module state, which
+  // a computed cannot see.
+  readonly retentionParams = computed(() => {
+    this.locales.locale();
+    return { days: n(this.defaultRetention()) };
+  });
 
   /** Static: the platform's recommendation does not depend on the session. */
   protected readonly countParams = { max: String(MAX_SERIES_PER_BUNDLE) };

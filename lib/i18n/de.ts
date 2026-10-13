@@ -384,6 +384,7 @@ export const de: Record<Key, string> = {
   'results.stat.perSecond.sub': 'über den Monat gemittelt',
   'byType.heading': 'Woher das Volumen kommt',
   'byType.empty': 'Noch keine Maschinentypen.',
+  'byType.perSecond': '{rate} Nachr./s',
   'ramp.heading': 'Monat für Monat',
   'ramp.months.one': '{count} Monat',
   'ramp.months.other': '{count} Monate',

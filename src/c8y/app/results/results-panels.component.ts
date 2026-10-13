@@ -24,6 +24,7 @@ import {
   n,
   nf1,
   pct,
+  rate,
 } from '../../../../lib/format/index.js';
 import { LocaleService } from '../i18n/locale.service.js';
 import { RichComponent } from '../i18n/rich.component.js';
@@ -62,9 +63,9 @@ import { FindingsComponent } from './findings.component.js';
                       {{ row.name }}
                       <div class="mc-bar"><i [style.width.%]="row.share"></i></div>
                     </td>
-                    <td class="text-right" style="width:120px">
+                    <td class="text-right" style="width:170px">
                       {{ row.total }}
-                      <div class="mc-faint">{{ row.pct }} %</div>
+                      <div class="mc-faint">{{ row.pct }} % · {{ row.perSecond }}</div>
                     </td>
                   </tr>
                 }
@@ -163,14 +164,14 @@ export class ResultsPanelsComponent {
       {
         key: 'perSecond',
         label: t('results.stat.perSecond'),
-        value: nf1.format(peak.avgMessagesPerSec),
+        value: rate(peak.avgMessagesPerSec),
         sub: t('results.stat.perSecond.sub'),
       },
     ];
   });
 
   readonly byType = computed(() => {
-    this.locales.locale();
+    const t = this.locales.t();
     const peak = this.peak();
     const rows = [...peak.byMachineType].sort((a, b) => b.total - a.total);
     const max = Math.max(1, ...rows.map(r => r.total));
@@ -180,6 +181,7 @@ export class ResultsPanelsComponent {
       total: compact(row.total),
       share: (row.total / max) * 100,
       pct: peak.total > 0 ? n((row.total / peak.total) * 100) : '0',
+      perSecond: t('byType.perSecond', { rate: rate(row.avgMessagesPerSec) }),
     }));
   });
 

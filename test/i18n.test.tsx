@@ -28,8 +28,8 @@ import {
   translate,
   type Key,
 } from '../lib/i18n/index.js';
-import { LocaleContext } from '../src/ui/i18n.js';
-import { setFormatLocale } from '../src/ui/format.js';
+import { LocaleContext, useLocale } from '../src/ui/i18n.js';
+import { compact, formatLocale, setFormatLocale } from '../src/ui/format.js';
 import { computeScenario } from '../lib/engine/index.js';
 import { conceptSection9Scenario } from '../lib/presets/index.js';
 import { COUNTER_LABELS, LINE_ITEMS } from '../lib/engine/index.js';
@@ -250,4 +250,44 @@ describe('a German session is German', () => {
       );
     }
   });
+});
+
+describe('switching the language', () => {
+  test('the number formatter follows at once, not one render later', () => {
+    // Told in an effect, the formatter lagged the render that switched the
+    // language: the top bar read "46 M" under a German label until a reload.
+    // The setter has to switch it before anything renders with the new locale.
+    let switchTo: ((next: 'en' | 'de') => void) | undefined;
+    function Probe() {
+      const [, setLocale] = useLocale();
+      switchTo = setLocale;
+      return null;
+    }
+    render(h(Probe, {}));
+    try {
+      switchTo!('de');
+      assert.equal(formatLocale(), 'de');
+      assert.equal(compact(46_000_000), '46 Mio.');
+    } finally {
+      setFormatLocale('en');
+    }
+  });
+});
+
+test('a default retention is grouped like every other number', () => {
+  // Three years is 1,095 days, and German writes it 1.095. It used to go
+  // into the sentence as bare digits in both languages.
+  const long = conceptSection9Scenario();
+  long.settings.retentionDays = 1095;
+  const result = computeScenario(long);
+  setFormatLocale('de');
+  try {
+    const html = render(
+      h(LocaleContext.Provider, { value: 'de' },
+        h(StepDiscrete, { scenario: long, result, expert: true, onChange: () => {} })),
+    );
+    assert.match(html, /1\.095 Tage/);
+  } finally {
+    setFormatLocale('en');
+  }
 });

@@ -15,7 +15,7 @@ import {
   type Scenario,
   type ScenarioResult,
 } from '../../lib/engine/index.js';
-import { compact, gib, gibMonths, gibRange, monthYear, n, nf1, pct, signed } from './format.js';
+import { compact, gib, gibMonths, gibRange, monthYear, n, nf1, pct, rate, signed } from './format.js';
 import { Rich, useT } from './i18n.js';
 
 export function Results({ scenario, result }: { scenario: Scenario; result: ScenarioResult }) {
@@ -68,7 +68,7 @@ export function Results({ scenario, result }: { scenario: Scenario; result: Scen
         </div>
         <div class="stat">
           <span>{t('results.stat.perSecond')}</span>
-          <b>{nf1.format(peak.avgMessagesPerSec)}</b>
+          <b>{rate(peak.avgMessagesPerSec)}</b>
           <small>{t('results.stat.perSecond.sub')}</small>
         </div>
       </div>
@@ -111,10 +111,11 @@ function ByMachineType({ peak }: { peak: MonthResult }) {
                       <i style={`width:${(row.total / max) * 100}%`} />
                     </div>
                   </td>
-                  <td class="num" style="width:120px">
+                  <td class="num" style="width:170px">
                     {compact(row.total)}
                     <div style="font-size:11px;color:var(--ink-faint)">
-                      {peak.total > 0 ? n((row.total / peak.total) * 100) : 0} %
+                      {peak.total > 0 ? n((row.total / peak.total) * 100) : 0} % ·{' '}
+                      {t('byType.perSecond', { rate: rate(row.avgMessagesPerSec) })}
                     </div>
                   </td>
                 </tr>

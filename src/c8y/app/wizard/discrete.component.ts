@@ -15,7 +15,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 
 import { DEFAULT_RETENTION_DAYS } from '../../../../lib/engine/index.js';
+import { n } from '../../../../lib/format/index.js';
 import { EmptyComponent, TeachComponent } from '../controls/fields.component.js';
+import { LocaleService } from '../i18n/locale.service.js';
 import { ProseComponent, RichComponent } from '../i18n/rich.component.js';
 import { TPipe } from '../i18n/t.pipe.js';
 import { ScenarioStore } from '../scenario.store.js';
@@ -111,12 +113,16 @@ const SPECS: KindSpec[] = [
 })
 export class StepDiscreteComponent {
   private readonly store = inject(ScenarioStore);
+  private readonly locales = inject(LocaleService);
 
   protected readonly specs = SPECS;
 
   readonly machineTypes = computed(() => this.store.scenario().machineTypes);
 
-  readonly retentionParams = computed(() => ({
-    days: String(this.store.scenario().settings.retentionDays ?? DEFAULT_RETENTION_DAYS),
-  }));
+  // Formatted, so it reads the locale: `n()` takes it from module state, which
+  // a computed cannot see.
+  readonly retentionParams = computed(() => {
+    this.locales.locale();
+    return { days: n(this.store.scenario().settings.retentionDays ?? DEFAULT_RETENTION_DAYS) };
+  });
 }
