@@ -183,10 +183,13 @@ behaviour is reasoned about, never observed, so say so rather than claiming it w
 
 ## Known unknowns
 
-- **No tenant.** The upload path is unverified, and the Web SDK app has never been rendered by
-  anything: it cannot boot without a Cumulocity instance to fetch its options from. It compiles and
-  it type-checks; that is the whole of what is known about it.
-- The storage model's bytes-per-value figures are rules of thumb marked "to be verified" at source,
-  and the tool reports the range rather than a midpoint on purpose (`lib/engine/storage.ts`).
-- Nobody has confirmed where a live tenant reports the nine counters for a past calendar month. That
-  gates any ground-truth test and any pre-fill.
+- **The Web SDK app cannot be rendered here.** `npm run c8y:deploy` to a test tenant works (target
+  from a git-ignored `.env`), but nothing in this repo can boot or snapshot it: it needs a
+  Cumulocity instance to fetch its options from. Locally it compiles and type-checks, and that is
+  all a check here can say about it.
+- Storage bytes are measured per document (CONCEPT.md §4.6), but events and alarms have no spread of
+  their own, operations are not measured at all, and the DataHub ratio is still "to be verified".
+  The tool reports the range rather than a midpoint on purpose (`lib/engine/storage.ts`).
+- A live tenant's monthly Messages and ODS are on the CTC Metrics Dashboard (CONCEPT.md §11), but
+  no ground-truth test compares them with the engine yet, and that dashboard leaves operations out.
+  Pre-fill is still unbuilt.
